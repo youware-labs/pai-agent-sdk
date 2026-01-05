@@ -29,8 +29,19 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.12", "3.13", "3.14"]
-        extras: ["", "docker"]
+        # Docker extra runs on all Python versions
+        # No extra only runs on 3.13 (most tests skip without Docker)
+        include:
+          - python-version: "3.11"
+            extras: "docker"
+          - python-version: "3.12"
+            extras: "docker"
+          - python-version: "3.13"
+            extras: "docker"
+          - python-version: "3.14"
+            extras: "docker"
+          - python-version: "3.13"
+            extras: ""
       fail-fast: false
     env:
       UV_PYTHON: ${{ matrix.python-version }}

@@ -5,9 +5,11 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from pai_agent_sdk.toolsets.browser_use._logger import logger
+from pai_agent_sdk._logger import get_logger
 from pai_agent_sdk.toolsets.browser_use._tools import get_browser_session
 from pai_agent_sdk.toolsets.browser_use.tools._types import ElementInfo, FindElementsResult
+
+logger = get_logger(__name__)
 
 
 def _parse_node_attributes(node: dict[str, Any]) -> dict[str, str]:
@@ -31,8 +33,8 @@ async def _get_element_bounding_box(session: Any, node_id: int) -> dict[str, flo
         width = max(border[0], border[2], border[4], border[6]) - x
         height = max(border[1], border[3], border[5], border[7]) - y
         return {"x": x, "y": y, "width": width, "height": height}
-    except Exception as e:  # pragma: no cover
-        logger.debug(f"Failed to get bounding box for node {node_id}: {e}")
+    except Exception:  # pragma: no cover
+        logger.debug(f"Failed to get bounding box for node {node_id}")
         return None
 
 
@@ -68,8 +70,8 @@ async def _extract_element_info(session: Any, node_id: int, selector: str) -> El
             attributes=attrs,
             bounding_box=bounding_box,
         )
-    except Exception as e:  # pragma: no cover
-        logger.debug(f"Failed to process element node {node_id}: {e}")
+    except Exception:  # pragma: no cover
+        logger.debug(f"Failed to process element node {node_id}")
         return None
 
 
@@ -140,7 +142,7 @@ async def find_elements(selector: str, limit: int = 10) -> dict[str, Any]:
         ).model_dump()
 
     except Exception as e:  # pragma: no cover
-        logger.error(f"Failed to find elements for selector {selector}: {e}")
+        logger.exception(f"Failed to find elements for selector {selector}")
         return FindElementsResult(
             status="error",
             selector=selector,
@@ -175,8 +177,8 @@ async def get_element_text(selector: str) -> str:
         logger.debug(f"Element text for '{selector}': {text[:200]}{'...' if len(text) > 200 else ''}")
         return text
 
-    except Exception as e:  # pragma: no cover
-        logger.error(f"Failed to get element text for {selector}: {e}")
+    except Exception:  # pragma: no cover
+        logger.exception(f"Failed to get element text for {selector}")
         return ""
 
 
@@ -235,8 +237,8 @@ async def get_element_attributes(selector: str, attributes: list[str] | None = N
         logger.debug(f"Element attributes for '{selector}': {attrs}")
         return attrs
 
-    except Exception as e:  # pragma: no cover
-        logger.error(f"Failed to get element attributes for {selector}: {e}")
+    except Exception:  # pragma: no cover
+        logger.exception(f"Failed to get element attributes for {selector}")
         return {}
 
 

@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from pai_agent_sdk.toolsets.browser_use._logger import logger
+from pai_agent_sdk._logger import get_logger
 from pai_agent_sdk.toolsets.browser_use._tools import get_browser_session
 from pai_agent_sdk.toolsets.browser_use.tools._types import CheckboxResult, FileUploadResult, SelectOptionResult
+
+logger = get_logger(__name__)
 
 
 async def select_option(
@@ -139,7 +141,7 @@ async def select_option(
         ).model_dump()
 
     except Exception as e:  # pragma: no cover
-        logger.error(f"Failed to select option in {selector}: {e}")
+        logger.exception(f"Failed to select option in {selector}")
         return SelectOptionResult(
             status="error",
             selector=selector,
@@ -232,7 +234,7 @@ async def check(selector: str) -> dict[str, Any]:
         ).model_dump()
 
     except Exception as e:  # pragma: no cover
-        logger.error(f"Failed to check element {selector}: {e}")
+        logger.exception(f"Failed to check element {selector}")
         return CheckboxResult(
             status="error",
             selector=selector,
@@ -323,7 +325,7 @@ async def uncheck(selector: str) -> dict[str, Any]:
         ).model_dump()
 
     except Exception as e:  # pragma: no cover
-        logger.error(f"Failed to uncheck element {selector}: {e}")
+        logger.exception(f"Failed to uncheck element {selector}")
         return CheckboxResult(
             status="error",
             selector=selector,
@@ -388,7 +390,7 @@ async def upload_file(selector: str, file_paths: list[str]) -> dict[str, Any]:
         ).model_dump()
 
     except Exception as e:  # pragma: no cover
-        logger.error(f"Failed to upload files to {selector}: {e}")
+        logger.exception(f"Failed to upload files to {selector}")
         return FileUploadResult(
             status="error",
             selector=selector,

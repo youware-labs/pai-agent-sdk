@@ -9,7 +9,6 @@ This module provides the foundational abstractions for building toolsets:
 from __future__ import annotations
 
 import functools
-import logging
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
@@ -27,10 +26,11 @@ from pydantic_ai.toolsets import AbstractToolset
 from pydantic_ai.toolsets.abstract import ToolsetTool
 from typing_extensions import TypeVar
 
+from pai_agent_sdk._logger import get_logger
 from pai_agent_sdk.context import AgentContext
 from pai_agent_sdk.utils import get_tool_name_from_id
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 AgentDepsT = TypeVar("AgentDepsT", bound=AgentContext, default=AgentContext, contravariant=True)
 
@@ -157,12 +157,16 @@ class BaseTool(ABC):
         self.ctx = ctx
 
     @abstractmethod
-    async def call(self, ctx: RunContext[AgentContext], **kwargs: Any) -> Any:
+    async def call(self, ctx: RunContext[AgentContext], /, *args: Any, **kwargs: Any) -> Any:
         """Execute the tool logic.
+
+        Subclasses should override this method with their specific parameter signature.
+        The base signature uses *args/**kwargs to allow any parameter combination.
 
         Args:
             ctx: The run context containing runtime information.
-            **kwargs: Tool-specific arguments.
+            *args: Tool-specific positional arguments.
+            **kwargs: Tool-specific keyword arguments.
 
         Returns:
             The tool's result.

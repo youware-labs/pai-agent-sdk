@@ -11,8 +11,10 @@ from typing import Any, TypeAlias
 from pydantic_ai import Tool
 from typing_extensions import ParamSpec
 
-from pai_agent_sdk.toolsets.browser_use._logger import logger
+from pai_agent_sdk._logger import get_logger
 from pai_agent_sdk.toolsets.browser_use._session import BrowserSession
+
+logger = get_logger(__name__)
 
 ToolParams = ParamSpec("ToolParams", default=...)
 # Tool functions don't need browser_session parameter
@@ -75,8 +77,8 @@ def build_tool(
             logger.info(f"Tool {tool_name} completed successfully")
             logger.debug(f"Tool {tool_name} result type: {type(result).__name__}")
             return result
-        except Exception as e:  # pragma: no cover
-            logger.error(f"Tool {tool_name} execution failed: {e}")
+        except Exception:  # pragma: no cover
+            logger.exception(f"Tool {tool_name} execution failed")
             raise
         finally:
             # Restore context

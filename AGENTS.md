@@ -70,3 +70,4 @@ Optional:
 - Toolsets extend `base.py` for consistent tool registration
 - Context management is centralized in `context.py`
 - Agents are modular and located in `agents/` directory
+- Logging is centralized in `_logger.py` - see [docs/logging.md](docs/logging.md) for configuration

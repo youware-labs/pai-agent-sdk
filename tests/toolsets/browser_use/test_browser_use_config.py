@@ -16,10 +16,10 @@ def test_browser_use_settings_defaults():
 def test_browser_use_settings_from_env(monkeypatch):
     """Test that BrowserUseSettings loads from environment variables."""
     # Set environment variables
-    monkeypatch.setenv("PAI_BROWSER_USE_MAX_RETRIES", "5")
-    monkeypatch.setenv("PAI_BROWSER_USE_PREFIX", "custom_prefix")
-    monkeypatch.setenv("PAI_BROWSER_USE_ALWAYS_USE_NEW_PAGE", "true")
-    monkeypatch.setenv("PAI_BROWSER_USE_AUTO_CLEANUP_PAGE", "false")
+    monkeypatch.setenv("PAI_AGENT_BROWSER_USE_MAX_RETRIES", "5")
+    monkeypatch.setenv("PAI_AGENT_BROWSER_USE_PREFIX", "custom_prefix")
+    monkeypatch.setenv("PAI_AGENT_BROWSER_USE_ALWAYS_USE_NEW_PAGE", "true")
+    monkeypatch.setenv("PAI_AGENT_BROWSER_USE_AUTO_CLEANUP_PAGE", "false")
 
     settings = BrowserUseSettings()
     assert settings.max_retries == 5
@@ -40,9 +40,9 @@ def test_browser_use_toolset_uses_settings_defaults():
 def test_browser_use_toolset_uses_env_settings(monkeypatch):
     """Test that BrowserUseToolset uses environment variables when parameters are None."""
     # Set environment variables
-    monkeypatch.setenv("PAI_BROWSER_USE_MAX_RETRIES", "10")
-    monkeypatch.setenv("PAI_BROWSER_USE_PREFIX", "env_browser")
-    monkeypatch.setenv("PAI_BROWSER_USE_ALWAYS_USE_NEW_PAGE", "true")
+    monkeypatch.setenv("PAI_AGENT_BROWSER_USE_MAX_RETRIES", "10")
+    monkeypatch.setenv("PAI_AGENT_BROWSER_USE_PREFIX", "env_browser")
+    monkeypatch.setenv("PAI_AGENT_BROWSER_USE_ALWAYS_USE_NEW_PAGE", "true")
 
     toolset = BrowserUseToolset(cdp_url="http://localhost:9222/json/version")
     assert toolset.max_retries == 10
@@ -54,10 +54,10 @@ def test_browser_use_toolset_uses_env_settings(monkeypatch):
 def test_browser_use_toolset_parameters_override_env(monkeypatch):
     """Test that explicit parameters override environment variables."""
     # Set environment variables
-    monkeypatch.setenv("PAI_BROWSER_USE_MAX_RETRIES", "10")
-    monkeypatch.setenv("PAI_BROWSER_USE_PREFIX", "env_browser")
-    monkeypatch.setenv("PAI_BROWSER_USE_ALWAYS_USE_NEW_PAGE", "true")
-    monkeypatch.setenv("PAI_BROWSER_USE_AUTO_CLEANUP_PAGE", "true")
+    monkeypatch.setenv("PAI_AGENT_BROWSER_USE_MAX_RETRIES", "10")
+    monkeypatch.setenv("PAI_AGENT_BROWSER_USE_PREFIX", "env_browser")
+    monkeypatch.setenv("PAI_AGENT_BROWSER_USE_ALWAYS_USE_NEW_PAGE", "true")
+    monkeypatch.setenv("PAI_AGENT_BROWSER_USE_AUTO_CLEANUP_PAGE", "true")
 
     # Create toolset with explicit parameters
     toolset = BrowserUseToolset(
@@ -78,10 +78,10 @@ def test_browser_use_toolset_parameters_override_env(monkeypatch):
 def test_browser_use_toolset_partial_parameter_override(monkeypatch):
     """Test that only provided parameters override environment variables."""
     # Set environment variables
-    monkeypatch.setenv("PAI_BROWSER_USE_MAX_RETRIES", "10")
-    monkeypatch.setenv("PAI_BROWSER_USE_PREFIX", "env_browser")
-    monkeypatch.setenv("PAI_BROWSER_USE_ALWAYS_USE_NEW_PAGE", "true")
-    monkeypatch.setenv("PAI_BROWSER_USE_AUTO_CLEANUP_PAGE", "false")
+    monkeypatch.setenv("PAI_AGENT_BROWSER_USE_MAX_RETRIES", "10")
+    monkeypatch.setenv("PAI_AGENT_BROWSER_USE_PREFIX", "env_browser")
+    monkeypatch.setenv("PAI_AGENT_BROWSER_USE_ALWAYS_USE_NEW_PAGE", "true")
+    monkeypatch.setenv("PAI_AGENT_BROWSER_USE_AUTO_CLEANUP_PAGE", "false")
 
     # Create toolset with only max_retries parameter
     toolset = BrowserUseToolset(
@@ -101,10 +101,10 @@ def test_browser_use_settings_env_file_loading(tmp_path, monkeypatch):
     # Create a temporary .env file
     env_file = tmp_path / ".env"
     env_file.write_text(
-        "PAI_BROWSER_USE_MAX_RETRIES=15\n"
-        "PAI_BROWSER_USE_PREFIX=file_browser\n"
-        "PAI_BROWSER_USE_ALWAYS_USE_NEW_PAGE=false\n"
-        "PAI_BROWSER_USE_AUTO_CLEANUP_PAGE=true\n"
+        "PAI_AGENT_BROWSER_USE_MAX_RETRIES=15\n"
+        "PAI_AGENT_BROWSER_USE_PREFIX=file_browser\n"
+        "PAI_AGENT_BROWSER_USE_ALWAYS_USE_NEW_PAGE=false\n"
+        "PAI_AGENT_BROWSER_USE_AUTO_CLEANUP_PAGE=true\n"
     )
 
     # Change to temp directory to pick up .env file

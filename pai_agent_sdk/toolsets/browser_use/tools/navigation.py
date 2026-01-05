@@ -5,10 +5,12 @@ from __future__ import annotations
 import json
 from typing import Any, Literal
 
-from pai_agent_sdk.toolsets.browser_use._logger import logger
+from pai_agent_sdk._logger import get_logger
 from pai_agent_sdk.toolsets.browser_use._tools import get_browser_session
 from pai_agent_sdk.toolsets.browser_use.tools._types import NavigationResult
 from pai_agent_sdk.toolsets.browser_use.tools.wait import wait_for_load_state
+
+logger = get_logger(__name__)
 
 
 async def _wait_for_page_ready(
@@ -70,9 +72,9 @@ async def navigate_to_url(url: str, timeout: int = 30000) -> dict[str, Any]:
         except TimeoutError as e:
             # Timeout but continue to try getting page info
             logger.warning(f"Navigation timeout: {e}, attempting to get current page info")
-        except Exception as e:  # pragma: no cover
+        except Exception:  # pragma: no cover
             # Other errors, log but continue
-            logger.error(f"Error during page load wait: {e}")
+            logger.exception("Error during page load wait")
 
         # Get page info after navigation
         logger.info("Fetching page information after navigation...")
@@ -112,7 +114,7 @@ async def navigate_to_url(url: str, timeout: int = 30000) -> dict[str, Any]:
         ).model_dump()
 
     except Exception as e:  # pragma: no cover
-        logger.error(f"Navigation failed for URL {url}: {e}")
+        logger.exception(f"Navigation failed for URL {url}")
         return NavigationResult(
             status="error",
             url=url,
@@ -150,8 +152,8 @@ async def go_back() -> dict[str, Any]:
                 await _wait_for_page_ready("domcontentloaded", timeout_ms=5000)
             except TimeoutError:
                 logger.warning("History navigation timeout, but continuing")
-            except Exception as e:  # pragma: no cover
-                logger.error(f"Error during history navigation wait: {e}")
+            except Exception:  # pragma: no cover
+                logger.exception("Error during history navigation wait")
 
             # Get updated info
             result = await session.cdp_client.send.Runtime.evaluate(
@@ -187,7 +189,7 @@ async def go_back() -> dict[str, Any]:
             ).model_dump()
 
     except Exception as e:  # pragma: no cover
-        logger.error(f"Failed to navigate back: {e}")
+        logger.exception("Failed to navigate back")
         return NavigationResult(
             status="error",
             url=session.current_url,
@@ -225,8 +227,8 @@ async def go_forward() -> dict[str, Any]:
                 await _wait_for_page_ready("domcontentloaded", timeout_ms=5000)
             except TimeoutError:
                 logger.warning("History navigation timeout, but continuing")
-            except Exception as e:  # pragma: no cover
-                logger.error(f"Error during history navigation wait: {e}")
+            except Exception:  # pragma: no cover
+                logger.exception("Error during history navigation wait")
 
             # Get updated info
             result = await session.cdp_client.send.Runtime.evaluate(
@@ -262,7 +264,7 @@ async def go_forward() -> dict[str, Any]:
             ).model_dump()
 
     except Exception as e:  # pragma: no cover
-        logger.error(f"Failed to navigate forward: {e}")
+        logger.exception("Failed to navigate forward")
         return NavigationResult(
             status="error",
             url=session.current_url,
@@ -293,8 +295,8 @@ async def reload_page(ignore_cache: bool = False) -> dict[str, Any]:
             await _wait_for_page_ready("load", timeout_ms=timeout_ms)
         except TimeoutError:
             logger.warning(f"Page reload timeout after {timeout_ms}ms")
-        except Exception as e:  # pragma: no cover
-            logger.error(f"Error during reload wait: {e}")
+        except Exception:  # pragma: no cover
+            logger.exception("Error during reload wait")
 
         # Get updated page info
         result = await session.cdp_client.send.Runtime.evaluate(
@@ -323,7 +325,7 @@ async def reload_page(ignore_cache: bool = False) -> dict[str, Any]:
         ).model_dump()
 
     except Exception as e:  # pragma: no cover
-        logger.error(f"Failed to reload page: {e}")
+        logger.exception("Failed to reload page")
         return NavigationResult(
             status="error",
             url=session.current_url,

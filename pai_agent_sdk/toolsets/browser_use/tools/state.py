@@ -9,7 +9,7 @@ from typing import Any
 
 from pydantic_ai.messages import ToolReturn
 
-from pai_agent_sdk.toolsets.browser_use._logger import logger
+from pai_agent_sdk._logger import get_logger
 from pai_agent_sdk.toolsets.browser_use._tools import get_browser_session
 from pai_agent_sdk.toolsets.browser_use.tools._types import (
     ElementScreenshotResult,
@@ -17,6 +17,8 @@ from pai_agent_sdk.toolsets.browser_use.tools._types import (
     ScreenshotResult,
 )
 from pai_agent_sdk.utils import ImageMediaType, split_image_data
+
+logger = get_logger(__name__)
 
 
 async def get_page_info() -> dict[str, Any]:
@@ -179,7 +181,7 @@ async def take_screenshot(
 
     except Exception as e:  # pragma: no cover
         # Error handling
-        logger.error(f"Failed to take screenshot: {e}")
+        logger.exception("Failed to take screenshot")
         return ToolReturn(
             return_value=ScreenshotResult(
                 status="error",
@@ -306,7 +308,7 @@ async def take_element_screenshot(
         )
 
     except Exception as e:  # pragma: no cover
-        logger.error(f"Failed to take element screenshot for {selector}: {e}")
+        logger.exception(f"Failed to take element screenshot for {selector}")
         return ToolReturn(
             return_value=ElementScreenshotResult(
                 status="error",

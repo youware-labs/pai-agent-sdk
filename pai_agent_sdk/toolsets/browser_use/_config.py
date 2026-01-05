@@ -8,12 +8,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class BrowserUseSettings(BaseSettings):
     """Configuration for BrowserUseToolset with environment variable support.
 
-    All settings can be overridden via environment variables with the prefix PAI_BROWSER_USE_.
-    For example, to set max_retries, use PAI_BROWSER_USE_MAX_RETRIES=5.
+    All settings can be overridden via environment variables with the prefix PAI_AGENT_BROWSER_USE_.
+    For example, to set max_retries, use PAI_AGENT_BROWSER_USE_MAX_RETRIES=5.
     """
 
     model_config = SettingsConfigDict(
-        env_prefix="PAI_BROWSER_USE_",
+        env_prefix="PAI_AGENT_BROWSER_USE_",
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",

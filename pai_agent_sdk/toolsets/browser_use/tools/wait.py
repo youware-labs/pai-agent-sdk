@@ -6,10 +6,12 @@ import asyncio
 import time
 from typing import Any, Literal
 
-from pai_agent_sdk.toolsets.browser_use._logger import logger
+from pai_agent_sdk._logger import get_logger
 from pai_agent_sdk.toolsets.browser_use._session import BrowserSession
 from pai_agent_sdk.toolsets.browser_use._tools import get_browser_session
 from pai_agent_sdk.toolsets.browser_use.tools._types import WaitResult
+
+logger = get_logger(__name__)
 
 
 async def wait_for_selector(
@@ -95,15 +97,15 @@ async def wait_for_selector(
                             # Element exists but not visible yet
                             logger.debug(f"Element not yet visible: {box_error}")
 
-            except Exception as e:
-                logger.debug(f"Polling error (will retry): {e}")
+            except Exception:
+                logger.debug("Polling error (will retry)")
 
             # Wait before next poll
             await asyncio.sleep(poll_interval)
 
     except Exception as e:  # pragma: no cover
         elapsed = time.time() - start_time
-        logger.error(f"Error waiting for selector {selector}: {e}")
+        logger.exception(f"Error waiting for selector {selector}")
         return WaitResult(
             status="error",
             wait_type="selector",
@@ -181,7 +183,7 @@ async def wait_for_navigation(timeout: int = 30000) -> dict[str, Any]:
 
     except Exception as e:  # pragma: no cover
         elapsed = time.time() - start_time
-        logger.error(f"Error waiting for navigation: {e}")
+        logger.exception("Error waiting for navigation")
         return WaitResult(
             status="error",
             wait_type="navigation",
@@ -238,8 +240,8 @@ async def _wait_for_document_ready(
                     wait_type="load_state",
                     elapsed_time=elapsed,
                 ).model_dump()
-        except Exception as e:
-            logger.debug(f"Error checking initial ready state: {e}")
+        except Exception:
+            logger.debug("Error checking initial ready state")
 
         # Wait for event or timeout
         while True:
@@ -367,7 +369,7 @@ async def wait_for_load_state(
 
     except Exception as e:  # pragma: no cover
         elapsed = time.time() - start_time
-        logger.error(f"Error waiting for load state {state}: {e}")
+        logger.exception(f"Error waiting for load state {state}")
         return WaitResult(
             status="error",
             wait_type="load_state",

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 from typing import Any
 from uuid import uuid4
 
@@ -17,10 +16,11 @@ except ImportError as e:
         "docker package is required for DockerBrowserSandbox. Install it with: pip install pai-agent-sdk[docker]"
     ) from e
 
+from pai_agent_sdk._logger import get_logger
 from pai_agent_sdk.sandbox.browser.base import BrowserSandbox
 from pai_agent_sdk.utils import get_available_port, run_in_threadpool
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 # Alias for backward compatibility

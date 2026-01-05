@@ -7,3 +7,24 @@
 [![License](https://img.shields.io/github/license/wh1isper/pai-agent-sdk)](https://img.shields.io/github/license/wh1isper/pai-agent-sdk)
 
 Toolsets and context management for building agents with Pydantic AI.
+
+## Installation
+
+```bash
+# Using pip
+pip install pai-agent-sdk
+
+# Using uv
+uv add pai-agent-sdk
+
+# With Docker sandbox support
+pip install pai-agent-sdk[docker]
+```
+
+## Documentation
+
+- [Logging Configuration](docs/logging.md) - Configure SDK logging levels
+
+## Development
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.

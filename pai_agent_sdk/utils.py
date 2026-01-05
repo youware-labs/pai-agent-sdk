@@ -135,10 +135,12 @@ def add_toolset_instructions(
     """
 
     @agent.instructions
-    def _(ctx: RunContext[AgentContext]) -> str:
-        return "\n\n".join(
-            instructions for instructions in (toolset.get_instructions(ctx) for toolset in toolsets) if instructions
-        )
+    def _(ctx: RunContext[AgentContext]) -> str | None:
+        parts = [instructions for toolset in toolsets if (instructions := toolset.get_instructions(ctx))]
+        if not parts:
+            return None
+        content = "\n".join(parts)
+        return f"<toolset-instructions>\n{content}\n</toolset-instructions>"
 
     return agent
 

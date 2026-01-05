@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pai_agent_sdk.toolsets.browser_use._logger import logger
+from pai_agent_sdk._logger import get_logger
 from pai_agent_sdk.toolsets.browser_use._tools import get_browser_session
 from pai_agent_sdk.toolsets.browser_use.tools._types import (
     ClickResult,
@@ -14,6 +14,8 @@ from pai_agent_sdk.toolsets.browser_use.tools._types import (
     KeyPressResult,
     TypeTextResult,
 )
+
+logger = get_logger(__name__)
 
 
 async def click_element(selector: str) -> dict[str, Any]:
@@ -106,7 +108,7 @@ async def click_element(selector: str) -> dict[str, Any]:
         ).model_dump()
 
     except Exception as e:  # pragma: no cover
-        logger.error(f"Failed to click element {selector}: {e}")
+        logger.exception(f"Failed to click element {selector}")
         return ClickResult(
             status="error",
             selector=selector,
@@ -178,7 +180,7 @@ async def type_text(selector: str, text: str, clear_first: bool = True) -> dict[
         ).model_dump()
 
     except Exception as e:  # pragma: no cover
-        logger.error(f"Failed to type text into {selector}: {e}")
+        logger.exception(f"Failed to type text into {selector}")
         return TypeTextResult(
             status="error",
             selector=selector,
@@ -227,7 +229,7 @@ async def execute_javascript(script: str) -> dict[str, Any]:
         ).model_dump()
 
     except Exception as e:  # pragma: no cover
-        logger.error(f"Failed to execute JavaScript: {e}")
+        logger.exception("Failed to execute JavaScript")
         return ExecuteScriptResult(
             status="error",
             error_message=str(e),
@@ -319,7 +321,7 @@ async def hover(selector: str) -> dict[str, Any]:
         ).model_dump()
 
     except Exception as e:  # pragma: no cover
-        logger.error(f"Failed to hover over element {selector}: {e}")
+        logger.exception(f"Failed to hover over element {selector}")
         return HoverResult(
             status="error",
             selector=selector,
@@ -394,7 +396,7 @@ async def press_key(key: str, modifiers: int = 0) -> dict[str, Any]:
         ).model_dump()
 
     except Exception as e:  # pragma: no cover
-        logger.error(f"Failed to press key {key}: {e}")
+        logger.exception(f"Failed to press key {key}")
         return KeyPressResult(
             status="error",
             key=key,
@@ -449,7 +451,7 @@ async def focus(selector: str) -> dict[str, Any]:
         ).model_dump()
 
     except Exception as e:  # pragma: no cover
-        logger.error(f"Failed to focus element {selector}: {e}")
+        logger.exception(f"Failed to focus element {selector}")
         return FocusResult(
             status="error",
             selector=selector,

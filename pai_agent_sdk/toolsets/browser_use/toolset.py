@@ -10,11 +10,13 @@ from pydantic_ai import RunContext, Tool
 from pydantic_ai.toolsets import AbstractToolset, ToolsetTool
 from typing_extensions import TypeVar
 
+from pai_agent_sdk._logger import get_logger
 from pai_agent_sdk.toolsets.browser_use._config import BrowserUseSettings
-from pai_agent_sdk.toolsets.browser_use._logger import logger
 from pai_agent_sdk.toolsets.browser_use._session import BrowserSession
 from pai_agent_sdk.toolsets.browser_use._tools import build_tool
 from pai_agent_sdk.toolsets.browser_use.tools import ALL_TOOLS
+
+logger = get_logger(__name__)
 
 AgentDepsT = TypeVar("AgentDepsT", default=None, contravariant=True)
 """Keep this for custom context types in the future."""
@@ -36,7 +38,7 @@ def get_cdp_websocket_url(cdp_url: str) -> str:
     try:
         data = response.json()
     except ValueError as e:  # pragma: no cover
-        logger.error(f"Failed to parse CDP response as JSON: {response.text}")
+        logger.exception(f"Failed to parse CDP response as JSON: {response.text}")
         raise ValueError(f"Invalid CDP response. {response.text}") from e
     if "webSocketDebuggerUrl" not in data:  # pragma: no cover
         logger.error(f"CDP response missing webSocketDebuggerUrl field: {data}")

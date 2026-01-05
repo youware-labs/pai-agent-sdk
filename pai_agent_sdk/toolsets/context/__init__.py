@@ -4,8 +4,14 @@ Tools for managing agent context, memory, and state.
 """
 
 from pai_agent_sdk.toolsets.base import BaseTool
+from pai_agent_sdk.toolsets.context.handoff import HandoffMessage, HandoffTool
 
-# TODO: Implement context tools
-tools: list[type[BaseTool]] = []
+tools: list[type[BaseTool]] = [
+    HandoffTool,
+]
 
-__all__ = ["tools"]
+__all__ = [
+    "HandoffMessage",
+    "HandoffTool",
+    "tools",
+]

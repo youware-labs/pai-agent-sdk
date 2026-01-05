@@ -5,9 +5,11 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from pai_agent_sdk.toolsets.browser_use._logger import logger
+from pai_agent_sdk._logger import get_logger
 from pai_agent_sdk.toolsets.browser_use._tools import get_browser_session
 from pai_agent_sdk.toolsets.browser_use.tools._types import DialogResult
+
+logger = get_logger(__name__)
 
 
 async def handle_dialog(
@@ -63,9 +65,9 @@ async def handle_dialog(
                     accepted=accept,
                     prompt_text=prompt_text,
                 ).model_dump()
-            except Exception as e:
+            except Exception:
                 # No dialog present, will wait for one
-                logger.debug(f"No existing dialog found: {e}")
+                logger.debug("No existing dialog found")
 
             # Wait for dialog event or timeout
             while True:
@@ -93,8 +95,8 @@ async def handle_dialog(
                             accepted=accept,
                             prompt_text=prompt_text,
                         ).model_dump()
-                    except Exception as e:
-                        logger.warning(f"Failed to handle dialog: {e}")
+                    except Exception:
+                        logger.warning("Failed to handle dialog")
                         # Dialog might have been closed already, treat as success
                         return DialogResult(
                             status="success",
@@ -110,7 +112,7 @@ async def handle_dialog(
             pass
 
     except Exception as e:  # pragma: no cover
-        logger.error(f"Error handling dialog: {e}")
+        logger.exception("Error handling dialog")
         return DialogResult(
             status="error",
             error_message=str(e),

@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from pai_agent_sdk.toolsets.browser_use._logger import logger
+from pai_agent_sdk._logger import get_logger
 from pai_agent_sdk.toolsets.browser_use._tools import get_browser_session
 from pai_agent_sdk.toolsets.browser_use.tools._types import ValidationResult
+
+logger = get_logger(__name__)
 
 
 async def is_visible(selector: str) -> dict[str, Any]:
@@ -88,7 +90,7 @@ async def is_visible(selector: str) -> dict[str, Any]:
         ).model_dump()
 
     except Exception as e:  # pragma: no cover
-        logger.error(f"Failed to check visibility of {selector}: {e}")
+        logger.exception(f"Failed to check visibility of {selector}")
         return ValidationResult(
             status="error",
             selector=selector,
@@ -176,7 +178,7 @@ async def is_enabled(selector: str) -> dict[str, Any]:
         ).model_dump()
 
     except Exception as e:  # pragma: no cover
-        logger.error(f"Failed to check if element is enabled {selector}: {e}")
+        logger.exception(f"Failed to check if element is enabled {selector}")
         return ValidationResult(
             status="error",
             selector=selector,
@@ -264,7 +266,7 @@ async def is_checked(selector: str) -> dict[str, Any]:
         ).model_dump()
 
     except Exception as e:  # pragma: no cover
-        logger.error(f"Failed to check if element is checked {selector}: {e}")
+        logger.exception(f"Failed to check if element is checked {selector}")
         return ValidationResult(
             status="error",
             selector=selector,

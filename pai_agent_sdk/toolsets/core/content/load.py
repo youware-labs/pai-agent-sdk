@@ -106,7 +106,7 @@ class LoadTool(BaseTool):
             if not has_vision:
                 return (
                     f"The URL '{url}' points to an image, but the current model does not support vision capability. "
-                    "Cannot display image content."
+                    "Use the `read_image` tool instead to analyze this image."
                 )
             return ImageUrl(url=url)
 
@@ -114,7 +114,7 @@ class LoadTool(BaseTool):
             if not has_video:
                 return (
                     f"The URL '{url}' points to a video, but the current model does not support video understanding. "
-                    "Cannot display video content."
+                    "Use the `read_video` tool instead to analyze this video."
                 )
             return VideoUrl(url=url)
 

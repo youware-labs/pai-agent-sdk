@@ -25,6 +25,7 @@ pai_agent_sdk/
       document/   # Document processing tools
       enhance/    # Enhancement tools (todo, thinking)
       filesystem/ # File system operation tools
+      multimodal/ # Multimodal processing tools (read_image, read_video)
       shell/      # Shell command execution tools
       subagent/   # Sub-agent delegation tools
       web/        # Web interaction tools

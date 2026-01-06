@@ -65,6 +65,7 @@ from xml.etree.ElementTree import Element, SubElement, tostring
 
 from pydantic import BaseModel, Field
 from pydantic_ai import RunContext
+from pydantic_ai.usage import RunUsage
 
 from pai_agent_sdk.environment.base import FileOperator, Shell
 from pai_agent_sdk.utils import get_latest_request_usage
@@ -110,6 +111,18 @@ class ToolConfig(BaseModel):
     enable_load_document: bool = False
     """Enable document URL parsing in LoadTool. Default disabled due to poor model support."""
 
+    image_understanding_model: str | None = None
+    """Model to use for image understanding. Falls back to AgentSettings.image_understanding_model."""
+
+    image_understanding_model_settings: dict[str, Any] | None = None
+    """Model settings for image understanding agent."""
+
+    video_understanding_model: str | None = None
+    """Model to use for video understanding. Falls back to AgentSettings.video_understanding_model."""
+
+    video_understanding_model_settings: dict[str, Any] | None = None
+    """Model settings for video understanding agent."""
+
 
 class ModelConfig(BaseModel):
     """Model configuration for context management."""
@@ -119,6 +132,15 @@ class ModelConfig(BaseModel):
 
     handoff_threshold: float | None = None
     """Handoff threshold for context injection."""
+
+    max_images: int = 20
+    """Maximum number of images allowed in message history. Default is 20 (Claude's limit)."""
+
+    max_videos: int = 1
+    """Maximum number of videos allowed in message history. Default is 1."""
+
+    support_gif: bool = True
+    """Whether the model supports GIF images. If False, GIF images will be filtered out."""
 
     capabilities: set[ModelCapability] = Field(default_factory=set)
     """Set of capabilities supported by the model."""
@@ -234,6 +256,9 @@ class AgentContext(BaseModel):
 
     model_cfg: ModelConfig | None = None
     """Model configuration for context management."""
+
+    extra_usage: dict[str, RunUsage] = Field(default_factory=dict)
+    """Extra usage from tool calls, keyed by tool_call_id."""
 
     _agent_name: str = "main"
 

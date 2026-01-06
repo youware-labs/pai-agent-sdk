@@ -26,6 +26,7 @@ dependencies = [
     "pydantic>=2.12.5",
     "pydantic-ai-slim>=1.39.0",
     "pydantic-settings>=2.0.0",
+    "tenacity>=9.0.0",
     "typing-extensions>=4.15.0",
 ]
 
@@ -125,6 +126,11 @@ ignore = [
 
 [tool.ruff.format]
 preview = true
+
+[tool.deptry]
+# anthropic is a transitive dependency from pydantic-ai-slim
+ignore = ["DEP001"]
+per_rule_ignores = { DEP001 = ["anthropic"] }
 
 [tool.coverage.report]
 skip_empty = true

@@ -7,8 +7,8 @@ from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class AgentContextSettings(BaseSettings):
-    """Configuration for AgentContext with environment variable support.
+class AgentSettings(BaseSettings):
+    """Configuration for agents with environment variable support.
 
     All settings can be overridden via environment variables with the prefix PAI_AGENT_.
     For example, to set working_dir, use PAI_AGENT_WORKING_DIR=/path/to/dir.
@@ -26,3 +26,9 @@ class AgentContextSettings(BaseSettings):
 
     tmp_base_dir: Path | None = None
     """Base directory for creating the session temporary directory. If None, uses system default."""
+
+    image_understanding_model: str | None = None
+    """Model to use for image understanding when native vision is unavailable."""
+
+    video_understanding_model: str | None = None
+    """Model to use for video understanding when native capability is unavailable."""

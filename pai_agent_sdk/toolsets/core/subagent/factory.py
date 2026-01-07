@@ -9,8 +9,9 @@ This module provides:
 from __future__ import annotations
 
 import inspect
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Container
 from typing import Annotated, Any, Protocol, cast, runtime_checkable
+from uuid import uuid4
 
 from pydantic import Field
 from pydantic_ai import Agent, AgentRunResult, RunContext
@@ -113,15 +114,8 @@ def create_subagent_tool(
             return instruction
 
         async def call(self, ctx: RunContext[AgentContext], /, **kwargs: Any) -> str:
-            """Execute the subagent call and record usage."""
-            output, usage = await call_func(ctx.deps, **kwargs)
-
-            # Record usage in extra_usages
-            if ctx.tool_call_id:
-                ctx.deps.add_extra_usage(agent=name, usage=usage, uuid=ctx.tool_call_id)
-
-            # Convert output to string for LLM
-            return str(output)
+            # Placeholder - will be replaced by _create_call_method
+            raise NotImplementedError  # pragma: no cover
 
     # Set class attributes from closure variables
     DynamicSubagentTool.name = name
@@ -200,6 +194,35 @@ def _to_pascal_case(name: str) -> str:
     return "".join(part.capitalize() for part in parts)
 
 
+def generate_unique_id(run_id: str, existing: Container[str], *, max_retries: int = 10) -> str:
+    """Generate a unique 4-character ID with collision detection.
+
+    First tries using the last 4 characters of run_id. If that collides
+    with existing IDs, generates random UUIDs until a unique one is found.
+
+    Args:
+        run_id: The current run ID to derive initial ID from.
+        existing: Container of existing IDs to check against.
+        max_retries: Maximum number of UUID generation attempts (default 10).
+
+    Returns:
+        A unique 4-character ID string.
+
+    Raises:
+        RuntimeError: If unable to generate unique ID within max_retries.
+    """
+    agent_id = run_id[-4:]
+    if agent_id not in existing:
+        return agent_id
+
+    for _ in range(max_retries):
+        agent_id = uuid4().hex[:4]
+        if agent_id not in existing:
+            return agent_id
+
+    raise RuntimeError(f"Failed to generate unique agent_id after {max_retries} retries")
+
+
 def create_subagent_call_func(
     agent: Agent[AgentContext, Any],
 ) -> SubagentCallFunc:
@@ -233,9 +256,12 @@ def create_subagent_call_func(
     async def call_func(
         ctx: AgentContext,
         prompt: Annotated[str, Field(description="The prompt to send to the subagent")],
-    ) -> tuple[Any, RunUsage]:
+        agent_id: Annotated[str | None, Field(description="Optional agent ID to resume")] = None,
+    ) -> tuple[str, RunUsage]:
         """Execute the agent with the given prompt."""
-        async with agent.iter(prompt, deps=ctx) as run:
+        if not agent_id:
+            agent_id = generate_unique_id(ctx.run_id, ctx.subagent_history)
+        async with agent.iter(prompt, deps=ctx, message_history=ctx.subagent_history.get(agent_id)) as run:
             async for node in run:
                 if Agent.is_user_prompt_node(node) or Agent.is_end_node(node):
                     continue
@@ -246,6 +272,11 @@ def create_subagent_call_func(
                             await ctx.subagent_stream_queues[ctx.run_id].put(event)
 
         result = cast(AgentRunResult, run.result)
-        return result.output, result.usage()
+        ctx.subagent_history[agent_id] = result.all_messages()
+
+        rendered_result = f"""<id>{agent_id}</id>
+<response>{result.output}</response>
+"""
+        return rendered_result, result.usage()
 
     return call_func  # type: ignore[return-value]

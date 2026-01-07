@@ -1,14 +1,21 @@
 """Tests for subagent tool factory."""
 
 import inspect
+from contextlib import asynccontextmanager
+from unittest.mock import MagicMock
 
 import pytest
-from pydantic_ai import RunContext
+from pydantic_ai import Agent, RunContext
 from pydantic_ai.usage import RunUsage
 
 from pai_agent_sdk.context import AgentContext
 from pai_agent_sdk.toolsets.core.base import Toolset
-from pai_agent_sdk.toolsets.core.subagent import create_subagent_tool
+from pai_agent_sdk.toolsets.core.subagent import (
+    SubagentCallFunc,
+    create_subagent_call_func,
+    create_subagent_tool,
+)
+from pai_agent_sdk.toolsets.core.subagent.factory import generate_unique_id
 
 # Test fixtures and mock functions
 
@@ -119,7 +126,6 @@ def test_pascal_case_naming():
     assert Tool2.__name__ == "AnalyzeContentTool"
 
 
-@pytest.mark.asyncio
 async def test_call_returns_string(agent_context: AgentContext):
     """Test that tool call returns string output."""
     AnalyzeTool = create_subagent_tool(
@@ -139,7 +145,6 @@ async def test_call_returns_string(agent_context: AgentContext):
     assert "test content" in result
 
 
-@pytest.mark.asyncio
 async def test_usage_recorded(agent_context: AgentContext):
     """Test that usage is recorded in extra_usages."""
     SearchTool = create_subagent_tool(
@@ -164,7 +169,6 @@ async def test_usage_recorded(agent_context: AgentContext):
     assert record.usage.output_tokens == 20
 
 
-@pytest.mark.asyncio
 async def test_usage_not_recorded_without_tool_call_id(agent_context: AgentContext):
     """Test that usage is not recorded when tool_call_id is None."""
     SearchTool = create_subagent_tool(
@@ -231,7 +235,6 @@ def test_instruction_none(agent_context: AgentContext):
     assert tool.get_instruction(ctx) is None
 
 
-@pytest.mark.asyncio
 async def test_with_toolset(agent_context: AgentContext):
     """Test that created tool works with Toolset."""
     SearchTool = create_subagent_tool(
@@ -261,7 +264,6 @@ def test_stream_queues_default_dict(agent_context: AgentContext):
     assert queue.empty()
 
 
-@pytest.mark.asyncio
 async def test_stream_queues_put_get(agent_context: AgentContext):
     """Test putting and getting events from stream queue."""
     tool_call_id = "test-tool-call-id"
@@ -276,7 +278,6 @@ async def test_stream_queues_put_get(agent_context: AgentContext):
     assert event == custom_event
 
 
-@pytest.mark.asyncio
 async def test_stream_queues_multiple_tools(agent_context: AgentContext):
     """Test that different tool calls have separate queues."""
     queue1 = agent_context.subagent_stream_queues["tool-1"]
@@ -290,6 +291,175 @@ async def test_stream_queues_multiple_tools(agent_context: AgentContext):
 
 
 # Helper functions
+
+
+async def test_call_method_uses_enter_subagent(agent_context: AgentContext):
+    """Test that the call method uses enter_subagent for subagent context creation."""
+    parent_run_id = agent_context.run_id
+
+    async def mock_with_parent_check(
+        ctx: AgentContext,
+        query: str,
+    ) -> tuple[str, RunUsage]:
+        """Mock function that verifies subagent context is created correctly."""
+        # Verify subagent context has run_id set to tool_call_id
+        assert ctx.run_id == "test-call-subagent"
+        # Verify parent_run_id points to the parent's run_id
+        assert ctx.parent_run_id == parent_run_id
+        usage = RunUsage(requests=1, input_tokens=5, output_tokens=10)
+        return f"Query: {query}", usage
+
+    SearchTool = create_subagent_tool(
+        name="search_subagent",
+        description="Search with subagent",
+        call_func=mock_with_parent_check,
+    )
+
+    tool = SearchTool(agent_context)
+    ctx = _create_mock_run_context(agent_context, tool_call_id="test-call-subagent")
+
+    result = await tool.call(ctx, query="test")
+
+    assert "Query: test" in result
+
+
+async def test_create_subagent_call_func():
+    """Test create_subagent_call_func creates a working SubagentCallFunc."""
+    # Create a mock Agent
+    mock_agent = MagicMock(spec=Agent)
+
+    # Mock the iter context manager and its return
+    mock_run = MagicMock()
+    mock_run.result = MagicMock()
+    mock_run.result.output = "search result"
+    mock_run.result.usage = MagicMock(return_value=RunUsage(requests=1, input_tokens=10, output_tokens=20))
+
+    # Create an async iterator that yields nothing (empty iteration)
+    async def empty_async_iter():
+        return
+        yield  # Make this an async generator
+
+    mock_run.__aiter__ = lambda _: empty_async_iter()
+
+    # Mock iter as async context manager
+    @asynccontextmanager
+    async def mock_iter(prompt, deps, message_history=None):
+        yield mock_run
+
+    mock_agent.iter = mock_iter
+    mock_agent.is_user_prompt_node = MagicMock(return_value=False)
+    mock_agent.is_end_node = MagicMock(return_value=False)
+    mock_agent.is_model_request_node = MagicMock(return_value=False)
+    mock_agent.is_call_tools_node = MagicMock(return_value=False)
+
+    # Create the call func
+    call_func = create_subagent_call_func(mock_agent)
+
+    # Create context
+    ctx = AgentContext()
+
+    # Call the function
+    output, usage = await call_func(ctx, prompt="test query")
+
+    # Output is wrapped in XML tags
+    assert "search result" in output
+    assert usage.requests == 1
+
+
+async def test_create_subagent_call_func_with_streaming_nodes():
+    """Test create_subagent_call_func handles model request and call tools nodes."""
+    # Create a mock Agent
+    mock_agent = MagicMock(spec=Agent)
+
+    # Mock result
+    mock_run = MagicMock()
+    mock_run.result = MagicMock()
+    mock_run.result.output = "result with streaming"
+    mock_run.result.usage = MagicMock(return_value=RunUsage(requests=2, input_tokens=20, output_tokens=30))
+    mock_run.ctx = MagicMock()
+
+    # Create mock nodes
+    mock_model_node = MagicMock()
+    mock_tools_node = MagicMock()
+    mock_end_node = MagicMock()
+
+    # Create mock stream that yields events
+    mock_event = {"type": "text", "content": "streaming..."}
+
+    @asynccontextmanager
+    async def mock_stream(ctx):
+        async def event_gen():
+            yield mock_event
+
+        yield event_gen()
+
+    mock_model_node.stream = mock_stream
+    mock_tools_node.stream = mock_stream
+
+    # Create async iterator that yields nodes
+    async def node_iter():
+        yield mock_model_node
+        yield mock_tools_node
+        yield mock_end_node
+
+    mock_run.__aiter__ = lambda _: node_iter()
+
+    @asynccontextmanager
+    async def mock_iter(prompt, deps, message_history=None):
+        yield mock_run
+
+    mock_agent.iter = mock_iter
+
+    # Configure node type detection
+    def is_model_request(node):
+        return node is mock_model_node
+
+    def is_call_tools(node):
+        return node is mock_tools_node
+
+    def is_end(node):
+        return node is mock_end_node
+
+    mock_agent.is_user_prompt_node = MagicMock(return_value=False)
+    mock_agent.is_end_node = is_end
+    mock_agent.is_model_request_node = is_model_request
+    mock_agent.is_call_tools_node = is_call_tools
+
+    # Patch Agent class methods
+    Agent.is_user_prompt_node = staticmethod(lambda n: False)
+    Agent.is_end_node = staticmethod(is_end)
+    Agent.is_model_request_node = staticmethod(is_model_request)
+    Agent.is_call_tools_node = staticmethod(is_call_tools)
+
+    # Create the call func
+    call_func = create_subagent_call_func(mock_agent)
+
+    # Create context
+    ctx = AgentContext()
+
+    # Call the function
+    output, usage = await call_func(ctx, prompt="test streaming")
+
+    # Output is wrapped in XML tags
+    assert "result with streaming" in output
+    assert usage.requests == 2
+
+    # Check that events were put into stream queue
+    queue = ctx.subagent_stream_queues[ctx.run_id]
+    assert not queue.empty()
+    event = await queue.get()
+    assert event == mock_event
+
+
+async def test_subagent_call_func_protocol():
+    """Test SubagentCallFunc protocol checking."""
+
+    # A valid SubagentCallFunc
+    async def valid_func(ctx: AgentContext, query: str) -> tuple[str, RunUsage]:
+        return "result", RunUsage()
+
+    # Check protocol conformance at runtime
+    assert isinstance(valid_func, SubagentCallFunc)
 
 
 def _create_mock_run_context(
@@ -306,3 +476,68 @@ def _create_mock_run_context(
         run_step=0,
         tool_call_id=tool_call_id,
     )
+
+
+# Tests for generate_unique_id function
+
+
+def test_generate_unique_id_uses_run_id_suffix():
+    """Test that generate_unique_id returns last 4 chars of run_id when no collision."""
+    run_id = "abcd1234efgh5678"
+    existing: set[str] = set()
+
+    result = generate_unique_id(run_id, existing)
+
+    assert result == "5678"
+
+
+def test_generate_unique_id_with_collision():
+    """Test that generate_unique_id generates new ID on collision."""
+    run_id = "abcd1234efgh5678"
+    existing = {"5678"}  # Collision with run_id[-4:]
+
+    result = generate_unique_id(run_id, existing)
+
+    assert result != "5678"
+    assert len(result) == 4
+
+
+def test_generate_unique_id_retries_until_unique():
+    """Test that generate_unique_id retries until finding unique ID."""
+    run_id = "abcd1234efgh5678"
+    # Create a set that will cause multiple collisions
+    # The function tries run_id[-4:] first, then random UUIDs
+    existing = {"5678"}
+
+    result = generate_unique_id(run_id, existing)
+
+    assert result not in existing
+    assert len(result) == 4
+
+
+def test_generate_unique_id_raises_on_max_retries(monkeypatch):
+    """Test that generate_unique_id raises RuntimeError after max retries."""
+
+    run_id = "abcd1234efgh5678"
+
+    # Mock uuid4 to always return the same value
+    class MockUUID:
+        hex = "aaaa0000bbbb1111"
+
+    monkeypatch.setattr("pai_agent_sdk.toolsets.core.subagent.factory.uuid4", lambda: MockUUID())
+
+    # Both the run_id suffix and the mocked uuid will collide
+    existing = {"5678", "aaaa"}
+
+    with pytest.raises(RuntimeError, match="Failed to generate unique agent_id after 10 retries"):
+        generate_unique_id(run_id, existing)
+
+
+def test_generate_unique_id_with_custom_max_retries():
+    """Test generate_unique_id with custom max_retries parameter."""
+    run_id = "abcd1234efgh5678"
+    existing: set[str] = set()
+
+    result = generate_unique_id(run_id, existing, max_retries=5)
+
+    assert result == "5678"

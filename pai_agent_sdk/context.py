@@ -209,8 +209,6 @@ class ModelCapability(str, Enum):
 
 
 def _generate_run_id() -> str:
-    from uuid import uuid4
-
     return uuid4().hex
 
 
@@ -444,6 +442,8 @@ class AgentContext(BaseModel):
     Each queue receives SubagentStreamEvent instances during subagent execution,
     enabling real-time streaming of subagent responses.
     """
+
+    subagent_history: dict[str, list[ModelMessage]] = Field(default_factory=dict)
 
     _agent_name: str = "main"
 

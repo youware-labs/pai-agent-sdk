@@ -1,7 +1,5 @@
 """Tests for URL helper utilities."""
 
-import pytest
-
 from pai_agent_sdk.toolsets.core.content._url_helper import (
     ContentCategory,
     get_category_from_extension,
@@ -129,7 +127,6 @@ class TestGetCategoryFromExtension:
         assert get_category_from_extension("https://example.com/noext") == ContentCategory.unknown
 
 
-@pytest.mark.asyncio
 async def test_detect_content_category_fallback() -> None:
     """Should fallback to extension when HEAD request fails."""
     from pai_agent_sdk.toolsets.core.content._url_helper import detect_content_category

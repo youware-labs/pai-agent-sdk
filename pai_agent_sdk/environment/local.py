@@ -26,7 +26,7 @@ from pai_agent_sdk.environment.exceptions import (
 )
 
 if TYPE_CHECKING:
-    from typing import Self
+    pass
 
 
 class LocalFileOperator(FileOperator):
@@ -392,7 +392,7 @@ class LocalShell(Shell):
 
 
 class LocalEnvironment(Environment):
-    """Async context manager for creating local environment components.
+    """Local environment with filesystem and shell access.
 
     Creates LocalFileOperator and LocalShell with shared configuration,
     and manages temporary directory lifecycle.
@@ -408,7 +408,11 @@ class LocalEnvironment(Environment):
                 LocalEnvironment(allowed_paths=[Path("/workspace")])
             )
             ctx = await stack.enter_async_context(
-                AgentContext(file_operator=env.file_operator, shell=env.shell)
+                AgentContext(
+                    file_operator=env.file_operator,
+                    shell=env.shell,
+                    resources=env.resources,
+                )
             )
             await ctx.file_operator.read_file("test.txt")
         # Resources cleaned up when stack exits
@@ -434,29 +438,13 @@ class LocalEnvironment(Environment):
             enable_tmp_dir: Whether to create a session temporary directory.
                 Defaults to True.
         """
+        super().__init__()  # Initialize ResourceRegistry
         self._allowed_paths = allowed_paths
         self._default_path = default_path
         self._shell_timeout = shell_timeout
         self._tmp_base_dir = tmp_base_dir
         self._enable_tmp_dir = enable_tmp_dir
-
-        self._file_operator: LocalFileOperator | None = None
-        self._shell: LocalShell | None = None
         self._tmp_dir_obj: tempfile.TemporaryDirectory[str] | None = None
-
-    @property
-    def file_operator(self) -> LocalFileOperator:
-        """Return the file operator."""
-        if self._file_operator is None:
-            raise RuntimeError("Environment not entered. Use 'async with' to enter the environment first.")
-        return self._file_operator
-
-    @property
-    def shell(self) -> LocalShell:
-        """Return the shell."""
-        if self._shell is None:
-            raise RuntimeError("Environment not entered. Use 'async with' to enter the environment first.")
-        return self._shell
 
     @property
     def tmp_dir(self) -> Path | None:
@@ -465,8 +453,8 @@ class LocalEnvironment(Environment):
             return None
         return Path(self._tmp_dir_obj.name)
 
-    async def __aenter__(self) -> "Self":
-        """Enter context and setup resources."""
+    async def _setup(self) -> None:
+        """Initialize file operator, shell, and tmp directory."""
         tmp_dir_path: Path | None = None
         if self._enable_tmp_dir:
             self._tmp_dir_obj = tempfile.TemporaryDirectory(
@@ -491,10 +479,8 @@ class LocalEnvironment(Environment):
             default_timeout=self._shell_timeout,
         )
 
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
-        """Exit context and cleanup resources."""
+    async def _teardown(self) -> None:
+        """Clean up tmp directory and reset operators."""
         if self._tmp_dir_obj is not None:
             self._tmp_dir_obj.cleanup()
             self._tmp_dir_obj = None

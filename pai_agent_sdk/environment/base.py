@@ -6,15 +6,16 @@ used interchangeably.
 
 Architecture Overview:
     Environment (outer, long-lived)
-      - Manages resource lifecycle (file_operator, shell)
+      - Manages resource lifecycle (file_operator, shell, resources)
       - Optionally manages tmp_dir for temporary file storage
+      - Subclasses implement _setup() and _teardown() hooks
       - async with environment as env:
-          env.file_operator, env.shell
+          env.file_operator, env.shell, env.resources
 
         AgentContext (inner, short-lived)
           - Manages session state (run_id, timing, handoff)
-          - Receives file_operator, shell as parameters
-          - async with AgentContext(file_operator, shell) as ctx:
+          - Receives file_operator, shell, resources as parameters
+          - async with AgentContext(...) as ctx:
 
 Example:
     Using AsyncExitStack for flat structure (recommended for dependent contexts):
@@ -27,7 +28,11 @@ Example:
             LocalEnvironment(tmp_base_dir=Path("/tmp"))
         )
         ctx = await stack.enter_async_context(
-            AgentContext(file_operator=env.file_operator, shell=env.shell)
+            AgentContext(
+                file_operator=env.file_operator,
+                shell=env.shell,
+                resources=env.resources,
+            )
         )
         # Handle request
         ...
@@ -42,6 +47,7 @@ Example:
         async with AgentContext(
             file_operator=env.file_operator,
             shell=env.shell,
+            resources=env.resources,
         ) as ctx1:
             ...
 
@@ -49,22 +55,162 @@ Example:
         async with AgentContext(
             file_operator=env.file_operator,
             shell=env.shell,
+            resources=env.resources,
         ) as ctx2:
             ...
-    # tmp_dir cleaned up when environment exits
+    # tmp_dir and resources cleaned up when environment exits
     ```
 """
 
+import asyncio
 import shutil
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar, runtime_checkable
 
 import anyio
 import pathspec
 
+from pai_agent_sdk.environment.exceptions import EnvironmentNotEnteredError
+
 if TYPE_CHECKING:
     from typing import Self
+
+T = TypeVar("T")
+
+
+# --- Resource Protocol and Registry ---
+
+
+@runtime_checkable
+class Resource(Protocol):
+    """Protocol for resources managed by Environment.
+
+    Resources must implement a close() method that can be either
+    synchronous or asynchronous. The Environment will call close()
+    during cleanup.
+
+    Example:
+        class DatabaseConnection:
+            async def close(self) -> None:
+                await self._pool.close()
+
+        class FileHandle:
+            def close(self) -> None:
+                self._handle.close()
+    """
+
+    def close(self) -> Any:
+        """Close the resource. Can be sync or async."""
+        ...
+
+
+class ResourceRegistry:
+    """Type-safe resource container with protocol validation.
+
+    Provides a registry for managing resources with:
+    - Protocol validation on set()
+    - Type-safe get operations
+    - Unified cleanup via close_all()
+
+    Example:
+        registry = ResourceRegistry()
+        registry.set("browser", browser_instance)  # Validates Resource protocol
+        browser = registry.get_typed("browser", Browser)
+        await registry.close_all()
+    """
+
+    def __init__(self) -> None:
+        self._resources: dict[str, Resource] = {}
+
+    def set(self, key: str, resource: Resource) -> None:
+        """Register a resource with protocol validation.
+
+        Args:
+            key: Unique identifier for the resource.
+            resource: Resource instance (must implement Resource protocol).
+
+        Raises:
+            TypeError: If resource doesn't implement Resource protocol.
+        """
+        if not isinstance(resource, Resource):
+            raise TypeError(
+                f"Resource must implement Resource protocol (have close() method), got {type(resource).__name__}"
+            )
+        self._resources[key] = resource
+
+    def get(self, key: str) -> Resource | None:
+        """Get a resource by key.
+
+        Args:
+            key: Resource identifier.
+
+        Returns:
+            Resource instance or None if not found.
+        """
+        return self._resources.get(key)
+
+    def get_typed(self, key: str, resource_type: type[T]) -> T | None:
+        """Get a resource with type casting.
+
+        Provides better IDE support by returning the expected type.
+
+        Args:
+            key: Resource identifier.
+            resource_type: Expected type of the resource.
+
+        Returns:
+            Resource cast to the expected type, or None if not found
+            or type doesn't match.
+
+        Example:
+            browser = resources.get_typed("browser", Browser)
+            if browser:
+                await browser.screenshot(url)
+        """
+        resource = self._resources.get(key)
+        if resource is not None and isinstance(resource, resource_type):
+            return resource
+        return None
+
+    def remove(self, key: str) -> Resource | None:
+        """Remove and return a resource.
+
+        Args:
+            key: Resource identifier.
+
+        Returns:
+            Removed resource or None if not found.
+        """
+        return self._resources.pop(key, None)
+
+    def __contains__(self, key: str) -> bool:
+        """Check if a resource exists."""
+        return key in self._resources
+
+    def __len__(self) -> int:
+        """Return number of registered resources."""
+        return len(self._resources)
+
+    def keys(self) -> list[str]:
+        """Return list of resource keys."""
+        return list(self._resources.keys())
+
+    async def close_all(self) -> None:
+        """Close all resources in reverse registration order.
+
+        Uses best-effort cleanup - continues even if individual
+        resources fail to close. Handles both sync and async close().
+        """
+        for resource in reversed(list(self._resources.values())):
+            try:
+                result = resource.close()
+                if asyncio.iscoroutine(result):
+                    await result
+            except Exception:  # noqa: S110
+                pass  # Best effort cleanup
+        self._resources.clear()
+
 
 # Default directories to skip but mark in file tree
 DEFAULT_INSTRUCTIONS_SKIP_DIRS: frozenset[str] = frozenset({"node_modules", ".git", ".venv", "__pycache__"})
@@ -777,8 +923,18 @@ class Shell(ABC):
 class Environment(ABC):
     """Abstract base class for environment context manager.
 
-    Environment manages the lifecycle of shared resources (file_operator, shell)
+    Environment manages the lifecycle of shared resources (file_operator, shell, resources)
     that can be reused across multiple AgentContext sessions.
+
+    Subclasses should:
+    - Call super().__init__() to initialize the resource registry
+    - Implement _setup() to create file_operator, shell, and any custom resources
+    - Implement _teardown() to clean up environment-specific resources
+    - NOT override __aenter__ or __aexit__ (use _setup/_teardown instead)
+
+    The base class handles:
+    - Calling _setup() in __aenter__
+    - Calling _teardown() then resources.close_all() in __aexit__
 
     Example:
         Using AsyncExitStack (recommended for dependent contexts):
@@ -791,34 +947,95 @@ class Environment(ABC):
                 LocalEnvironment(allowed_paths=[Path("/workspace")])
             )
             ctx = await stack.enter_async_context(
-                AgentContext(file_operator=env.file_operator, shell=env.shell)
+                AgentContext(
+                    file_operator=env.file_operator,
+                    shell=env.shell,
+                    resources=env.resources,
+                )
             )
             ...
         # Resources cleaned up when stack exits
         ```
     """
 
+    def __init__(self) -> None:
+        """Initialize the resource registry."""
+        self._resources = ResourceRegistry()
+        self._file_operator: FileOperator | None = None
+        self._shell: Shell | None = None
+
     @property
-    @abstractmethod
     def file_operator(self) -> FileOperator:
-        """Return the file operator."""
-        ...
+        """Return the file operator.
+
+        Raises:
+            RuntimeError: If environment has not been entered.
+        """
+        if self._file_operator is None:
+            raise RuntimeError("Environment not entered. Use 'async with' to enter the environment first.")
+        return self._file_operator
 
     @property
-    @abstractmethod
     def shell(self) -> Shell:
-        """Return the shell."""
+        """Return the shell.
+
+        Raises:
+            RuntimeError: If environment has not been entered.
+        """
+        if self._shell is None:
+            raise RuntimeError("Environment not entered. Use 'async with' to enter the environment first.")
+        return self._shell
+
+    @property
+    def resources(self) -> ResourceRegistry:
+        """Return the resource registry for runtime resources.
+
+        Resources can be accessed by AgentContext and tools.
+        """
+        return self._resources
+
+    # --- Subclass hooks ---
+
+    @abstractmethod
+    async def _setup(self) -> None:
+        """Initialize environment resources.
+
+        Subclasses must implement this to:
+        - Create and assign self._file_operator
+        - Create and assign self._shell
+        - Optionally register custom resources via self._resources.set()
+
+        This is called by __aenter__.
+        """
         ...
 
     @abstractmethod
+    async def _teardown(self) -> None:
+        """Clean up environment-specific resources.
+
+        Subclasses must implement this to:
+        - Clean up tmp_dir, containers, connections, etc.
+        - Set self._file_operator = None
+        - Set self._shell = None
+
+        Note: self._resources.close_all() is called automatically after _teardown().
+        This is called by __aexit__.
+        """
+        ...
+
+    # --- Fixed lifecycle management ---
+
     async def __aenter__(self) -> "Self":
         """Enter context and setup resources."""
-        ...
+        await self._setup()
+        return self
 
-    @abstractmethod
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         """Exit context and cleanup resources."""
-        ...
+        try:
+            await self._teardown()
+        finally:
+            await self._resources.close_all()
 
     async def get_context_instructions(self) -> str:
         """Return combined context instructions from file_operator and shell.
@@ -833,8 +1050,6 @@ class Environment(ABC):
         Raises:
             EnvironmentNotEnteredError: If environment has not been entered yet.
         """
-        from pai_agent_sdk.environment.exceptions import EnvironmentNotEnteredError
-
         parts: list[str] = []
 
         try:

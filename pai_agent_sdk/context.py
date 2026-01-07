@@ -69,7 +69,7 @@ from pydantic_ai import RunContext
 from pydantic_ai.messages import ModelMessage, RetryPromptPart, ToolCallPart, ToolReturnPart
 from pydantic_ai.usage import RunUsage
 
-from pai_agent_sdk.environment.base import FileOperator, Shell
+from pai_agent_sdk.environment.base import FileOperator, ResourceRegistry, Shell
 from pai_agent_sdk.utils import get_latest_request_usage
 
 if TYPE_CHECKING:
@@ -322,6 +322,9 @@ class AgentContext(BaseModel):
 
     shell: Shell
     """Shell executor for command execution. Provided by Environment."""
+
+    resources: ResourceRegistry = Field(default_factory=ResourceRegistry)
+    """Resource registry for runtime resources. Provided by Environment."""
 
     model_cfg: ModelConfig | None = None
     """Model configuration for context management."""

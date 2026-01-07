@@ -96,38 +96,9 @@ Optional:
 
 ## Async Context Manager Patterns
 
-### Using AsyncExitStack for Dependent Context Managers
+See [docs/environment.md](docs/environment.md) for detailed Environment architecture documentation, including:
 
-When you have multiple async context managers where later ones depend on earlier ones,
-use `contextlib.AsyncExitStack` instead of nested `async with` statements:
-
-```python
-from contextlib import AsyncExitStack
-
-async with AsyncExitStack() as stack:
-    env = await stack.enter_async_context(
-        LocalEnvironment(allowed_paths=[path], tmp_base_dir=path)
-    )
-    ctx = await stack.enter_async_context(
-        AgentContext(file_operator=env.file_operator, shell=env.shell)
-    )
-    # Use env and ctx here
-```
-
-**Benefits:**
-
-- Flat structure instead of deeply nested code
-- Sequential initialization with proper dependency handling
-- Single exit stack manages cleanup in reverse order
-- Cleaner code when dealing with 2+ dependent context managers
-
-**When to use:**
-
-- Context managers have dependencies (one needs values from another)
-- Multiple context managers would create deep nesting
-- Dynamic number of context managers
-
-**When nested `async with` is fine:**
-
-- Only 2 context managers with simple, obvious relationship
-- Independent context managers (can use parenthesized form)
+- Using `AsyncExitStack` for dependent context managers
+- Resource management with `ResourceRegistry`
+- The `_setup`/`_teardown` pattern for custom environments
+- `LocalEnvironment` and `DockerEnvironment` usage

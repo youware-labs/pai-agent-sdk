@@ -20,11 +20,15 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pai_agent_sdk.environment.base import Environment, Shell
-from pai_agent_sdk.environment.exceptions import ShellExecutionError, ShellTimeoutError
+from pai_agent_sdk.environment.exceptions import (
+    EnvironmentNotEnteredError,
+    ShellExecutionError,
+    ShellTimeoutError,
+)
 from pai_agent_sdk.environment.local import LocalFileOperator
 
 if TYPE_CHECKING:
-    from typing import Self
+    pass
 
 try:
     import docker
@@ -242,6 +246,7 @@ class DockerEnvironment(Environment):
         if container_id is None and image is None:
             raise ValueError("Either container_id or image must be provided")
 
+        super().__init__()  # Initialize ResourceRegistry
         self._mount_dir = mount_dir.resolve()
         self._container_workdir = container_workdir
         self._container_id = container_id
@@ -252,8 +257,6 @@ class DockerEnvironment(Environment):
         self._tmp_base_dir = tmp_base_dir
 
         # Runtime state
-        self._file_operator: LocalFileOperator | None = None
-        self._shell: DockerShell | None = None
         self._created_container: bool = False
         self._client: docker.DockerClient | None = None
         self._tmp_dir_obj: tempfile.TemporaryDirectory[str] | None = None
@@ -264,20 +267,6 @@ class DockerEnvironment(Environment):
         if self._client is None:
             self._client = docker.from_env()
         return self._client
-
-    @property
-    def file_operator(self) -> LocalFileOperator:
-        """Return the file operator."""
-        if self._file_operator is None:
-            raise RuntimeError("Environment not entered. Use 'async with' to enter the environment first.")
-        return self._file_operator
-
-    @property
-    def shell(self) -> DockerShell:
-        """Return the shell."""
-        if self._shell is None:
-            raise RuntimeError("Environment not entered. Use 'async with' to enter the environment first.")
-        return self._shell
 
     @property
     def container_id(self) -> str | None:
@@ -291,9 +280,8 @@ class DockerEnvironment(Environment):
             return None
         return Path(self._tmp_dir_obj.name)
 
-    async def __aenter__(self) -> Self:
-        """Enter context and setup resources."""
-
+    async def _setup(self) -> None:
+        """Initialize file operator, shell, and container."""
         # Create tmp directory if enabled
         tmp_dir_path: Path | None = None
         if self._enable_tmp_dir:
@@ -336,10 +324,8 @@ class DockerEnvironment(Environment):
             default_timeout=self._shell_timeout,
         )
 
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
-        """Exit context and cleanup resources."""
+    async def _teardown(self) -> None:
+        """Clean up container and tmp directory."""
         # Cleanup container if we created it and cleanup_on_exit is True
         if self._cleanup_on_exit and self._container_id is not None:
             await self._stop_container()
@@ -426,8 +412,6 @@ class DockerEnvironment(Environment):
         Raises:
             EnvironmentNotEnteredError: If environment has not been entered yet.
         """
-        from pai_agent_sdk.environment.exceptions import EnvironmentNotEnteredError
-
         if not self._file_operator or not self._shell:
             raise EnvironmentNotEnteredError("get_context_instructions")
 

@@ -5,7 +5,7 @@ description = "Toolsets and context management for building agents with Pydantic
 authors = [{ name = "Wh1isper", email = "jizhongsheng957@gmail.com" }]
 readme = "README.md"
 keywords = ['python']
-requires-python = ">=3.11,<4.0"
+requires-python = ">=3.11,<3.14"
 classifiers = [
     "Intended Audience :: Developers",
     "Programming Language :: Python",
@@ -13,7 +13,6 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
@@ -42,11 +41,13 @@ web = [
     "firecrawl-py>=4.0.0",
     "markitdown[all]>=0.1.2",
 ]
-all = [
-    "docker>=7.0.0",
-    "tavily-python>=0.7.0",
-    "firecrawl-py>=4.0.0",
+document = [
+    "pymupdf>=1.26.0",
+    "pymupdf4llm>=0.2.0",
     "markitdown[all]>=0.1.2",
+]
+all = [
+    "pai-agent-sdk[docker,web,document]",
 ]
 
 [dependency-groups]
@@ -68,6 +69,8 @@ dev = [
     "tavily-python>=0.7.0",
     "firecrawl-py>=4.0.0",
     "markitdown[all]>=0.1.2",
+    "pymupdf>=1.25.0",
+    "pymupdf4llm>=0.0.17",
 ]
 
 [build-system]
@@ -145,8 +148,9 @@ preview = true
 
 [tool.deptry]
 # anthropic is a transitive dependency from pydantic-ai-slim
-ignore = ["DEP001"]
-per_rule_ignores = { DEP001 = ["anthropic"] }
+# pai-agent-sdk is self-reference in optional dependencies
+ignore = ["DEP001", "DEP002"]
+per_rule_ignores = { DEP001 = ["anthropic"], DEP002 = ["pai-agent-sdk"] }
 
 [tool.coverage.report]
 skip_empty = true

@@ -37,8 +37,8 @@ jobs:
             extras: "all"
           - python-version: "3.13"
             extras: "all"
-          - python-version: "3.14"
-            extras: "all"
+          # - python-version: "3.14"
+          #   extras: "all"
           - python-version: "3.13"
             extras: ""
       fail-fast: false

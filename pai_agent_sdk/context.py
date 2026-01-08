@@ -57,7 +57,6 @@ Example:
 """
 
 import asyncio
-import os
 from collections import defaultdict
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -81,6 +80,7 @@ from pydantic_ai.messages import (
     ToolReturnPart,
 )
 from pydantic_ai.usage import RunUsage
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from pai_agent_sdk.environment.base import FileOperator, ResourceRegistry, Shell
 from pai_agent_sdk.environment.local import LocalFileOperator, LocalShell
@@ -351,20 +351,50 @@ def _xml_to_string(element: Element) -> str:
     return "\n".join(line for line in lines if line.strip())
 
 
-def _env_str(key: str) -> str | None:
-    """Get string from environment variable."""
-    return os.environ.get(key) or None
+class ToolSettings(BaseSettings):
+    """Tool-related settings from environment variables.
+
+    API keys for various external services used by tools.
+    All settings are loaded from environment variables or .env file.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    # Web search API keys
+    google_search_api_key: str | None = None
+    """Google Custom Search API key."""
+
+    google_search_cx: str | None = None
+    """Google Custom Search Engine ID."""
+
+    tavily_api_key: str | None = None
+    """Tavily API key for web search."""
+
+    # Image search API keys
+    pixabay_api_key: str | None = None
+    """Pixabay API key for stock image search."""
+
+    rapidapi_api_key: str | None = None
+    """RapidAPI key for real-time image search."""
+
+    # Web scraping API key
+    firecrawl_api_key: str | None = None
+    """Firecrawl API key for web scraping."""
+
+
+# Default instance for ToolConfig defaults
+_default_tool_settings = ToolSettings()
 
 
 class ToolConfig(BaseModel):
     """Tool-level configuration for fine-grained control.
 
-    API keys can be passed directly or read from environment variables:
-    - GOOGLE_API_KEY / GOOGLE_CX for Google Search
-    - TAVILY_API_KEY for Tavily Search
-    - PIXABAY_API_KEY for Pixabay Image Search
-    - RAPIDAPI_API_KEY for RapidAPI Image Search
-    - FIRECRAWL_API_KEY for Firecrawl Web Scraping
+    API keys can be passed directly or loaded from environment variables
+    via ToolSettings. See .env.example for available environment variables.
     """
 
     model_config = {"arbitrary_types_allowed": True}
@@ -388,24 +418,24 @@ class ToolConfig(BaseModel):
     """Model settings for video understanding agent."""
 
     # Web search API keys
-    google_search_api_key: str | None = Field(default_factory=lambda: _env_str("GOOGLE_SEARCH_API_KEY"))
+    google_search_api_key: str | None = Field(default_factory=lambda: _default_tool_settings.google_search_api_key)
     """Google Custom Search API key."""
 
-    google_search_cx: str | None = Field(default_factory=lambda: _env_str("GOOGLE_SEARCH_CX"))
+    google_search_cx: str | None = Field(default_factory=lambda: _default_tool_settings.google_search_cx)
     """Google Custom Search Engine ID."""
 
-    tavily_api_key: str | None = Field(default_factory=lambda: _env_str("TAVILY_API_KEY"))
+    tavily_api_key: str | None = Field(default_factory=lambda: _default_tool_settings.tavily_api_key)
     """Tavily API key for web search."""
 
     # Image search API keys
-    pixabay_api_key: str | None = Field(default_factory=lambda: _env_str("PIXABAY_API_KEY"))
+    pixabay_api_key: str | None = Field(default_factory=lambda: _default_tool_settings.pixabay_api_key)
     """Pixabay API key for stock image search."""
 
-    rapidapi_api_key: str | None = Field(default_factory=lambda: _env_str("RAPIDAPI_API_KEY"))
+    rapidapi_api_key: str | None = Field(default_factory=lambda: _default_tool_settings.rapidapi_api_key)
     """RapidAPI key for real-time image search."""
 
     # Web scraping API key
-    firecrawl_api_key: str | None = Field(default_factory=lambda: _env_str("FIRECRAWL_API_KEY"))
+    firecrawl_api_key: str | None = Field(default_factory=lambda: _default_tool_settings.firecrawl_api_key)
     """Firecrawl API key for web scraping."""
 
 

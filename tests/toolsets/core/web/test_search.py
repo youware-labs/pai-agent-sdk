@@ -61,13 +61,8 @@ async def test_search_tool_is_available_with_tavily(tmp_path: Path) -> None:
         assert tool.is_available() is True
 
 
-async def test_search_tool_not_available_without_keys(tmp_path: Path, monkeypatch) -> None:
+async def test_search_tool_not_available_without_keys(tmp_path: Path) -> None:
     """Should not be available when no keys configured."""
-    # Clear environment variables
-    monkeypatch.delenv("GOOGLE_SEARCH_API_KEY", raising=False)
-    monkeypatch.delenv("GOOGLE_SEARCH_CX", raising=False)
-    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
-
     async with AsyncExitStack() as stack:
         env = await stack.enter_async_context(
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
@@ -76,7 +71,12 @@ async def test_search_tool_not_available_without_keys(tmp_path: Path, monkeypatc
             AgentContext(
                 file_operator=env.file_operator,
                 shell=env.shell,
-                tool_config=ToolConfig(),
+                # Explicitly pass None for all API keys to override any env defaults
+                tool_config=ToolConfig(
+                    google_search_api_key=None,
+                    google_search_cx=None,
+                    tavily_api_key=None,
+                ),
             )
         )
         tool = SearchTool(ctx)

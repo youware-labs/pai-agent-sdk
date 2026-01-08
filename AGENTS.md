@@ -89,6 +89,12 @@ Optional:
 - docker (for sandbox features)
 - web: tavily-python, firecrawl-py, markitdown (for web tools)
 
+## Environment Configuration
+
+API keys and settings are loaded from environment variables or `.env` file via `pydantic-settings`. See [.env.example](.env.example) for all available variables.
+
+**Important**: When adding or modifying environment variables or default configurations, always update `.env.example` to keep it as the single source of truth.
+
 ## Architecture Notes
 
 - Toolsets extend `base.py` for consistent tool registration

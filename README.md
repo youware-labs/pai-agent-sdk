@@ -21,6 +21,10 @@ uv add pai-agent-sdk
 pip install pai-agent-sdk[docker]
 ```
 
+## Configuration
+
+Copy `.env.example` to `.env` and configure your API keys. See [.env.example](.env.example) for all available environment variables.
+
 ## Documentation
 
 - [AgentContext & Sessions](docs/context.md) - Session state, resumable sessions, extending context

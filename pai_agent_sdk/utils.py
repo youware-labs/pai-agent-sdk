@@ -8,9 +8,10 @@ from typing import TYPE_CHECKING, Literal
 
 import anyio.to_thread
 from PIL import Image
-from pydantic_ai import Agent, ModelMessage, ModelResponse, RequestUsage, RunContext, ToolCallPart
+from pydantic_ai import AbstractToolset, Agent, ModelMessage, ModelResponse, RequestUsage, RunContext, ToolCallPart
 from pydantic_ai.messages import BinaryContent
 from pydantic_ai.output import OutputDataT
+from typing_extensions import TypeVar
 
 if TYPE_CHECKING:
     from pai_agent_sdk.context import AgentContext
@@ -18,6 +19,7 @@ if TYPE_CHECKING:
 
 P = typing.ParamSpec("P")
 T = typing.TypeVar("T")
+AgentDepsT = TypeVar("AgentDepsT", bound=AgentContext, default=AgentContext)
 
 ImageMediaType = Literal["image/png", "image/jpeg", "image/gif", "image/webp"]
 
@@ -59,8 +61,8 @@ def get_latest_request_usage(message_history: list[ModelMessage]) -> RequestUsag
 
 
 def add_toolset_instructions(
-    agent: Agent[AgentContext, OutputDataT], toolsets: list[InstructableToolset]
-) -> Agent[AgentContext, OutputDataT]:
+    agent: Agent[AgentDepsT, OutputDataT], toolsets: list[AbstractToolset]
+) -> Agent[AgentDepsT, OutputDataT]:
     """Add instructions from toolsets to the agent.
 
     Works with any toolset that implements InstructableToolset protocol
@@ -70,8 +72,12 @@ def add_toolset_instructions(
     """
 
     @agent.instructions
-    def _(ctx: RunContext[AgentContext]) -> str | None:
-        parts = [instructions for toolset in toolsets if (instructions := toolset.get_instructions(ctx))]
+    def _(ctx: RunContext[AgentDepsT]) -> str | None:
+        parts = [
+            instructions
+            for toolset in toolsets
+            if (isinstance(toolset, InstructableToolset) and (instructions := toolset.get_instructions(ctx)))
+        ]
         if not parts:
             return None
         return "\n".join(parts)

@@ -47,6 +47,8 @@ class InstructableToolset(Protocol[AgentDepsT]):
 
     This enables duck typing for any toolset that has a get_instructions method,
     allowing add_toolset_instructions() to work with both Toolset and BrowserUseToolset.
+
+    TODO: Drop it when https://github.com/pydantic/pydantic-ai/pull/3780 merged
     """
 
     def get_instructions(self, ctx: RunContext[AgentDepsT]) -> str | None:

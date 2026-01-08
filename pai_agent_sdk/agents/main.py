@@ -37,6 +37,7 @@ from pai_agent_sdk.environment.local import LocalEnvironment
 from pai_agent_sdk.filters.environment_instructions import create_environment_instructions_filter
 from pai_agent_sdk.filters.system_prompt import create_system_prompt_filter
 from pai_agent_sdk.toolsets.core.base import BaseTool, GlobalHooks, Toolset
+from pai_agent_sdk.utils import add_toolset_instructions
 
 if TYPE_CHECKING:
     from pydantic_ai import ModelSettings
@@ -323,19 +324,22 @@ async def create_agent(
             all_processors.extend(history_processors)
 
         # --- Create Agent ---
-        agent: Agent[AgentDepsT, OutputT] = Agent(
-            model=infer_model(model) if isinstance(model, str) else model,
-            system_prompt=effective_system_prompt,
-            model_settings=model_settings,
-            deps_type=context_type,
-            output_type=output_type,
-            tools=agent_tools or (),
-            toolsets=all_toolsets if all_toolsets else None,
-            history_processors=all_processors if all_processors else None,
-            retries=retries,
-            output_retries=output_retries,
-            defer_model_check=defer_model_check,
-            end_strategy=end_strategy,  # type: ignore[arg-type]
+        agent: Agent[AgentDepsT, OutputT] = add_toolset_instructions(
+            Agent(
+                model=infer_model(model) if isinstance(model, str) else model,
+                system_prompt=effective_system_prompt,
+                model_settings=model_settings,
+                deps_type=context_type,
+                output_type=output_type,
+                tools=agent_tools or (),
+                toolsets=all_toolsets if all_toolsets else None,
+                history_processors=all_processors if all_processors else None,
+                retries=retries,
+                output_retries=output_retries,
+                defer_model_check=defer_model_check,
+                end_strategy=end_strategy,  # type: ignore[arg-type]
+            ),
+            all_toolsets,
         )
 
         yield AgentRuntime(env=entered_env, ctx=ctx, agent=agent, core_toolset=core_toolset)

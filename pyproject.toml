@@ -25,6 +25,7 @@ dependencies = [
     "pydantic>=2.12.5",
     "pydantic-ai-slim>=1.39.0",
     "pydantic-settings>=2.0.0",
+    "pyyaml>=6.0.0",
     "tenacity>=9.0.0",
     "typing-extensions>=4.15.0",
 ]

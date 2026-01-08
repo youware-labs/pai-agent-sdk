@@ -146,7 +146,7 @@ def add_toolset_instructions(
     Works with any toolset that implements InstructableToolset protocol
     (has get_instructions method), including Toolset and BrowserUseToolset.
 
-    TODO: Mark it deprecated and no-op when https://github.com/pydantic/pydantic-ai/pull/3780 merged
+    TODO: Skip subclasses of AbstractToolset when https://github.com/pydantic/pydantic-ai/pull/3780 merged
     """
 
     @agent.instructions

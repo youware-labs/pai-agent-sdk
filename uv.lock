@@ -1378,6 +1378,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pydantic-ai-slim" },
     { name = "pydantic-settings" },
+    { name = "pyyaml" },
     { name = "tenacity" },
     { name = "typing-extensions" },
 ]
@@ -1443,6 +1444,7 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.0.0" },
     { name = "pymupdf", marker = "extra == 'document'", specifier = ">=1.26.0" },
     { name = "pymupdf4llm", marker = "extra == 'document'", specifier = ">=0.2.0" },
+    { name = "pyyaml", specifier = ">=6.0.0" },
     { name = "tavily-python", marker = "extra == 'web'", specifier = ">=0.7.0" },
     { name = "tenacity", specifier = ">=9.0.0" },
     { name = "typing-extensions", specifier = ">=4.15.0" },

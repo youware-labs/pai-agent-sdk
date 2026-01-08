@@ -341,3 +341,119 @@ def test_instructable_toolset_protocol_check(agent_context: AgentContext) -> Non
     ctx = agent_context
     toolset = Toolset(ctx, tools=[DummyTool])
     assert isinstance(toolset, InstructableToolset)
+
+
+# --- Toolset.subset tests ---
+
+
+class AnotherTool(BaseTool):
+    """Another test tool for subset tests."""
+
+    name = "another_tool"
+    description = "Another tool"
+
+    async def call(self, ctx: RunContext[AgentContext]) -> str:
+        return "another"
+
+
+def test_toolset_tool_names(agent_context: AgentContext) -> None:
+    """Should return list of tool names."""
+    ctx = agent_context
+    toolset = Toolset(ctx, tools=[DummyTool, AnotherTool])
+    names = toolset.tool_names
+    assert set(names) == {"dummy_tool", "another_tool"}
+
+
+def test_toolset_subset_all_tools(agent_context: AgentContext) -> None:
+    """Should return all tools when tool_names is None."""
+    ctx = agent_context
+    toolset = Toolset(ctx, tools=[DummyTool, AnotherTool])
+    subset = toolset.subset(None)
+
+    assert set(subset.tool_names) == {"dummy_tool", "another_tool"}
+
+
+def test_toolset_subset_specific_tools(agent_context: AgentContext) -> None:
+    """Should return only specified tools."""
+    ctx = agent_context
+    toolset = Toolset(ctx, tools=[DummyTool, AnotherTool])
+    subset = toolset.subset(["dummy_tool"])
+
+    assert subset.tool_names == ["dummy_tool"]
+    assert "another_tool" not in subset.tool_names
+
+
+def test_toolset_subset_with_new_context(agent_context: AgentContext) -> None:
+    """Should use new context when provided."""
+    ctx1 = agent_context
+
+    # Create another context
+    from pai_agent_sdk.environment.local import LocalFileOperator, LocalShell
+
+    ctx2 = AgentContext(
+        file_operator=LocalFileOperator(),
+        shell=LocalShell(),
+    )
+
+    toolset = Toolset(ctx1, tools=[DummyTool])
+    subset = toolset.subset(None, ctx=ctx2)
+
+    assert subset.ctx is ctx2
+    assert subset.ctx is not ctx1
+
+
+def test_toolset_subset_inherit_hooks(agent_context: AgentContext) -> None:
+    """Should inherit hooks when inherit_hooks=True."""
+
+    async def pre_hook(ctx: Any, args: dict) -> dict:
+        return args
+
+    async def post_hook(ctx: Any, result: Any) -> Any:
+        return result
+
+    async def global_pre(ctx: Any, name: str, args: dict) -> dict:
+        return args
+
+    ctx = agent_context
+    toolset = Toolset(
+        ctx,
+        tools=[DummyTool, AnotherTool],
+        pre_hooks={"dummy_tool": pre_hook},
+        post_hooks={"dummy_tool": post_hook},
+        global_hooks=GlobalHooks(pre=global_pre),
+    )
+
+    subset = toolset.subset(["dummy_tool"], inherit_hooks=True)
+
+    assert "dummy_tool" in subset.pre_hooks
+    assert "dummy_tool" in subset.post_hooks
+    assert subset.global_hooks.pre is global_pre
+
+
+def test_toolset_subset_no_inherit_hooks(agent_context: AgentContext) -> None:
+    """Should not inherit hooks by default."""
+
+    async def pre_hook(ctx: Any, args: dict) -> dict:
+        return args
+
+    ctx = agent_context
+    toolset = Toolset(
+        ctx,
+        tools=[DummyTool],
+        pre_hooks={"dummy_tool": pre_hook},
+    )
+
+    subset = toolset.subset(["dummy_tool"], inherit_hooks=False)
+
+    assert subset.pre_hooks == {}
+    assert subset.post_hooks == {}
+    assert subset.global_hooks.pre is None
+
+
+def test_toolset_subset_nonexistent_tool_skipped(agent_context: AgentContext) -> None:
+    """Should skip non-existent tools with warning."""
+    ctx = agent_context
+    toolset = Toolset(ctx, tools=[DummyTool])
+    subset = toolset.subset(["dummy_tool", "nonexistent_tool"])
+
+    assert subset.tool_names == ["dummy_tool"]

@@ -1,0 +1,155 @@
+"""Subagent configuration and creation utilities.
+
+This module provides utilities for creating subagents from markdown configuration files.
+Each markdown file contains YAML frontmatter with subagent metadata and the system prompt
+as the body content.
+
+YAML Frontmatter Schema::
+
+    ---
+    name: debugger
+    description: Debug code issues
+    instruction: Use this tool when debugging
+    tools:  # Optional - list of tool names from parent toolset
+      - grep_tool
+      - view
+      - edit
+    model: inherit  # Optional - 'inherit' or model name
+    model_settings: anthropic_medium  # Optional - preset name, 'inherit', or dict
+    ---
+
+    System prompt content here...
+
+Usage::
+
+    from pai_agent_sdk.subagents import (
+        parse_subagent_markdown,
+        create_subagent_tool_from_markdown,
+        load_subagent_tools_from_dir,
+        get_builtin_subagent_configs,
+        load_builtin_subagent_tools,
+    )
+    from pai_agent_sdk.toolsets.core.base import Toolset
+
+    # Parse config from markdown string
+    config = parse_subagent_markdown(markdown_content)
+
+    # Create single subagent tool
+    DebuggerTool = create_subagent_tool_from_markdown(
+        "path/to/debugger.md",
+        parent_toolset=main_toolset,
+        model="anthropic:claude-sonnet-4",
+    )
+
+    # Load all builtin subagents
+    subagent_tools = load_builtin_subagent_tools(
+        parent_toolset=main_toolset,
+        model="anthropic:claude-sonnet-4",
+    )
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+from pai_agent_sdk.subagents.config import (
+    INHERIT,
+    SubagentConfig,
+    load_subagent_from_file,
+    load_subagents_from_dir,
+    parse_subagent_markdown,
+)
+from pai_agent_sdk.subagents.factory import (
+    create_subagent_tool_from_config,
+    create_subagent_tool_from_markdown,
+    load_subagent_tools_from_dir,
+)
+from pai_agent_sdk.subagents.presets import (
+    ModelSettingsPreset,
+    get_model_settings,
+    list_presets,
+    resolve_model_settings,
+)
+from pai_agent_sdk.toolsets.core.base import BaseTool, Toolset
+from pai_agent_sdk.toolsets.core.subagent import create_subagent_call_func, create_subagent_tool
+
+if TYPE_CHECKING:
+    from pydantic_ai.models import Model
+
+_HERE = Path(__file__).parent
+PRESET_SUBAGNENTS_DIR = _HERE / "presets"
+
+
+def get_builtin_subagent_configs() -> dict[str, SubagentConfig]:
+    """Get all builtin subagent configurations from pai_agent_sdk/subagents/*.md.
+
+    Returns:
+        Dict mapping subagent names to their configurations.
+
+    Example::
+
+        configs = get_builtin_subagent_configs()
+        for name, config in configs.items():
+            print(f"{name}: {config.description}")
+    """
+    return load_subagents_from_dir(PRESET_SUBAGNENTS_DIR)
+
+
+def load_builtin_subagent_tools(
+    parent_toolset: Toolset[Any],
+    *,
+    model: str | Model | None = None,
+    model_settings: dict[str, Any] | str | None = None,
+) -> list[type[BaseTool]]:
+    """Load all builtin subagent tools from pai_agent_sdk/subagents/*.md.
+
+    This is a convenience function that loads all predefined subagent configurations
+    and creates tools from them.
+
+    Args:
+        parent_toolset: The parent toolset to derive tools from.
+        model: Fallback model for all subagents.
+        model_settings: Fallback model settings for all subagents.
+
+    Returns:
+        List of BaseTool subclasses.
+
+    Example::
+
+        from pai_agent_sdk.subagents import load_builtin_subagent_tools
+        from pai_agent_sdk.toolsets.core.base import Toolset
+
+        main_toolset = Toolset(ctx, tools=[ViewTool, EditTool, GrepTool])
+        subagent_tools = load_builtin_subagent_tools(
+            parent_toolset=main_toolset,
+            model="anthropic:claude-sonnet-4",
+            model_settings="anthropic_medium",
+        )
+    """
+    return load_subagent_tools_from_dir(
+        PRESET_SUBAGNENTS_DIR,
+        parent_toolset,
+        model=model,
+        model_settings=model_settings,
+    )
+
+
+__all__ = [
+    "INHERIT",
+    "ModelSettingsPreset",
+    "SubagentConfig",
+    "create_subagent_call_func",
+    "create_subagent_tool",
+    "create_subagent_tool_from_config",
+    "create_subagent_tool_from_markdown",
+    "get_builtin_subagent_configs",
+    "get_model_settings",
+    "list_presets",
+    "load_builtin_subagent_tools",
+    "load_subagent_from_file",
+    "load_subagent_tools_from_dir",
+    "load_subagents_from_dir",
+    "parse_subagent_markdown",
+    "resolve_model_settings",
+]

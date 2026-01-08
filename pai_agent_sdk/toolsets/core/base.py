@@ -317,6 +317,74 @@ class Toolset(BaseToolset[AgentDepsT]):
         """Return the toolset ID."""
         return self._id
 
+    @property
+    def tool_names(self) -> list[str]:
+        """Return list of available tool names in this toolset."""
+        return list(self._tool_classes.keys())
+
+    def subset(
+        self,
+        tool_names: list[str] | None = None,
+        *,
+        ctx: AgentContext | None = None,
+        inherit_hooks: bool = False,
+    ) -> Toolset[AgentDepsT]:
+        """Create a subset Toolset with only the specified tools.
+
+        This is useful for creating subagent toolsets that only have access to
+        a subset of the parent agent's tools.
+
+        Args:
+            tool_names: List of tool names to include. None means all tools.
+            ctx: Optional new context for the subset. If None, uses self.ctx.
+            inherit_hooks: Whether to inherit pre/post hooks for selected tools.
+
+        Returns:
+            A new Toolset instance with the selected tools.
+
+        Example::
+
+            # Create main toolset
+            main_toolset = Toolset(ctx, tools=[ViewTool, EditTool, ShellTool])
+
+            # Create subset for subagent (only view and edit)
+            sub_toolset = main_toolset.subset(["view", "edit"])
+
+            # Create subset with new context
+            sub_toolset = main_toolset.subset(["view"], ctx=subagent_ctx)
+        """
+        if tool_names is None:
+            selected_classes = list(self._tool_classes.values())
+            selected_names = set(self._tool_classes.keys())
+        else:
+            selected_classes = []
+            selected_names: set[str] = set()
+            for name in tool_names:
+                if name in self._tool_classes:
+                    selected_classes.append(self._tool_classes[name])
+                    selected_names.add(name)
+                else:
+                    logger.warning(f"Tool {name!r} not found in parent toolset, skipping")
+
+        pre_hooks: dict[str, PreHookFunc[AgentDepsT]] | None = None
+        post_hooks: dict[str, PostHookFunc[AgentDepsT]] | None = None
+        global_hooks: GlobalHooks | None = None
+
+        if inherit_hooks:
+            pre_hooks = {k: v for k, v in self.pre_hooks.items() if k in selected_names}
+            post_hooks = {k: v for k, v in self.post_hooks.items() if k in selected_names}
+            global_hooks = self.global_hooks
+
+        return Toolset(
+            ctx=ctx or self.ctx,
+            tools=selected_classes,
+            pre_hooks=pre_hooks,
+            post_hooks=post_hooks,
+            global_hooks=global_hooks,
+            max_retries=self.max_retries,
+            timeout=self.timeout,
+        )
+
     def _create_pydantic_tool(self, name: str, tool_instance: BaseTool) -> Tool[AgentDepsT]:
         """Create a pydantic_ai Tool wrapper for a BaseTool instance."""
 

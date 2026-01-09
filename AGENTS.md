@@ -1,43 +1,83 @@
 ## Project Overview
 
-**pai-agent-sdk** is a Python library providing toolsets and context management for building agents with Pydantic AI.
+**pai-agent-sdk** is a Python SDK for building production-ready AI agents with [Pydantic AI](https://ai.pydantic.dev/).
 
 - **Language**: Python 3.11+
 - **Package Manager**: uv
 - **Build System**: hatchling
 
+## Key Features
+
+- **Environment-based Architecture**: Inject file operations, shell access, and resources via `Environment` for clean separation of concerns
+- **Resumable Sessions**: Export/restore `AgentContext` state for multi-turn conversations across restarts
+- **Hierarchical Agents**: Subagent system with task delegation and tool inheritance
+- **Human-in-the-Loop**: Built-in approval workflows for sensitive operations
+- **Streaming Support**: Real-time streaming of agent responses and tool executions
+
 ## Project Structure
 
 ```
 pai_agent_sdk/
-  agents/         # Agent implementations (main, search, reasoning, compact, etc.)
-  filters/        # Filter utilities
-  sandbox/        # Sandbox environments (browser, shell)
-  skills/         # Skill definitions
-  stream/         # Stream processing
-  toolsets/       # Tool implementations
-    __init__.py   # Re-exports from core.base and browser_use
-    browser_use/  # BrowserUse toolset (independent)
-    core/         # Core toolsets collection
-      base.py     # Base classes for toolsets (BaseTool, Toolset, etc.)
-      content/    # Content loading tools (load)
-      context/    # Context management tools (handoff)
-      document/   # Document processing tools
-      enhance/    # Enhancement tools (todo, thinking)
-      filesystem/ # File system operation tools
-      multimodal/ # Multimodal processing tools (read_image, read_video)
-      shell/      # Shell command execution tools
-      subagent/   # Sub-agent delegation tools
-      web/        # Web interaction tools
-  context.py      # Context management (AgentContext, ModelConfig, ToolConfig)
-  utils.py        # Utility functions
-tests/            # Test suite (pytest)
-  toolsets/
-    browser_use/  # BrowserUse tests
-    core/         # Core toolsets tests
-      content/    # content module tests
-      enhance/    # enhance module tests
-      test_base.py # base module tests
+├── agents/                # Agent implementations
+│   ├── main.py            # create_agent, stream_agent entry points
+│   ├── compact.py         # Compact agent variant
+│   ├── image_understanding.py  # Image understanding agent
+│   ├── video_understanding.py  # Video understanding agent
+│   └── models/            # Model configuration and inference
+│
+├── context.py             # AgentContext, ModelConfig, ToolConfig, ResumableState
+│
+├── environment/           # Environment management
+│   ├── base.py            # Environment ABC, FileOperator, Shell, ResourceRegistry
+│   ├── local.py           # LocalEnvironment for local filesystem
+│   └── docker.py          # DockerEnvironment for container-based execution
+│
+├── toolsets/              # Tool implementations
+│   ├── core/              # Core toolsets collection
+│   │   ├── base.py        # BaseTool, Toolset, GlobalHooks (base classes)
+│   │   ├── content/       # Content loading tools
+│   │   ├── context/       # Context management tools (handoff)
+│   │   ├── document/      # Document processing tools
+│   │   ├── enhance/       # Enhancement tools (todo, thinking)
+│   │   ├── filesystem/    # File system operation tools
+│   │   ├── multimodal/    # Multimodal tools (read_image, read_video)
+│   │   ├── shell/         # Shell command execution tools
+│   │   ├── subagent/      # Subagent delegation tools
+│   │   └── web/           # Web interaction tools
+│   └── browser_use/       # Browser automation toolset (independent)
+│
+├── subagents/             # Subagent system
+│   ├── config.py          # SubagentConfig parsing
+│   ├── factory.py         # Subagent tool factory functions
+│   └── presets/           # Built-in subagent presets
+│       ├── debugger.md    # Debugging specialist
+│       ├── explorer.md    # Codebase exploration specialist
+│       ├── searcher.md    # Search specialist
+│       └── code-reviewer.md # Code review specialist
+│
+├── filters/               # Message history processors
+│   ├── handoff.py         # Handoff message processing
+│   ├── image.py           # Image filtering
+│   ├── system_prompt.py   # System prompt filtering
+│   └── tool_args.py       # Tool argument fixing
+│
+├── sandbox/               # Sandbox environments
+│   └── browser/           # Browser sandbox
+│
+├── skills/                # Skill definitions
+│   └── checkpointing/     # Checkpointing skill
+│
+├── stream/                # Stream processing
+├── presets.py             # Preset configurations (model settings, etc.)
+├── utils.py               # Utility functions
+└── _logger.py             # Centralized logging
+
+tests/                     # Test suite (pytest)
+├── environment/           # Environment tests
+├── filters/               # Filter tests
+├── sandbox/               # Sandbox tests
+├── subagents/             # Subagent tests
+└── toolsets/              # Toolset tests
 ```
 
 ## Development Workflow
@@ -75,56 +115,95 @@ After modifying any code:
 
 ## Dependencies
 
-Core dependencies include:
+Core dependencies:
 
 - pydantic-ai-slim (AI agent framework)
-- pydantic / pydantic-settings
-- httpx, anyio
+- pydantic / pydantic-settings (data validation and configuration)
+- httpx, anyio (async HTTP and concurrency)
 - cdp-use (browser automation)
 - pillow (image processing)
 - jinja2 (template rendering for tool instructions)
 
-Optional:
+Optional dependencies:
 
-- docker (for sandbox features)
-- web: tavily-python, firecrawl-py, markitdown (for web tools)
+- `docker` - Docker sandbox support
+- `web` - Web tools (tavily-python, firecrawl-py, markitdown)
+- `document` - Document processing (pymupdf, markitdown)
 
 ## Environment Configuration
 
-API keys and settings are loaded from environment variables or `.env` file via `pydantic-settings`. See [.env.example](.env.example) for all available variables.
+API keys and settings are loaded from environment variables or `.env` file via `pydantic-settings`. See `.env.example` for all available variables.
 
-**Important**: When adding or modifying environment variables or default configurations, always update `.env.example` to keep it as the single source of truth.
+**Important**: When adding or modifying environment variables, always update `.env.example` as the single source of truth.
 
-## Architecture Notes
+## Architecture Reference
 
-- Toolsets extend `base.py` for consistent tool registration
-- Context management is centralized in `context.py`
-- Agents are modular and located in `agents/` directory
-- Logging is centralized in `_logger.py` - see [docs/logging.md](docs/logging.md) for configuration
+### AgentContext and Sessions
 
-## AgentContext and Sessions
-
-See [docs/context.md](docs/context.md) for detailed AgentContext documentation, including:
+See [docs/context.md](docs/context.md) for details:
 
 - Session state management (run_id, timing, user prompts)
 - Resumable sessions with `export_state()` and `with_state()`
 - Extending `AgentContext` and `ResumableState` for custom fields
 - Using `create_agent` with `state` parameter for session restoration
 
-## Toolset Architecture
+### Toolset Architecture
 
-See [docs/toolset.md](docs/toolset.md) for detailed Toolset documentation, including:
+See [docs/toolset.md](docs/toolset.md) for details:
 
 - Creating custom tools with `BaseTool`
 - Hook system (pre/post hooks, global hooks)
 - Error handling in post-hooks (exceptions as results)
 - Extending `Toolset` via `_call_tool_func` for timeout/retry/custom logic
 
-## Async Context Manager Patterns
+### Subagent System
 
-See [docs/environment.md](docs/environment.md) for detailed Environment architecture documentation, including:
+See [docs/subagent.md](docs/subagent.md) for details:
 
-- Using `AsyncExitStack` for dependent context managers
-- Resource management with `ResourceRegistry`
-- The `_setup`/`_teardown` pattern for custom environments
+- Hierarchical agent architecture and task delegation
+- Markdown configuration format (YAML frontmatter + system prompt)
+- Tool inheritance and availability rules
+- Built-in presets (debugger, explorer, searcher, code-reviewer)
+
+### Environment Management
+
+See [docs/environment.md](docs/environment.md) for details:
+
+- Environment ABC: FileOperator, Shell, ResourceRegistry
+- `_setup`/`_teardown` pattern for custom environments
 - `LocalEnvironment` and `DockerEnvironment` usage
+- `AsyncExitStack` for managing dependent context managers
+
+### Model Configuration
+
+See [docs/model.md](docs/model.md) for details:
+
+- Native pydantic-ai model strings (direct provider connection)
+- Gateway mode (route requests through unified gateway)
+- Sticky routing and extra headers
+
+### Logging
+
+See [docs/logging.md](docs/logging.md) for details:
+
+- Global log level: `PAI_AGENT_LOG_LEVEL`
+- Module-specific log levels: `PAI_AGENT_LOG_LEVEL_<MODULE_PATH>`
+- Use `get_logger(__name__)` to obtain logger
+
+## Examples
+
+| Example                                     | Description                                                               |
+| ------------------------------------------- | ------------------------------------------------------------------------- |
+| [general.py](examples/general.py)           | Complete production pattern with streaming, HITL, and session persistence |
+| [deepresearch.py](examples/deepresearch.py) | Autonomous research agent with web search and content extraction          |
+| [browser_use.py](examples/browser_use.py)   | Browser automation with Docker-based headless Chrome sandbox              |
+
+## Quick Start
+
+```python
+from pai_agent_sdk.agents import create_agent
+
+async with create_agent("openai:gpt-4o") as runtime:
+    result = await runtime.agent.run("Hello", deps=runtime.ctx)
+    print(result.output)
+```

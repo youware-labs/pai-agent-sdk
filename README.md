@@ -6,7 +6,15 @@
 [![Commit activity](https://img.shields.io/github/commit-activity/m/wh1isper/pai-agent-sdk)](https://img.shields.io/github/commit-activity/m/wh1isper/pai-agent-sdk)
 [![License](https://img.shields.io/github/license/wh1isper/pai-agent-sdk)](https://img.shields.io/github/license/wh1isper/pai-agent-sdk)
 
-Toolsets and context management for building agents with Pydantic AI.
+Production-ready SDK for building AI agents with [Pydantic AI](https://ai.pydantic.dev/).
+
+## Key Features
+
+- **Environment-based Architecture**: Inject file operations, shell access, and resources via `Environment` for clean separation of concerns
+- **Resumable Sessions**: Export and restore `AgentContext` state for multi-turn conversations across restarts
+- **Hierarchical Agents**: Delegate specialized tasks to subagents with automatic tool inheritance
+- **Human-in-the-Loop**: Built-in approval workflows for sensitive tool operations
+- **Streaming Support**: Real-time streaming of agent responses and tool executions
 
 ## Installation
 
@@ -21,27 +29,41 @@ pip install pai-agent-sdk[web]       # Web tools (tavily, firecrawl, markitdown)
 pip install pai-agent-sdk[document]  # Document processing (pymupdf, markitdown)
 ```
 
+## Quick Start
+
+```python
+from pai_agent_sdk.agents import create_agent
+
+async with create_agent("openai:gpt-4o") as runtime:
+    result = await runtime.agent.run("Hello", deps=runtime.ctx)
+    print(result.output)
+```
+
+## Examples
+
+Check out the [examples/](examples/) directory for production-ready patterns:
+
+| Example                                     | Description                                                                        |
+| ------------------------------------------- | ---------------------------------------------------------------------------------- |
+| [general.py](examples/general.py)           | Complete production pattern with streaming, HITL approval, and session persistence |
+| [deepresearch.py](examples/deepresearch.py) | Autonomous research agent with web search and content extraction                   |
+| [browser_use.py](examples/browser_use.py)   | Browser automation with Docker-based headless Chrome sandbox                       |
+
 ## For Agent Users
 
 If you're using an AI agent (e.g., Claude, Cursor) that supports skills, you can download the latest `SKILL.zip` from the [Releases](https://github.com/wh1isper/pai-agent-sdk/releases) page. The skill package is automatically built and uploaded during each release via GitHub Actions.
 
-## Quick Start
-
-Check out the [examples/](examples/) directory for ready-to-run examples:
-
-- [hello_world.py](examples/hello_world.py) - Basic agent setup and usage
-- [coding.py](examples/coding.py) - Coding assistant example
-- [deepresearch.py](examples/deepresearch.py) - Deep research agent example
-
 ## Configuration
 
-Copy `.env.example` to `.env` and configure your API keys. See [.env.example](.env.example) for all available environment variables.
+Copy `examples/.env.example` to `examples/.env` and configure your API keys.
 
 ## Documentation
 
 - [AgentContext & Sessions](docs/context.md) - Session state, resumable sessions, extending context
 - [Toolset Architecture](docs/toolset.md) - Create tools, use hooks, handle errors, extend Toolset
-- [Custom Environments](docs/environment.md) - Extend context management with custom environments
+- [Subagent System](docs/subagent.md) - Hierarchical agents, builtin presets, markdown configuration
+- [Custom Environments](docs/environment.md) - Environment lifecycle, resource management
+- [Model Configuration](docs/model.md) - Provider setup, gateway mode
 - [Logging Configuration](docs/logging.md) - Configure SDK logging levels
 
 ## Development

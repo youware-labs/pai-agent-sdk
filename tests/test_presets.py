@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from inline_snapshot import snapshot
 
 from pai_agent_sdk.presets import (
     ANTHROPIC_DEFAULT,
@@ -10,11 +11,6 @@ from pai_agent_sdk.presets import (
     ANTHROPIC_LOW,
     ANTHROPIC_MEDIUM,
     ANTHROPIC_OFF,
-    GEMINI_DEFAULT,
-    GEMINI_HIGH,
-    GEMINI_LOW,
-    GEMINI_MEDIUM,
-    GEMINI_MINIMAL,
     OPENAI_DEFAULT,
     OPENAI_HIGH,
     OPENAI_LOW,
@@ -67,19 +63,14 @@ def test_openai_chat_presets_structure() -> None:
 
 def test_openai_responses_presets_structure() -> None:
     """Test that OpenAI Responses presets have expected structure."""
-    for preset in [OPENAI_RESPONSES_DEFAULT, OPENAI_RESPONSES_HIGH, OPENAI_RESPONSES_MEDIUM, OPENAI_RESPONSES_LOW]:
+    for preset in [
+        OPENAI_RESPONSES_DEFAULT,
+        OPENAI_RESPONSES_HIGH,
+        OPENAI_RESPONSES_MEDIUM,
+        OPENAI_RESPONSES_LOW,
+    ]:
         assert "openai_reasoning_effort" in preset
         assert "openai_reasoning_summary" in preset
-
-
-def test_gemini_presets_structure() -> None:
-    """Test that Gemini presets have expected structure."""
-    for preset in [GEMINI_DEFAULT, GEMINI_HIGH, GEMINI_MEDIUM, GEMINI_LOW]:
-        assert "google_thinking_config" in preset
-        assert "max_tokens" in preset
-
-    # MINIMAL should have MINIMAL thinking level
-    assert GEMINI_MINIMAL["google_thinking_config"]["thinking_level"] == "MINIMAL"
 
 
 def test_get_model_settings_by_enum() -> None:
@@ -132,12 +123,36 @@ def test_list_presets() -> None:
     """Test list_presets returns all available presets."""
     presets = list_presets()
 
-    # Should include main presets
-    assert "anthropic_high" in presets
-    assert "openai_medium" in presets
-    assert "gemini_low" in presets
-
-    # Should include aliases
-    assert "anthropic" in presets
-    assert "openai" in presets
-    assert "gemini" in presets
+    assert presets == snapshot([
+        "anthropic",
+        "anthropic_default",
+        "anthropic_high",
+        "anthropic_low",
+        "anthropic_medium",
+        "anthropic_off",
+        "gemini",
+        "gemini_2.5",
+        "gemini_3",
+        "gemini_thinking_budget_default",
+        "gemini_thinking_budget_high",
+        "gemini_thinking_budget_low",
+        "gemini_thinking_budget_medium",
+        "gemini_thinking_level_default",
+        "gemini_thinking_level_high",
+        "gemini_thinking_level_low",
+        "gemini_thinking_level_medium",
+        "gemini_thinking_level_minimal",
+        "high",
+        "low",
+        "medium",
+        "openai",
+        "openai_default",
+        "openai_high",
+        "openai_low",
+        "openai_medium",
+        "openai_responses",
+        "openai_responses_default",
+        "openai_responses_high",
+        "openai_responses_low",
+        "openai_responses_medium",
+    ])

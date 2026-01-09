@@ -56,6 +56,10 @@ class MyTool(BaseTool):
     def get_instruction(self, ctx: RunContext[AgentContext]) -> str | None:
         """Return dynamic instructions injected into system prompt."""
         return "Use this tool when..."
+
+    def get_approval_metadata(self) -> dict[str, Any] | None:
+        """Return metadata for ApprovalRequired when HITL is triggered."""
+        return {"reason": "This tool modifies files"}
 ```
 
 ## Using Toolset
@@ -292,3 +296,58 @@ classDiagram
 | `HookableToolsetTool` | Internal wrapper with hook support      |
 | `GlobalHooks`         | Container for global pre/post hooks     |
 | `_call_tool_func`     | Overridable method for custom execution |
+
+## Human-in-the-Loop (HITL) Approval
+
+Toolset supports requiring user approval before executing specific tools via pydantic-ai's `ApprovalRequired` mechanism.
+
+### Configuring Approval-Required Tools
+
+Set `need_user_approve_tools` in `AgentContext` to specify which tools require approval:
+
+```python
+from pai_agent_sdk.context import AgentContext
+
+async with AgentContext(...) as ctx:
+    # Tools that require user approval before execution
+    ctx.need_user_approve_tools = ["shell", "edit", "replace"]
+```
+
+### How It Works
+
+1. When a tool in `need_user_approve_tools` is called, `Toolset.call_tool()` raises `ApprovalRequired`
+2. The exception includes metadata from `BaseTool.get_approval_metadata()` if implemented
+3. pydantic-ai handles the approval flow, deferring execution until user confirms
+4. If approved (via `ctx.tool_call_approved`), the tool executes normally
+
+### Custom Approval Metadata
+
+Implement `get_approval_metadata()` in your tool to provide context for approval requests:
+
+```python
+class ShellTool(BaseTool):
+    name = "shell"
+    description = "Execute shell commands"
+
+    def get_approval_metadata(self) -> dict[str, Any] | None:
+        return {
+            "warning": "This will execute a shell command",
+            "risk_level": "high",
+        }
+
+    async def call(self, ctx: RunContext[AgentContext], command: str) -> str:
+        ...
+```
+
+### Session Persistence
+
+The `need_user_approve_tools` list is included in `ResumableState`, so approval settings persist across session restores:
+
+```python
+# Export state (includes need_user_approve_tools)
+state = ctx.export_state()
+
+# Restore later - approval settings are preserved
+new_ctx = AgentContext(...).with_state(state)
+assert new_ctx.need_user_approve_tools == ["shell", "edit", "replace"]
+```

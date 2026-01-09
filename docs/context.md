@@ -233,13 +233,14 @@ tool_config = ToolConfig(
 
 The base `ResumableState` includes:
 
-| Field                    | Type                     | Description                                  |
-| ------------------------ | ------------------------ | -------------------------------------------- |
-| `subagent_history`       | `dict[str, list[dict]]`  | Serialized conversation history per subagent |
-| `extra_usages`           | `list[ExtraUsageRecord]` | Token usage records from tools/filters       |
-| `user_prompts`           | `list[str]`              | Collected user prompts                       |
-| `handoff_message`        | `str \| None`            | Context handoff message                      |
-| `deferred_tool_metadata` | `dict[str, dict]`        | Metadata for deferred tool calls             |
+| Field                     | Type                     | Description                                    |
+| ------------------------- | ------------------------ | ---------------------------------------------- |
+| `subagent_history`        | `dict[str, list[dict]]`  | Serialized conversation history per subagent   |
+| `extra_usages`            | `list[ExtraUsageRecord]` | Token usage records from tools/filters         |
+| `user_prompts`            | `list[str]`              | Collected user prompts                         |
+| `handoff_message`         | `str \| None`            | Context handoff message                        |
+| `deferred_tool_metadata`  | `dict[str, dict]`        | Metadata for deferred tool calls               |
+| `need_user_approve_tools` | `list[str]`              | Tool names requiring user approval (HITL flow) |
 
 ## Best Practices
 

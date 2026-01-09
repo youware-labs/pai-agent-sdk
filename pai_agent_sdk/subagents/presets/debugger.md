@@ -19,6 +19,16 @@ instruction: |
   - Root cause analysis with evidence
   - Specific code fix recommendations
   - Verification steps to confirm the fix
+tools:
+  - glob_tool
+  - grep_tool
+  - view
+  - ls
+optional_tools:
+  - shell
+  - edit
+  - multi_edit
+  - replace
 model: inherit
 model_settings: inherit
 ---

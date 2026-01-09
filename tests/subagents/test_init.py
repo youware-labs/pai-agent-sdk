@@ -268,6 +268,13 @@ async def test_create_agent_with_include_builtin_subagents(agent_context) -> Non
     from pai_agent_sdk.toolsets.core.base import BaseTool
 
     # Create tools needed by builtin subagents
+    class GlobTool(BaseTool):
+        name = "glob_tool"
+        description = "Find files"
+
+        async def call(self, ctx, pattern: str) -> str:
+            return pattern
+
     class GrepTool(BaseTool):
         name = "grep_tool"
         description = "Search"
@@ -289,23 +296,16 @@ async def test_create_agent_with_include_builtin_subagents(agent_context) -> Non
         async def call(self, ctx) -> str:
             return "."
 
-    class SearchTavilyTool(BaseTool):
-        name = "search_with_tavily"
+    class SearchTool(BaseTool):
+        name = "search"
         description = "Search"
 
         async def call(self, ctx, query: str) -> str:
             return query
 
-    class VisitWebpageTool(BaseTool):
-        name = "visit_webpage"
-        description = "Visit"
-
-        async def call(self, ctx, url: str) -> str:
-            return url
-
     async with create_agent(
         "test",
-        tools=[GrepTool, ViewTool, LsTool, SearchTavilyTool, VisitWebpageTool],
+        tools=[GlobTool, GrepTool, ViewTool, LsTool, SearchTool],
         include_builtin_subagents=True,
         compact_model="test",
     ) as runtime:
@@ -322,6 +322,13 @@ async def test_create_agent_with_both_custom_and_builtin_subagents() -> None:
     from pai_agent_sdk.subagents import SubagentConfig, get_builtin_subagent_configs
     from pai_agent_sdk.toolsets.core.base import BaseTool
 
+    class GlobTool(BaseTool):
+        name = "glob_tool"
+        description = "Find files"
+
+        async def call(self, ctx, pattern: str) -> str:
+            return pattern
+
     class GrepTool(BaseTool):
         name = "grep_tool"
         description = "Search"
@@ -343,19 +350,12 @@ async def test_create_agent_with_both_custom_and_builtin_subagents() -> None:
         async def call(self, ctx) -> str:
             return "."
 
-    class SearchTavilyTool(BaseTool):
-        name = "search_with_tavily"
+    class SearchTool(BaseTool):
+        name = "search"
         description = "Search"
 
         async def call(self, ctx, query: str) -> str:
             return query
-
-    class VisitWebpageTool(BaseTool):
-        name = "visit_webpage"
-        description = "Visit"
-
-        async def call(self, ctx, url: str) -> str:
-            return url
 
     custom_config = SubagentConfig(
         name="my_custom_agent",
@@ -365,7 +365,7 @@ async def test_create_agent_with_both_custom_and_builtin_subagents() -> None:
 
     async with create_agent(
         "test",
-        tools=[GrepTool, ViewTool, LsTool, SearchTavilyTool, VisitWebpageTool],
+        tools=[GlobTool, GrepTool, ViewTool, LsTool, SearchTool],
         subagent_configs=[custom_config],
         include_builtin_subagents=True,
         compact_model="test",

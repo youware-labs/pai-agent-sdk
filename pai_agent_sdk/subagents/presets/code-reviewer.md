@@ -18,6 +18,15 @@ instruction: |
   - Issues categorized by severity (Critical/Warning/Suggestion)
   - Specific code locations and recommended fixes
   - Security and performance considerations
+tools:
+  - glob_tool
+  - grep_tool
+  - view
+  - ls
+optional_tools:
+  - search
+  - scrape
+  - fetch
 model: inherit
 model_settings: inherit
 ---

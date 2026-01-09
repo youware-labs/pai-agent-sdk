@@ -18,6 +18,14 @@ instruction: |
   - Relevant information and sources
   - Code examples and documentation excerpts
   - Multiple perspectives when applicable
+tools:
+  - search
+optional_tools:
+  - scrape
+  - fetch
+  - edit
+  - multi_edit
+  - replace
 model: inherit
 model_settings: inherit
 ---

@@ -313,7 +313,7 @@ class Toolset(BaseToolset[AgentDepsT]):
 
             # Check availability after instantiation
             if skip_unavailable and not tool_instance.is_available():
-                logger.info(f"Skipping unavailable tool {name!r}")
+                logger.debug(f"Skipping unavailable tool {name!r}")
                 continue
 
             if name in self._tool_instances:
@@ -335,6 +335,22 @@ class Toolset(BaseToolset[AgentDepsT]):
     def tool_names(self) -> list[str]:
         """Return list of available tool names in this toolset."""
         return list(self._tool_classes.keys())
+
+    def is_tool_available(self, tool_name: str) -> bool:
+        """Check if a tool is registered and available by name.
+
+        This method checks both that the tool exists in this toolset and that
+        its is_available() method returns True.
+
+        Args:
+            tool_name: The name of the tool to check.
+
+        Returns:
+            True if the tool exists and is available, False otherwise.
+        """
+        if tool_name not in self._tool_instances:
+            return False
+        return self._tool_instances[tool_name].is_available()
 
     def subset(
         self,
@@ -378,7 +394,7 @@ class Toolset(BaseToolset[AgentDepsT]):
                     selected_classes.append(self._tool_classes[name])
                     selected_names.add(name)
                 else:
-                    logger.warning(f"Tool {name!r} not found in parent toolset, skipping")
+                    logger.debug(f"Tool {name!r} not found in parent toolset, skipping")
 
         pre_hooks: dict[str, PreHookFunc[AgentDepsT]] | None = None
         post_hooks: dict[str, PostHookFunc[AgentDepsT]] | None = None

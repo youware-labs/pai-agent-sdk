@@ -63,8 +63,19 @@ def create_subagent_tool_from_config(
     elif model_settings is not None:
         resolved_settings = resolve_model_settings(model_settings)
 
-    # Create subset toolset
-    sub_toolset = parent_toolset.subset(config.tools)
+    # Combine required and optional tools for subset
+    # Required tools (config.tools) must all be available for subagent to be enabled
+    # Optional tools (config.optional_tools) are included if available, not required
+    all_tools: list[str] | None = None
+    if config.tools is not None or config.optional_tools is not None:
+        all_tools = []
+        if config.tools:
+            all_tools.extend(config.tools)
+        if config.optional_tools:
+            all_tools.extend(config.optional_tools)
+
+    # Create subset toolset with all tools (required + optional)
+    sub_toolset = parent_toolset.subset(all_tools)
 
     # Create the subagent
     subagent: Agent[AgentContext, str] = Agent(
@@ -75,12 +86,22 @@ def create_subagent_tool_from_config(
         deps_type=AgentContext,
     )
 
+    # Create availability check function
+    # If tools are specified, check that all required tools are available in parent
+    required_tools = config.tools
+
+    def check_tools_available() -> bool:
+        if required_tools is None:
+            return True
+        return all(parent_toolset.is_tool_available(name) for name in required_tools)
+
     # Create the tool
     return create_subagent_tool(
         name=config.name,
         description=config.description,
         call_func=create_subagent_call_func(subagent),
         instruction=config.instruction,
+        availability_check=check_tools_available,
     )
 
 

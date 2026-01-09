@@ -18,6 +18,15 @@ instruction: |
   - Relevant file paths and locations
   - Code snippets showing the findings
   - Summary of patterns and relationships discovered
+tools:
+  - glob_tool
+  - grep_tool
+  - view
+  - ls
+optional_tools:
+  - edit
+  - multi_edit
+  - replace
 model: inherit
 model_settings: inherit
 ---

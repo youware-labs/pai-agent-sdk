@@ -36,7 +36,10 @@ class SubagentConfig(BaseModel):
     """The markdown body content, used as the subagent's system prompt."""
 
     tools: list[str] | None = None
-    """List of tool names to include from parent toolset. None means inherit all."""
+    """Required tools from parent toolset. ALL must be available for subagent to be enabled."""
+
+    optional_tools: list[str] | None = None
+    """Optional tools from parent toolset. Included if available, not required for availability."""
 
     model: str | None = None
     """Model to use: 'inherit' (default), or model name like 'anthropic:claude-sonnet-4'."""
@@ -110,12 +113,18 @@ def parse_subagent_markdown(content: str) -> SubagentConfig:
     if isinstance(tools, str):
         tools = [t.strip() for t in tools.split(",") if t.strip()]
 
+    # Handle optional_tools field - can be string (comma-separated) or list
+    optional_tools = frontmatter.get("optional_tools")
+    if isinstance(optional_tools, str):
+        optional_tools = [t.strip() for t in optional_tools.split(",") if t.strip()]
+
     return SubagentConfig(
         name=frontmatter["name"],
         description=frontmatter["description"],
         instruction=frontmatter.get("instruction"),
         system_prompt=body_content,
         tools=tools,
+        optional_tools=optional_tools,
         model=frontmatter.get("model"),
         model_settings=frontmatter.get("model_settings"),
     )

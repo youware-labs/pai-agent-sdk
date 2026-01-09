@@ -35,6 +35,9 @@ class SubagentCallFunc(Protocol):
 # Type alias for instruction functions
 InstructionFunc = Callable[[RunContext[AgentContext]], str | None]
 
+# Type alias for availability check functions
+AvailabilityCheckFunc = Callable[[], bool]
+
 
 def create_subagent_tool(
     name: str,
@@ -42,6 +45,7 @@ def create_subagent_tool(
     call_func: SubagentCallFunc,
     *,
     instruction: str | InstructionFunc | None = None,
+    availability_check: AvailabilityCheckFunc | None = None,
 ) -> type[BaseTool]:
     """Create a BaseTool subclass that wraps a subagent call function.
 
@@ -59,6 +63,8 @@ def create_subagent_tool(
                    The function's parameters (after ctx) define the tool's input schema.
         instruction: Optional instruction for system prompt. Can be a string or
                      a callable that takes RunContext and returns a string.
+        availability_check: Optional callable that returns True if the tool is available.
+                            Called dynamically each time is_available() is invoked.
 
     Returns:
         A BaseTool subclass that can be used with Toolset.
@@ -105,6 +111,11 @@ def create_subagent_tool(
 
         def __init__(self, ctx: AgentContext) -> None:
             super().__init__(ctx)
+
+        def is_available(self) -> bool:
+            if availability_check is None:
+                return True
+            return availability_check()
 
         def get_instruction(self, ctx: RunContext[AgentContext]) -> str | None:
             if instruction is None:

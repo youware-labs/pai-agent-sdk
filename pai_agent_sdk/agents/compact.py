@@ -178,15 +178,14 @@ def condense_result_to_markdown(result: CondenseResult) -> str:
         Markdown formatted string with analysis and context.
     """
     return f"""## Condensed conversation summary
-<condense>
-<analysis>
-{result.analysis}
-</analysis>
 
-<context>
+### Analysis
+
+{result.analysis}
+
+### Context
+
 {result.context}
-</context>
-</condense>
 """
 
 

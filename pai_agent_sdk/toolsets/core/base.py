@@ -213,12 +213,9 @@ class BaseTool(ABC):
         """
         return None
 
-    def get_deferred_metadata(self, ctx: RunContext[AgentContext]) -> dict[str, Any] | None:
+    def get_deferred_metadata(self, ctx: RunContext[AgentContext]) -> Any:
         """Get HITL metadata for the tool call, if applicable."""
-        # TODO: Get it from ctx.tool_call_metadata when supported: https://github.com/pydantic/pydantic-ai/pull/3811
-        if not ctx.tool_call_id:
-            return None
-        return ctx.deps.deferred_tool_metadata.get(ctx.tool_call_id)
+        return ctx.tool_call_metadata
 
 
 class BaseToolset(AbstractToolset[AgentDepsT], ABC):
@@ -678,9 +675,7 @@ class Toolset(BaseToolset[AgentDepsT]):
 
                 results.approvals[interaction.tool_call_id] = ToolApproved(override_args=override_args)
                 if metadata:
-                    # TODO: Switch to DeferredToolResults.metadata https://github.com/pydantic/pydantic-ai/pull/3811
-                    #     results.metadata[interaction.tool_call_id] = metadata
-                    self.ctx.deferred_tool_metadata[interaction.tool_call_id] = metadata
+                    results.metadata[interaction.tool_call_id] = metadata
                 logger.info(f"User approved tool call: {interaction.tool_call_id}")
             else:
                 reason = interaction.reason or "User rejected the tool call."

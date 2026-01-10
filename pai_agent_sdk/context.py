@@ -96,6 +96,7 @@ from pydantic_ai.usage import RunUsage
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from pai_agent_sdk.environment.base import FileOperator, ResourceRegistry, Shell
+from pai_agent_sdk.events import AgentEvent
 from pai_agent_sdk.utils import get_latest_request_usage
 
 # =============================================================================
@@ -306,9 +307,9 @@ class ToolIdWrapper:
 # Subagent Stream Event Types
 # =============================================================================
 
-# Subagent stream event type for the queue
-# Includes pydantic-ai events + Any for user-defined custom events
-AgentStreamEvent = ModelResponseStreamEvent | PydanticHandleResponseEvent | Any
+# Stream event type for the queue
+# Includes pydantic-ai events + custom AgentEvent for user-defined events
+AgentStreamEvent = ModelResponseStreamEvent | PydanticHandleResponseEvent | AgentEvent
 
 
 def _create_stream_queue_factory() -> dict[str, asyncio.Queue[AgentStreamEvent]]:
@@ -485,7 +486,7 @@ class ModelConfig(BaseModel):
     context_window: int | None = None
     """Total context window size in tokens."""
 
-    proactive_context_management_threshold: float | None = None
+    proactive_context_management_threshold: float | None = 0.5
     """Proactive context management threshold. When token usage exceeds this ratio, reminders are triggered."""
 
     compact_threshold: float = 0.90
@@ -642,13 +643,13 @@ class AgentContext(BaseModel):
     tool_id_wrapper: ToolIdWrapper = Field(default_factory=ToolIdWrapper)
     """Tool ID wrapper for normalizing tool call IDs across providers."""
 
-    subagent_stream_queues: dict[str, asyncio.Queue[AgentStreamEvent]] = Field(
+    agent_stream_queues: dict[str, asyncio.Queue[AgentStreamEvent]] = Field(
         default_factory=_create_stream_queue_factory
     )
-    """Stream queues for subagent events, keyed by run_id(tool_call_id).
+    """Stream queues for agent events, keyed by run_id(tool_call_id).
 
-    Each queue receives AgentStreamEvent instances during subagent execution,
-    enabling real-time streaming of subagent responses.
+    Each queue receives AgentStreamEvent instances during agent execution,
+    enabling real-time streaming of agent responses via a sideband channel.
     """
 
     need_user_approve_tools: list[str] = Field(default_factory=list)
@@ -861,6 +862,24 @@ class AgentContext(BaseModel):
         """
         record_uuid = uuid or uuid4().hex
         self.extra_usages.append(ExtraUsageRecord(uuid=record_uuid, agent=agent, usage=usage))
+
+    async def emit_event(self, event: AgentStreamEvent) -> None:
+        """Emit a custom event to the sideband stream queue.
+
+        Events are placed in the agent_stream_queues under the current run_id,
+        allowing consumers to receive custom notifications alongside pydantic-ai
+        stream events.
+
+        Args:
+            event: Any event object (AgentEvent subclass, pydantic-ai events, or custom).
+
+        Example::
+
+            from pai_agent_sdk.events import CompactStartEvent
+
+            await ctx.emit_event(CompactStartEvent(event_id="abc123", message_count=50))
+        """
+        await self.agent_stream_queues[self.run_id].put(event)
 
     async def __aenter__(self):
         """Enter the context and start timing."""

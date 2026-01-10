@@ -28,6 +28,7 @@ from pai_agent_sdk._config import AgentSettings
 from pai_agent_sdk._logger import logger
 from pai_agent_sdk.agents.models import infer_model
 from pai_agent_sdk.context import AgentContext, ModelConfig
+from pai_agent_sdk.events import CompactCompleteEvent, CompactFailedEvent, CompactStartEvent
 from pai_agent_sdk.filters import (
     create_system_prompt_filter,
     drop_extra_images,
@@ -313,7 +314,13 @@ def create_compact_filter(
 
         logger.info("Compacting conversation history...")
 
+        # Generate event_id to correlate start/complete events
+        event_id = uuid4().hex[:8]
+
         try:
+            # Emit start event
+            await agent_ctx.emit_event(CompactStartEvent(event_id=event_id, message_count=len(message_history)))
+
             # Run compact agent on full message history with AgentContext as deps
             result = await agent.run(
                 DEFAULT_COMPACT_INSTRUCTION,
@@ -339,11 +346,25 @@ def create_compact_filter(
                 condense_markdown, agent_ctx.user_prompts or condense_result.original_prompt
             )
 
+            # Emit complete event with summary
+            await agent_ctx.emit_event(
+                CompactCompleteEvent(
+                    event_id=event_id,
+                    summary_markdown=condense_markdown,
+                    original_message_count=len(message_history),
+                    compacted_message_count=len(compacted),
+                )
+            )
+
             logger.info(f"Compacted history from {len(message_history)} messages to {len(compacted)} messages")
             return compacted
 
         except Exception as e:
             logger.error(f"Failed to compact history: {e}")
+            # Emit failed event so consumers know compact did not succeed
+            await agent_ctx.emit_event(
+                CompactFailedEvent(event_id=event_id, error=str(e), message_count=len(message_history))
+            )
             # On error, return original history
             return message_history
 

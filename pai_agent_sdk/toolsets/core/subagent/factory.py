@@ -55,7 +55,7 @@ def create_subagent_tool(
     - Automatically records RunUsage to ctx.deps.extra_usage
     - Converts the output to string for LLM consumption
 
-    For streaming, use ctx.deps.subagent_stream_queues[tool_call_id] to send events.
+    For streaming, use ctx.deps.agent_stream_queues[tool_call_id] to send events.
 
     Args:
         name: Tool name used for invocation.
@@ -288,7 +288,7 @@ def create_subagent_call_func(
                 elif Agent.is_model_request_node(node) or Agent.is_call_tools_node(node):
                     async with node.stream(run.ctx) as request_stream:
                         async for event in request_stream:
-                            await ctx.subagent_stream_queues[ctx.run_id].put(event)
+                            await ctx.emit_event(event)
 
         result = cast(AgentRunResult, run.result)
         ctx.subagent_history[agent_id] = result.all_messages()

@@ -253,13 +253,13 @@ async def test_with_toolset(agent_context: AgentContext):
     assert tools["search"].tool_def.description == "Search the web"
 
 
-# Tests for subagent_stream_queues functionality
+# Tests for agent_stream_queues functionality
 
 
 def test_stream_queues_default_dict(agent_context: AgentContext):
     """Test that stream_queues is a defaultdict creating queues on access."""
     # Access non-existent key should create a new queue
-    queue = agent_context.subagent_stream_queues["test-tool-call-id"]
+    queue = agent_context.agent_stream_queues["test-tool-call-id"]
     assert queue is not None
     assert queue.empty()
 
@@ -267,7 +267,7 @@ def test_stream_queues_default_dict(agent_context: AgentContext):
 async def test_stream_queues_put_get(agent_context: AgentContext):
     """Test putting and getting events from stream queue."""
     tool_call_id = "test-tool-call-id"
-    queue = agent_context.subagent_stream_queues[tool_call_id]
+    queue = agent_context.agent_stream_queues[tool_call_id]
 
     # Put a custom event
     custom_event = {"event_kind": "custom", "data": "test"}
@@ -280,8 +280,8 @@ async def test_stream_queues_put_get(agent_context: AgentContext):
 
 async def test_stream_queues_multiple_tools(agent_context: AgentContext):
     """Test that different tool calls have separate queues."""
-    queue1 = agent_context.subagent_stream_queues["tool-1"]
-    queue2 = agent_context.subagent_stream_queues["tool-2"]
+    queue1 = agent_context.agent_stream_queues["tool-1"]
+    queue2 = agent_context.agent_stream_queues["tool-2"]
 
     await queue1.put("event1")
     await queue2.put("event2")
@@ -445,7 +445,7 @@ async def test_create_subagent_call_func_with_streaming_nodes():
     assert usage.requests == 2
 
     # Check that events were put into stream queue
-    queue = ctx.subagent_stream_queues[ctx.run_id]
+    queue = ctx.agent_stream_queues[ctx.run_id]
     assert not queue.empty()
     event = await queue.get()
     assert event == mock_event

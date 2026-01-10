@@ -571,8 +571,8 @@ async def stream_agent(  # noqa: C901
     )
 
     # Register main agent
-    main_agent_info = AgentInfo(agent_id="main", agent_name="main")
-    ctx.agent_registry["main"] = main_agent_info
+    main_agent_info = AgentInfo(agent_id=ctx.run_id, agent_name="main")
+    ctx.agent_registry[ctx.run_id] = main_agent_info
     ctx.user_prompts = user_prompt
 
     async def process_node(
@@ -598,7 +598,11 @@ async def stream_agent(  # noqa: C901
                     )
 
                 await output_queue.put(
-                    StreamEvent(agent_id="main", agent_name="main", event=ctx.tool_id_wrapper.wrap_event(event))
+                    StreamEvent(
+                        agent_id=main_agent_info.agent_id,
+                        agent_name=main_agent_info.agent_name,
+                        event=ctx.tool_id_wrapper.wrap_event(event),
+                    )
                 )
 
                 # POST EVENT HOOK
@@ -648,12 +652,12 @@ async def stream_agent(  # noqa: C901
             while True:
                 # Check exit condition: main done and all queues empty
                 if main_done.is_set():
-                    all_empty = all(q.empty() for q in ctx.subagent_stream_queues.values())
+                    all_empty = all(q.empty() for q in ctx.agent_stream_queues.values())
                     if all_empty:
                         return
 
                 # Collect events from all subagent queues
-                for agent_id, queue in list(ctx.subagent_stream_queues.items()):
+                for agent_id, queue in list(ctx.agent_stream_queues.items()):
                     try:
                         event = queue.get_nowait()
                         agent_info = ctx.agent_registry.get(agent_id)

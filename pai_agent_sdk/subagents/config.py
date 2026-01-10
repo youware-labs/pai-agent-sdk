@@ -47,6 +47,9 @@ class SubagentConfig(BaseModel):
     model_settings: str | dict[str, Any] | None = None
     """ModelSettings: 'inherit', preset name (e.g., 'anthropic_medium'), or dict config."""
 
+    model_cfg: dict[str, Any] | None = None
+    """ModelConfig for context management: None (inherit from parent) or dict config."""
+
 
 def parse_subagent_markdown(content: str) -> SubagentConfig:
     """Parse subagent configuration from markdown with YAML frontmatter.
@@ -127,6 +130,7 @@ def parse_subagent_markdown(content: str) -> SubagentConfig:
         optional_tools=optional_tools,
         model=frontmatter.get("model"),
         model_settings=frontmatter.get("model_settings"),
+        model_cfg=frontmatter.get("model_cfg"),
     )
 
 

@@ -17,7 +17,7 @@ from pydantic import Field
 from pydantic_ai import Agent, AgentRunResult, RunContext
 from pydantic_ai.usage import RunUsage
 
-from pai_agent_sdk.context import AgentContext
+from pai_agent_sdk.context import AgentContext, ModelConfig
 from pai_agent_sdk.toolsets.core.base import BaseTool
 
 
@@ -46,6 +46,7 @@ def create_subagent_tool(
     *,
     instruction: str | InstructionFunc | None = None,
     availability_check: AvailabilityCheckFunc | None = None,
+    model_cfg: ModelConfig | None = None,
 ) -> type[BaseTool]:
     """Create a BaseTool subclass that wraps a subagent call function.
 
@@ -65,6 +66,8 @@ def create_subagent_tool(
                      a callable that takes RunContext and returns a string.
         availability_check: Optional callable that returns True if the tool is available.
                             Called dynamically each time is_available() is invoked.
+        model_cfg: Optional ModelConfig to override in subagent context.
+                   If None, subagent inherits parent's model_cfg.
 
     Returns:
         A BaseTool subclass that can be used with Toolset.
@@ -134,7 +137,7 @@ def create_subagent_tool(
 
     # Copy the call signature from call_func to DynamicSubagentTool.call
     # This allows pydantic-ai to inspect the correct parameters
-    DynamicSubagentTool.call = _create_call_method(call_func)  # type: ignore[method-assign]
+    DynamicSubagentTool.call = _create_call_method(call_func, model_cfg=model_cfg)  # type: ignore[method-assign]
 
     # Set a meaningful class name for debugging
     DynamicSubagentTool.__name__ = f"{_to_pascal_case(name)}Tool"
@@ -145,6 +148,8 @@ def create_subagent_tool(
 
 def _create_call_method(
     call_func: SubagentCallFunc,
+    *,
+    model_cfg: ModelConfig | None = None,
 ) -> Callable[..., Awaitable[str]]:
     """Create a call method with the correct signature from call_func.
 
@@ -154,7 +159,10 @@ def _create_call_method(
 
     async def call(self: BaseTool, ctx: RunContext[AgentContext], /, **kwargs: Any) -> str:
         """Execute the subagent call and record usage."""
-        async with ctx.deps.enter_subagent(self.name, agent_id=ctx.tool_call_id) as sub_ctx:
+        override_kwargs: dict[str, Any] = {}
+        if model_cfg is not None:
+            override_kwargs["model_cfg"] = model_cfg
+        async with ctx.deps.enter_subagent(self.name, agent_id=ctx.tool_call_id, **override_kwargs) as sub_ctx:
             output, usage = await call_func(sub_ctx, **kwargs)
 
         # Record usage in extra_usages

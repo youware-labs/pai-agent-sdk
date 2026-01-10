@@ -198,3 +198,28 @@ def test_subagent_config_model() -> None:
     )
     assert config.name == "test"
     assert config.tools is None
+
+
+def test_parse_subagent_markdown_with_model_cfg() -> None:
+    """Test parsing subagent markdown with model_cfg."""
+    content = """---
+name: fast_searcher
+description: Quick search with smaller context
+tools:
+  - search_with_tavily
+model_cfg:
+  context_window: 50000
+  compact_threshold: 0.80
+  max_images: 5
+---
+
+You are a fast search specialist.
+"""
+    config = parse_subagent_markdown(content)
+
+    assert config.name == "fast_searcher"
+    assert config.model_cfg == {
+        "context_window": 50000,
+        "compact_threshold": 0.80,
+        "max_images": 5,
+    }

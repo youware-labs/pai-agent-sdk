@@ -90,12 +90,40 @@ You are an expert debugger specializing in systematic root cause analysis.
 | `optional_tools` | `list[str]`   | No       | Optional tools (included if available)                          |
 | `model`          | `str`         | No       | `"inherit"` or model name (e.g., `"anthropic:claude-sonnet-4"`) |
 | `model_settings` | `str \| dict` | No       | `"inherit"`, preset name, or dict config                        |
+| `model_cfg`      | `dict`        | No       | ModelConfig for context management (see below)                  |
 
 ### Tool Availability Rules
 
 - **Required tools** (`tools`): ALL must be available in parent toolset for subagent to be enabled
 - **Optional tools** (`optional_tools`): Included if available, not required for availability
 - **No tools specified**: Subagent inherits all tools from parent and is always available
+
+### ModelConfig for Subagents
+
+Subagents can have their own `model_cfg` for context management. This controls:
+
+- `context_window`: Total context window size in tokens
+- `compact_threshold`: When to trigger auto-compaction (default: 0.90)
+- `max_images`: Maximum images in message history (default: 20)
+- `max_videos`: Maximum videos in message history (default: 1)
+- `capabilities`: Model capabilities (vision, video_understanding, document_understanding)
+
+```yaml
+---
+name: fast_searcher
+description: Quick search with smaller context
+tools:
+  - search_with_tavily
+model_cfg:
+  context_window: 50000
+  compact_threshold: 0.80
+  max_images: 5
+---
+
+You are a fast search specialist...
+```
+
+If `model_cfg` is not specified, the subagent inherits the parent's configuration.
 
 ## Usage
 
@@ -483,6 +511,7 @@ class SubagentConfig(BaseModel):
     optional_tools: list[str] | None = None
     model: str | None = None
     model_settings: str | dict[str, Any] | None = None
+    model_cfg: dict[str, Any] | None = None
 ```
 
 ### Factory Functions
@@ -504,6 +533,8 @@ def create_subagent_tool_from_config(
     *,
     model: str | Model | None = None,
     model_settings: dict[str, Any] | str | None = None,
+    history_processors: Sequence[HistoryProcessor[AgentContext]] | None = None,
+    model_cfg: ModelConfig | None = None,
 ) -> type[BaseTool]: ...
 
 # Create tool from markdown
@@ -513,6 +544,8 @@ def create_subagent_tool_from_markdown(
     *,
     model: str | Model | None = None,
     model_settings: dict[str, Any] | str | None = None,
+    history_processors: Sequence[HistoryProcessor[AgentContext]] | None = None,
+    model_cfg: ModelConfig | None = None,
 ) -> type[BaseTool]: ...
 
 # Load tools from directory
@@ -522,6 +555,8 @@ def load_subagent_tools_from_dir(
     *,
     model: str | Model | None = None,
     model_settings: dict[str, Any] | str | None = None,
+    history_processors: Sequence[HistoryProcessor[AgentContext]] | None = None,
+    model_cfg: ModelConfig | None = None,
 ) -> list[type[BaseTool]]: ...
 
 # Get builtin configs
@@ -533,6 +568,8 @@ def load_builtin_subagent_tools(
     *,
     model: str | Model | None = None,
     model_settings: dict[str, Any] | str | None = None,
+    history_processors: Sequence[HistoryProcessor[AgentContext]] | None = None,
+    model_cfg: ModelConfig | None = None,
 ) -> list[type[BaseTool]]: ...
 ```
 
@@ -554,6 +591,7 @@ def create_subagent_tool(
     *,
     instruction: str | InstructionFunc | None = None,
     availability_check: AvailabilityCheckFunc | None = None,
+    model_cfg: ModelConfig | None = None,
 ) -> type[BaseTool]: ...
 
 # Create call function from Agent

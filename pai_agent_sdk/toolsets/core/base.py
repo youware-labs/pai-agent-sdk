@@ -16,11 +16,13 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from pydantic import BaseModel, Field
 from pydantic_ai import ApprovalRequired, RunContext, Tool, UserError
+from pydantic_ai._agent_graph import HistoryProcessor
 
 if TYPE_CHECKING:
     from pydantic_ai import ModelSettings
     from pydantic_ai.models import Model
 
+    from pai_agent_sdk.context import ModelConfig
     from pai_agent_sdk.subagents import SubagentConfig
 from pydantic_ai.messages import ModelMessage
 from pydantic_ai.tools import (
@@ -421,6 +423,8 @@ class Toolset(BaseToolset[AgentDepsT]):
         *,
         model: str | Model | None = None,
         model_settings: ModelSettings | dict[str, Any] | str | None = None,
+        history_processors: Sequence[HistoryProcessor[AgentContext]] | None = None,
+        model_cfg: ModelConfig | None = None,
     ) -> Toolset[AgentDepsT]:
         """Create a new Toolset that includes subagent tools.
 
@@ -432,6 +436,8 @@ class Toolset(BaseToolset[AgentDepsT]):
             configs: Sequence of SubagentConfig defining the subagents to create.
             model: Fallback model for subagents with 'inherit' or None model.
             model_settings: Fallback model settings for subagents with 'inherit' or None.
+            history_processors: History processors for subagents.
+            model_cfg: Fallback ModelConfig for subagents.
 
         Returns:
             A new Toolset instance with subagent tools added.
@@ -459,7 +465,14 @@ class Toolset(BaseToolset[AgentDepsT]):
             return self
 
         subagent_tools = [
-            create_subagent_tool_from_config(cfg, parent_toolset=self, model=model, model_settings=model_settings)
+            create_subagent_tool_from_config(
+                cfg,
+                parent_toolset=self,
+                model=model,
+                model_settings=model_settings,
+                history_processors=history_processors,
+                model_cfg=model_cfg,
+            )
             for cfg in configs
         ]
         all_tools = list(self._tool_classes.values()) + subagent_tools

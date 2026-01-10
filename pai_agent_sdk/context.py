@@ -796,6 +796,7 @@ class AgentContext(BaseModel):
             "start_at": datetime.now(),
             "end_at": None,
             "handoff_message": None,  # Subagents don't inherit handoff state
+            "tool_id_wrapper": ToolIdWrapper(),  # Fresh wrapper for subagent
             **override,
         }
         new_ctx = self.model_copy(update=update)
@@ -830,6 +831,10 @@ class AgentContext(BaseModel):
         from pai_agent_sdk.filters.runtime_instructions import inject_runtime_instructions
         from pai_agent_sdk.filters.tool_args import fix_truncated_tool_args
 
+        def dynamic_tool_id_wrapper(ctx: RunContext[AgentContext], messages: list[ModelMessage]) -> list[ModelMessage]:
+            """Dynamically get tool_id_wrapper from current context."""
+            return ctx.deps.tool_id_wrapper.wrap_messages(ctx, messages)
+
         return [
             drop_extra_images,
             drop_gif_images,
@@ -838,7 +843,7 @@ class AgentContext(BaseModel):
             process_handoff_message,
             filter_by_capability,
             inject_runtime_instructions,
-            self.tool_id_wrapper.wrap_messages,
+            dynamic_tool_id_wrapper,
         ]
 
     def add_extra_usage(

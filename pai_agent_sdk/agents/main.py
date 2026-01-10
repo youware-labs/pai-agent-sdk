@@ -285,42 +285,58 @@ async def create_agent(
             ).with_state(state)
         )
         logger.debug("Context created: %s (run_id=%s)", type(ctx).__name__, ctx.run_id)
+        # --- History Processors ---
+        # Combine context's processors with built-in and user-provided ones
+        all_processors: list[HistoryProcessor[AgentDepsT]] = [
+            *ctx.get_history_processors(),
+            create_compact_filter(
+                model=compact_model,
+                model_settings=compact_model_settings,
+                model_cfg=compact_model_cfg or effective_model_cfg,
+                main_model=model,
+                main_model_settings=model_settings,
+            ),
+            create_environment_instructions_filter(entered_env),
+        ]
+        if history_processors:
+            all_processors.extend(history_processors)
 
         # --- Toolset Setup ---
         all_toolsets: list[AbstractToolset[Any]] = []
         core_toolset: Toolset[AgentDepsT] | None = None
 
         # Create Toolset from BaseTool classes if provided
-        if tools:
-            logger.debug("Creating core toolset with %d tools", len(tools))
-            core_toolset = Toolset(
-                ctx,
-                tools=tools,
-                pre_hooks=pre_hooks,
-                post_hooks=post_hooks,
-                global_hooks=global_hooks,
-                max_retries=toolset_max_retries,
-                timeout=toolset_timeout,
-                skip_unavailable=skip_unavailable_tools,
-            )
+        tools = tools or []
+        logger.debug("Creating core toolset with %d tools", len(tools))
+        core_toolset = Toolset(
+            ctx,
+            tools=tools,
+            pre_hooks=pre_hooks,
+            post_hooks=post_hooks,
+            global_hooks=global_hooks,
+            max_retries=toolset_max_retries,
+            timeout=toolset_timeout,
+            skip_unavailable=skip_unavailable_tools,
+        )
 
-            # Add subagent tools if requested
-            if subagent_configs or include_builtin_subagents:
-                from pai_agent_sdk.subagents import get_builtin_subagent_configs
+        # Add subagent tools if requested
+        if subagent_configs or include_builtin_subagents:
+            from pai_agent_sdk.subagents import get_builtin_subagent_configs
 
-                all_subagent_configs = list(subagent_configs) if subagent_configs else []
-                if include_builtin_subagents:
-                    all_subagent_configs.extend(get_builtin_subagent_configs().values())
+            all_subagent_configs = list(subagent_configs) if subagent_configs else []
+            if include_builtin_subagents:
+                all_subagent_configs.extend(get_builtin_subagent_configs().values())
 
-                if all_subagent_configs:
-                    logger.debug("Adding %d subagent configs to toolset", len(all_subagent_configs))
-                    core_toolset = core_toolset.with_subagents(
-                        all_subagent_configs,
-                        model=model,
-                        model_settings=model_settings,
-                    )
+            if all_subagent_configs:
+                logger.debug("Adding %d subagent configs to toolset", len(all_subagent_configs))
+                core_toolset = core_toolset.with_subagents(
+                    all_subagent_configs,
+                    model=model,
+                    model_settings=model_settings,
+                    history_processors=[*ctx.get_history_processors()],
+                )
 
-            all_toolsets.append(core_toolset)
+        all_toolsets.append(core_toolset)
 
         # Add user-provided toolsets
         if toolsets:
@@ -338,23 +354,6 @@ async def create_agent(
             loaded_prompt = _load_system_prompt(system_prompt_template_vars)
             effective_system_prompt = loaded_prompt if loaded_prompt else ""
 
-        # --- History Processors ---
-        # Combine context's processors with built-in and user-provided ones
-        all_processors: list[HistoryProcessor[AgentDepsT]] = [
-            *ctx.get_history_processors(),
-            create_compact_filter(
-                model=compact_model,
-                model_settings=compact_model_settings,
-                model_cfg=compact_model_cfg or effective_model_cfg,
-                main_model=model,
-                main_model_settings=model_settings,
-            ),
-            create_environment_instructions_filter(entered_env),
-            create_system_prompt_filter(system_prompt=effective_system_prompt),
-        ]
-        if history_processors:
-            all_processors.extend(history_processors)
-
         # --- Create Agent ---
         logger.debug("Creating agent with model=%s, output_type=%s", model, output_type)
         agent: Agent[AgentDepsT, OutputT] = add_toolset_instructions(
@@ -366,7 +365,10 @@ async def create_agent(
                 output_type=output_type,
                 tools=agent_tools or (),
                 toolsets=all_toolsets if all_toolsets else None,
-                history_processors=all_processors if all_processors else None,
+                history_processors=[
+                    *(all_processors or []),
+                    create_system_prompt_filter(system_prompt=effective_system_prompt),
+                ],
                 retries=retries,
                 output_retries=output_retries,
                 defer_model_check=defer_model_check,

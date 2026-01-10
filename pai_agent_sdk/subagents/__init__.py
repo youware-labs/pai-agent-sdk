@@ -50,9 +50,13 @@ Usage::
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from pydantic_ai._agent_graph import HistoryProcessor
+
+from pai_agent_sdk.context import AgentContext, ModelConfig
 from pai_agent_sdk.subagents.config import (
     INHERIT,
     SubagentConfig,
@@ -95,6 +99,8 @@ def load_builtin_subagent_tools(
     *,
     model: str | Model | None = None,
     model_settings: dict[str, Any] | str | None = None,
+    history_processors: Sequence[HistoryProcessor[AgentContext]] | None = None,
+    model_cfg: ModelConfig | None = None,
 ) -> list[type[BaseTool]]:
     """Load all builtin subagent tools from pai_agent_sdk/subagents/*.md.
 
@@ -105,6 +111,8 @@ def load_builtin_subagent_tools(
         parent_toolset: The parent toolset to derive tools from.
         model: Fallback model for all subagents.
         model_settings: Fallback model settings for all subagents.
+        history_processors: History processors for all subagents.
+        model_cfg: Fallback ModelConfig for all subagents.
 
     Returns:
         List of BaseTool subclasses.
@@ -126,6 +134,8 @@ def load_builtin_subagent_tools(
         parent_toolset,
         model=model,
         model_settings=model_settings,
+        history_processors=history_processors,
+        model_cfg=model_cfg,
     )
 
 

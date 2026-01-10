@@ -5,13 +5,15 @@ This module provides functions to create subagent tools from SubagentConfig obje
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from pydantic_ai import Agent
+from pydantic_ai._agent_graph import HistoryProcessor
 
 from pai_agent_sdk.agents.models import infer_model
-from pai_agent_sdk.context import AgentContext
+from pai_agent_sdk.context import AgentContext, ModelConfig
 from pai_agent_sdk.presets import resolve_model_settings
 from pai_agent_sdk.subagents.config import (
     INHERIT,
@@ -21,11 +23,53 @@ from pai_agent_sdk.subagents.config import (
     parse_subagent_markdown,
 )
 from pai_agent_sdk.toolsets.core.base import BaseTool, Toolset
-from pai_agent_sdk.toolsets.core.subagent import create_subagent_call_func, create_subagent_tool
+from pai_agent_sdk.toolsets.core.subagent import (
+    create_subagent_call_func,
+    create_subagent_tool,
+)
 
 if TYPE_CHECKING:
     from pydantic_ai import ModelSettings
     from pydantic_ai.models import Model
+
+
+def _resolve_model(config: SubagentConfig, model: str | Model | None) -> str | Model:
+    """Resolve effective model from config and fallback."""
+    if config.model is not None and config.model != INHERIT:
+        return config.model
+    if model is not None:
+        return model
+    return "test"  # Placeholder, actual model passed at runtime
+
+
+def _resolve_model_settings(
+    config: SubagentConfig, model_settings: ModelSettings | dict[str, Any] | str | None
+) -> dict[str, Any] | None:
+    """Resolve effective model settings from config and fallback."""
+    if config.model_settings is not None and config.model_settings != INHERIT:
+        return resolve_model_settings(config.model_settings)
+    if model_settings is not None:
+        return resolve_model_settings(model_settings)
+    return None
+
+
+def _resolve_model_cfg(config: SubagentConfig, model_cfg: ModelConfig | None) -> ModelConfig | None:
+    """Resolve effective ModelConfig from config and fallback."""
+    if config.model_cfg is not None:
+        return ModelConfig(**config.model_cfg)
+    return model_cfg
+
+
+def _collect_tools(config: SubagentConfig) -> list[str] | None:
+    """Collect all tools (required + optional) from config."""
+    if config.tools is None and config.optional_tools is None:
+        return None
+    all_tools: list[str] = []
+    if config.tools:
+        all_tools.extend(config.tools)
+    if config.optional_tools:
+        all_tools.extend(config.optional_tools)
+    return all_tools
 
 
 def create_subagent_tool_from_config(
@@ -34,6 +78,8 @@ def create_subagent_tool_from_config(
     *,
     model: str | Model | None = None,
     model_settings: ModelSettings | dict[str, Any] | str | None = None,
+    history_processors: Sequence[HistoryProcessor[AgentContext]] | None = None,
+    model_cfg: ModelConfig | None = None,
 ) -> type[BaseTool]:
     """Create a subagent tool from a SubagentConfig.
 
@@ -42,53 +88,28 @@ def create_subagent_tool_from_config(
         parent_toolset: The parent toolset to derive tools from.
         model: Fallback model. Used if config.model is 'inherit' or None.
         model_settings: Fallback model settings. Used if config.model_settings is 'inherit' or None.
+        history_processors: History processors to use for the subagent.
+        model_cfg: Fallback ModelConfig. Used if config.model_cfg is None.
 
     Returns:
         A BaseTool subclass that wraps the subagent.
     """
-    # Resolve model
-    # Priority: config.model (if not inherit/None) > function arg model
-    if config.model is not None and config.model != INHERIT:
-        effective_model = config.model
-    elif model is not None:
-        effective_model = model
-    else:
-        # Will be resolved at runtime - use a placeholder
-        effective_model = "test"  # Placeholder, actual model passed at runtime
+    effective_model = _resolve_model(config, model)
+    resolved_settings = _resolve_model_settings(config, model_settings)
+    resolved_model_cfg = _resolve_model_cfg(config, model_cfg)
+    all_tools = _collect_tools(config)
 
-    # Resolve model_settings
-    # Priority: config.model_settings (if not inherit/None) > function arg model_settings
-    resolved_settings: dict[str, Any] | None = None
-    if config.model_settings is not None and config.model_settings != INHERIT:
-        resolved_settings = resolve_model_settings(config.model_settings)
-    elif model_settings is not None:
-        resolved_settings = resolve_model_settings(model_settings)
-
-    # Combine required and optional tools for subset
-    # Required tools (config.tools) must all be available for subagent to be enabled
-    # Optional tools (config.optional_tools) are included if available, not required
-    all_tools: list[str] | None = None
-    if config.tools is not None or config.optional_tools is not None:
-        all_tools = []
-        if config.tools:
-            all_tools.extend(config.tools)
-        if config.optional_tools:
-            all_tools.extend(config.optional_tools)
-
-    # Create subset toolset with all tools (required + optional)
     sub_toolset = parent_toolset.subset(all_tools)
 
-    # Create the subagent
     subagent: Agent[AgentContext, str] = Agent(
         model=infer_model(effective_model),
         system_prompt=config.system_prompt,
         toolsets=[sub_toolset],
         model_settings=resolved_settings,  # type: ignore[arg-type]
         deps_type=AgentContext,
+        history_processors=history_processors,
     )
 
-    # Create availability check function
-    # If tools are specified, check that all required tools are available in parent
     required_tools = config.tools
 
     def check_tools_available() -> bool:
@@ -96,13 +117,13 @@ def create_subagent_tool_from_config(
             return True
         return all(parent_toolset.is_tool_available(name) for name in required_tools)
 
-    # Create the tool
     return create_subagent_tool(
         name=config.name,
         description=config.description,
         call_func=create_subagent_call_func(subagent),
         instruction=config.instruction,
         availability_check=check_tools_available,
+        model_cfg=resolved_model_cfg,
     )
 
 
@@ -112,6 +133,8 @@ def create_subagent_tool_from_markdown(
     *,
     model: str | Model | None = None,
     model_settings: dict[str, Any] | str | None = None,
+    history_processors: Sequence[HistoryProcessor[AgentContext]] | None = None,
+    model_cfg: ModelConfig | None = None,
 ) -> type[BaseTool]:
     """Create a subagent tool from markdown content or file path.
 
@@ -122,6 +145,8 @@ def create_subagent_tool_from_markdown(
         parent_toolset: The parent toolset to derive tools from.
         model: Fallback model. Used if config.model is 'inherit' or None.
         model_settings: Fallback model settings. Used if config.model_settings is 'inherit' or None.
+        history_processors: History processors to use for the subagent.
+        model_cfg: Fallback ModelConfig. Used if config.model_cfg is None.
 
     Returns:
         A BaseTool subclass that wraps the subagent.
@@ -158,6 +183,8 @@ def create_subagent_tool_from_markdown(
         parent_toolset,
         model=model,
         model_settings=model_settings,
+        history_processors=history_processors,
+        model_cfg=model_cfg,
     )
 
 
@@ -167,6 +194,8 @@ def load_subagent_tools_from_dir(
     *,
     model: str | Model | None = None,
     model_settings: dict[str, Any] | str | None = None,
+    history_processors: Sequence[HistoryProcessor[AgentContext]] | None = None,
+    model_cfg: ModelConfig | None = None,
 ) -> list[type[BaseTool]]:
     """Load all subagent tools from a directory.
 
@@ -177,6 +206,8 @@ def load_subagent_tools_from_dir(
         parent_toolset: The parent toolset to derive tools from.
         model: Fallback model for all subagents.
         model_settings: Fallback model settings for all subagents.
+        history_processors: History processors to use for all subagents.
+        model_cfg: Fallback ModelConfig for all subagents.
 
     Returns:
         List of BaseTool subclasses.
@@ -199,6 +230,8 @@ def load_subagent_tools_from_dir(
             parent_toolset,
             model=model,
             model_settings=model_settings,
+            history_processors=history_processors,
+            model_cfg=model_cfg,
         )
         tools.append(tool)
 

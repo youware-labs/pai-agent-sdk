@@ -67,6 +67,7 @@ from pai_agent_sdk.toolsets.core.enhance import tools as enhance_tools
 from pai_agent_sdk.toolsets.core.filesystem import tools as filesystem_tools
 from pai_agent_sdk.toolsets.core.multimodal import tools as multimodal_tools
 from pai_agent_sdk.toolsets.core.shell import tools as shell_tools
+from pai_agent_sdk.toolsets.core.subagent import tools as subagent_tools
 from pai_agent_sdk.toolsets.core.web import tools as web_tools
 
 # =============================================================================
@@ -317,6 +318,7 @@ async def main():
             *multimodal_tools,
             *shell_tools,
             *web_tools,
+            *subagent_tools,
         ],
         need_user_approve_tools=["shell"],
         model_cfg=ModelConfig(context_window=200_000, capabilities={ModelCapability.vision}),

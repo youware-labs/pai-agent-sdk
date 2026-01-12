@@ -1,42 +1,30 @@
 """Factory functions for creating subagent tools.
 
 This module provides:
-- SubagentCallFunc: Protocol for subagent call functions
-- create_subagent_tool: Create BaseTool from a SubagentCallFunc
-- create_subagent_call_func: Create SubagentCallFunc from a pydantic-ai Agent
+- create_subagent_tool: Create BaseTool from a call function
+- create_subagent_call_func: Create a BaseTool.call compatible function from a pydantic-ai Agent
 """
 
 from __future__ import annotations
 
-import inspect
 from collections.abc import Awaitable, Callable, Container
-from typing import Annotated, Any, Protocol, cast, runtime_checkable
+from typing import Annotated, Any, cast
 from uuid import uuid4
 
 from pydantic import Field
 from pydantic_ai import Agent, AgentRunResult, RunContext
-from pydantic_ai.usage import RunUsage
 
 from pai_agent_sdk.context import AgentContext, ModelConfig
 from pai_agent_sdk.toolsets.core.base import BaseTool
-
-
-@runtime_checkable
-class SubagentCallFunc(Protocol):
-    """Protocol for subagent call functions.
-
-    The first parameter must be AgentContext (the subagent context),
-    followed by user-defined parameters. Returns (output, RunUsage) tuple.
-    """
-
-    async def __call__(self, ctx: AgentContext, /, **kwargs: Any) -> tuple[Any, RunUsage]: ...
-
 
 # Type alias for instruction functions
 InstructionFunc = Callable[[RunContext[AgentContext]], str | None]
 
 # Type alias for availability check functions
 AvailabilityCheckFunc = Callable[[RunContext[AgentContext]], bool]
+
+# Type alias for BaseTool.call compatible function
+SubagentCallFunc = Callable[..., Awaitable[str]]
 
 
 def create_subagent_tool(
@@ -46,63 +34,46 @@ def create_subagent_tool(
     *,
     instruction: str | InstructionFunc | None = None,
     availability_check: AvailabilityCheckFunc | None = None,
-    model_cfg: ModelConfig | None = None,
 ) -> type[BaseTool]:
     """Create a BaseTool subclass that wraps a subagent call function.
 
-    This factory function creates a tool class that:
-    - Uses the call_func's parameter signature (excluding ctx) as tool parameters
-    - Automatically records RunUsage to ctx.deps.extra_usage
-    - Converts the output to string for LLM consumption
+    This factory function creates a tool class that uses the provided call_func
+    directly as the tool's call method. The call_func should have a signature
+    compatible with BaseTool.call: (ctx: RunContext[AgentContext], **kwargs) -> str
 
-    For streaming, use ctx.deps.agent_stream_queues[tool_call_id] to send events.
+    Use create_subagent_call_func() to create a compatible call_func from a
+    pydantic-ai Agent.
 
     Args:
         name: Tool name used for invocation.
         description: Tool description shown to the model.
-        call_func: Async function with signature (ctx, **kwargs) -> (output, RunUsage).
-                   The function's parameters (after ctx) define the tool's input schema.
+        call_func: Async function with signature (ctx: RunContext[AgentContext], **kwargs) -> str.
+                   Use create_subagent_call_func() to create this from an Agent.
         instruction: Optional instruction for system prompt. Can be a string or
                      a callable that takes RunContext and returns a string.
         availability_check: Optional callable that returns True if the tool is available.
                             Called dynamically each time is_available() is invoked.
-        model_cfg: Optional ModelConfig to override in subagent context.
-                   If None, subagent inherits parent's model_cfg.
 
     Returns:
         A BaseTool subclass that can be used with Toolset.
 
     Example::
 
-        async def search(
-            ctx: AgentContext,  # This is the subagent context (auto-created)
-            query: str,
-            max_results: int = 10,
-        ) -> tuple[str, RunUsage]:
-            agent = get_search_agent()
-            result = await agent.run(f"Search: {query}, max: {max_results}", deps=ctx)
-            return str(result.output), result.usage()
+        from pydantic_ai import Agent
 
+        # Create an agent
+        search_agent: Agent[AgentContext, str] = Agent(...)
+
+        # Create the call function using create_subagent_call_func
+        search_call = create_subagent_call_func(search_agent)
+
+        # Create the tool
         SearchTool = create_subagent_tool(
             name="search",
             description="Search the web for information",
-            call_func=search,
+            call_func=search_call,
             instruction="Use this tool to search for current information.",
         )
-
-        # For streaming, access the parent context's stream queue:
-        async def search_with_stream(
-            ctx: AgentContext,
-            query: str,
-        ) -> tuple[str, RunUsage]:
-            # ctx.parent_run_id is the tool_call_id
-            # Access parent's stream queue via the shared reference
-            agent = get_search_agent()
-            async for event in agent.run_stream_events(query, deps=ctx):
-                # Forward events as needed
-                pass
-            result = await agent.run(query, deps=ctx)
-            return str(result.output), result.usage()
     """
 
     class DynamicSubagentTool(BaseTool):
@@ -128,83 +99,22 @@ def create_subagent_tool(
             return instruction
 
         async def call(self, ctx: RunContext[AgentContext], /, **kwargs: Any) -> str:
-            # Placeholder - will be replaced by _create_call_method
+            # Placeholder - will be replaced by actual call_func
             raise NotImplementedError  # pragma: no cover
 
     # Set class attributes from closure variables
     DynamicSubagentTool.name = name
     DynamicSubagentTool.description = description
 
-    # Copy the call signature from call_func to DynamicSubagentTool.call
-    # This allows pydantic-ai to inspect the correct parameters
-    DynamicSubagentTool.call = _create_call_method(call_func, model_cfg=model_cfg)  # type: ignore[method-assign]
+    # Use call_func directly as the call method
+    # call_func should already have the correct signature from create_subagent_call_func
+    DynamicSubagentTool.call = call_func  # type: ignore[method-assign]
 
     # Set a meaningful class name for debugging
     DynamicSubagentTool.__name__ = f"{_to_pascal_case(name)}Tool"
     DynamicSubagentTool.__qualname__ = DynamicSubagentTool.__name__
 
     return DynamicSubagentTool
-
-
-def _create_call_method(
-    call_func: SubagentCallFunc,
-    *,
-    model_cfg: ModelConfig | None = None,
-) -> Callable[..., Awaitable[str]]:
-    """Create a call method with the correct signature from call_func.
-
-    The first parameter (ctx: AgentContext) is replaced with RunContext[AgentContext]
-    for pydantic-ai compatibility. The actual call_func receives the subagent context.
-    """
-
-    async def call(self: BaseTool, ctx: RunContext[AgentContext], /, **kwargs: Any) -> str:
-        """Execute the subagent call and record usage."""
-        override_kwargs: dict[str, Any] = {}
-        if model_cfg is not None:
-            override_kwargs["model_cfg"] = model_cfg
-        async with ctx.deps.create_subagent_context(self.name, agent_id=ctx.tool_call_id, **override_kwargs) as sub_ctx:
-            output, usage = await call_func(sub_ctx, **kwargs)
-
-        # Record usage in extra_usages
-        if ctx.tool_call_id:
-            ctx.deps.add_extra_usage(agent=self.name, usage=usage, uuid=ctx.tool_call_id)
-
-        # Convert output to string for LLM
-        return str(output)
-
-    # Copy the signature from call_func, but replace ctx type
-    original_sig = inspect.signature(call_func)
-    params = list(original_sig.parameters.values())
-
-    # Replace first param (ctx: AgentContext) with (ctx: RunContext[AgentContext])
-    if params:
-        first_param = params[0]
-        new_first_param = first_param.replace(annotation=RunContext[AgentContext])
-        params[0] = new_first_param
-
-    # Create new signature with RunContext and str return type
-    new_sig = original_sig.replace(parameters=params, return_annotation=str)
-    call.__signature__ = new_sig  # type: ignore[attr-defined]
-
-    # Copy docstring and name
-    call.__doc__ = call_func.__doc__ or "Execute the subagent call and record usage."
-    call.__name__ = "call"
-    call.__qualname__ = "call"
-
-    # Build annotations with RunContext[AgentContext] for the first param
-    original_annotations = getattr(call_func, "__annotations__", {})
-    new_annotations: dict[str, Any] = {}
-    first_param_name = params[0].name if params else "ctx"
-    for key, value in original_annotations.items():
-        if key == first_param_name:
-            # Replace ctx: AgentContext with ctx: RunContext[AgentContext]
-            new_annotations[key] = RunContext[AgentContext]
-        elif key != "return":
-            new_annotations[key] = value
-    new_annotations["return"] = str
-    call.__annotations__ = new_annotations
-
-    return call
 
 
 def _to_pascal_case(name: str) -> str:
@@ -244,17 +154,26 @@ def generate_unique_id(run_id: str, existing: Container[str], *, max_retries: in
 
 def create_subagent_call_func(
     agent: Agent[AgentContext, Any],
+    *,
+    model_cfg: ModelConfig | None = None,
 ) -> SubagentCallFunc:
-    """Create a SubagentCallFunc from a pydantic-ai Agent.
+    """Create a BaseTool.call compatible function from a pydantic-ai Agent.
 
-    Wraps a pydantic-ai Agent into a SubagentCallFunc that can be used
-    directly or passed to create_subagent_tool().
+    This function creates a call method that:
+    - Has the correct signature for BaseTool.call: (ctx: RunContext[AgentContext], **kwargs) -> str
+    - Generates stable agent_id in format {agent.name}-{short_id}
+    - Registers the agent in parent's agent_registry
+    - Manages subagent_history for conversation continuity
+    - Records usage in extra_usages
+    - Streams events to parent context
 
     Args:
         agent: A pydantic-ai Agent with AgentContext as deps type.
+        model_cfg: Optional ModelConfig to override in subagent context.
+                   If None, subagent inherits parent's model_cfg.
 
     Returns:
-        A SubagentCallFunc with signature (ctx: AgentContext, prompt: str) -> tuple[Any, RunUsage]
+        A function compatible with BaseTool.call signature.
 
     Example::
 
@@ -263,39 +182,60 @@ def create_subagent_call_func(
         search_agent: Agent[AgentContext, str] = Agent(...)
 
         # Create the call function
-        search_func = create_subagent_call_func(search_agent)
+        search_call = create_subagent_call_func(search_agent)
 
-        # Direct usage
-        output, usage = await search_func(ctx, prompt="Search for Python tutorials")
-
-        # Or pass to create_subagent_tool
-        SearchTool = create_subagent_tool("search", "Search the web", search_func)
+        # Pass to create_subagent_tool
+        SearchTool = create_subagent_tool("search", "Search the web", search_call)
     """
+    agent_name = agent.name or "subagent"
 
     async def call_func(
-        ctx: AgentContext,
+        self: BaseTool,
+        ctx: RunContext[AgentContext],
         prompt: Annotated[str, Field(description="The prompt to send to the subagent")],
         agent_id: Annotated[str | None, Field(description="Optional agent ID to resume")] = None,
-    ) -> tuple[str, RunUsage]:
+    ) -> str:
         """Execute the agent with the given prompt."""
+        deps = ctx.deps
+
+        # Generate stable agent_id if not provided
         if not agent_id:
-            agent_id = generate_unique_id(ctx.run_id, ctx.subagent_history)
-        async with agent.iter(prompt, deps=ctx, message_history=ctx.subagent_history.get(agent_id)) as run:
-            async for node in run:
-                if Agent.is_user_prompt_node(node) or Agent.is_end_node(node):
-                    continue
+            short_id = generate_unique_id(deps.run_id, deps.subagent_history)
+            agent_id = f"{agent_name}-{short_id}"
 
-                elif Agent.is_model_request_node(node) or Agent.is_call_tools_node(node):
-                    async with node.stream(run.ctx) as request_stream:
-                        async for event in request_stream:
-                            await ctx.emit_event(event)
+        # Create subagent context (handles registration in agent_registry)
+        override_kwargs: dict[str, Any] = {}
+        if model_cfg is not None:
+            override_kwargs["model_cfg"] = model_cfg
 
-        result = cast(AgentRunResult, run.result)
-        ctx.subagent_history[agent_id] = result.all_messages()
+        async with deps.create_subagent_context(agent_name, agent_id=agent_id, **override_kwargs) as sub_ctx:
+            # Run agent with message history for conversation continuity
+            async with agent.iter(
+                prompt,
+                deps=sub_ctx,
+                message_history=deps.subagent_history.get(agent_id),
+            ) as run:
+                async for node in run:
+                    if Agent.is_user_prompt_node(node) or Agent.is_end_node(node):
+                        continue
 
-        rendered_result = f"""<id>{agent_id}</id>
+                    elif Agent.is_model_request_node(node) or Agent.is_call_tools_node(node):
+                        async with node.stream(run.ctx) as request_stream:
+                            async for event in request_stream:
+                                await deps.emit_event(event)
+
+            result = cast(AgentRunResult, run.result)
+
+            # Store message history for future resume
+            deps.subagent_history[agent_id] = result.all_messages()
+
+            # Record usage in extra_usages
+            if ctx.tool_call_id:
+                deps.add_extra_usage(agent=agent_id, usage=result.usage(), uuid=ctx.tool_call_id)
+
+        # Return formatted result
+        return f"""<id>{agent_id}</id>
 <response>{result.output}</response>
 """
-        return rendered_result, result.usage()
 
     return call_func  # type: ignore[return-value]

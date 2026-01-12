@@ -217,6 +217,7 @@ def create_agent(
     include_builtin_subagents: bool = False,
     # --- Agent ---
     agent_tools: Sequence[Any] | None = None,
+    agent_name: str = "main",
     system_prompt: str | None = None,
     system_prompt_template_vars: dict[str, Any] | None = None,
     history_processors: Sequence[HistoryProcessor[AgentDepsT]] | None = None,
@@ -265,6 +266,7 @@ def create_agent(
         compact_model_cfg: ModelConfig for compact filter. Defaults to main model_cfg.
 
         agent_tools: Additional tools to pass directly to Agent (pydantic-ai Tool objects).
+        agent_name: Name of the agent for logging.
         system_prompt: Custom system prompt(s). If None, loads from main.md.
         system_prompt_template_vars: Variables for Jinja2 template rendering.
         history_processors: Sequence of history processor functions.
@@ -410,6 +412,7 @@ def create_agent(
             defer_model_check=defer_model_check,
             end_strategy=end_strategy,  # type: ignore[arg-type]
             metadata=cast(dict[str, Any], metadata) if metadata else None,
+            name=agent_name,
         ),
         all_toolsets,
     )
@@ -626,9 +629,8 @@ async def stream_agent(  # noqa: C901
         user_prompt[:100] if isinstance(user_prompt, str) else type(user_prompt),
     )
 
-    # Register main agent
-    main_agent_info = AgentInfo(agent_id=ctx.run_id, agent_name="main")
-    ctx.agent_registry[ctx.run_id] = main_agent_info
+    # Build main agent info
+    main_agent_info = AgentInfo(agent_id="main", agent_name=agent.name or "main")
     ctx.user_prompts = user_prompt
 
     async def process_node(

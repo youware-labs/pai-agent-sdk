@@ -830,12 +830,13 @@ class AgentContext(BaseModel):
         # Generate agent_id if not provided
         effective_agent_id = agent_id or _generate_run_id()
 
-        # Register agent info in parent's registry
-        self.agent_registry[effective_agent_id] = AgentInfo(
-            agent_id=effective_agent_id,
-            agent_name=agent_name,
-            parent_agent_id=self.run_id,
-        )
+        # Register agent info in parent's registry (idempotent for resume)
+        if effective_agent_id not in self.agent_registry:
+            self.agent_registry[effective_agent_id] = AgentInfo(
+                agent_id=effective_agent_id,
+                agent_name=agent_name,
+                parent_agent_id=self.run_id,
+            )
 
         update: dict[str, Any] = {
             "run_id": effective_agent_id,

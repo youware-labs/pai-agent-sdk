@@ -40,11 +40,27 @@ For streaming, use the parent context's stream queue::
         return result.output, result.usage()
 """
 
+from pai_agent_sdk.toolsets.core.base import BaseTool
 from pai_agent_sdk.toolsets.core.subagent.factory import (
     AvailabilityCheckFunc,
     SubagentCallFunc,
     create_subagent_call_func,
     create_subagent_tool,
 )
+from pai_agent_sdk.toolsets.core.subagent.tools import (
+    SubagentInfoTool,
+)
 
-__all__ = ["AvailabilityCheckFunc", "SubagentCallFunc", "create_subagent_call_func", "create_subagent_tool"]
+# Management tools for inspecting subagent state
+tools: list[type[BaseTool]] = [
+    SubagentInfoTool,
+]
+
+__all__ = [
+    "AvailabilityCheckFunc",
+    "SubagentCallFunc",
+    "SubagentInfoTool",
+    "create_subagent_call_func",
+    "create_subagent_tool",
+    "tools",
+]

@@ -9,99 +9,26 @@ from pydantic_ai import Agent, RunContext
 from pydantic_ai.usage import RunUsage
 
 from pai_agent_sdk.context import AgentContext
-from pai_agent_sdk.toolsets.core.base import Toolset
+from pai_agent_sdk.toolsets.core.base import BaseTool, Toolset
 from pai_agent_sdk.toolsets.core.subagent import (
-    SubagentCallFunc,
     create_subagent_call_func,
     create_subagent_tool,
 )
 from pai_agent_sdk.toolsets.core.subagent.factory import generate_unique_id
 
-# Test fixtures and mock functions
+# Tests for create_subagent_tool with create_subagent_call_func
 
 
-async def mock_search(
-    ctx: AgentContext,  # Now receives subagent context directly
-    query: str,
-    max_results: int = 10,
-) -> tuple[str, RunUsage]:
-    """Mock search function that returns query info and usage."""
-    usage = RunUsage(requests=1, input_tokens=10, output_tokens=20)
-    return f"Results for '{query}' (max: {max_results})", usage
+def test_creates_tool_class_with_agent():
+    """Test that create_subagent_tool creates a BaseTool subclass from agent call func."""
+    mock_agent = MagicMock(spec=Agent)
+    mock_agent.name = "search"
 
-
-async def mock_analyze(
-    ctx: AgentContext,  # Now receives subagent context directly
-    content: str,
-) -> tuple[dict, RunUsage]:
-    """Mock analyze function that returns a dict."""
-    usage = RunUsage(requests=1, input_tokens=5, output_tokens=15)
-    return {"analysis": content, "score": 0.95}, usage
-
-
-# Tests for create_subagent_tool function
-
-
-def test_call_signature_is_correct():
-    """Test that the call method has correct signature for pydantic-ai.
-
-    The call method should have:
-    - First parameter: ctx with type RunContext[AgentContext]
-    - Remaining parameters: copied from call_func (without ctx)
-    - Return type: str
-
-    Note: 'self' is not in __signature__ because we assign a plain function
-    to the class attribute, not a bound method. pydantic-ai Tool extracts
-    parameters starting from 'ctx', which is correct.
-    """
+    call_func = create_subagent_call_func(mock_agent)
     SearchTool = create_subagent_tool(
         name="search",
         description="Search the web",
-        call_func=mock_search,
-    )
-
-    # Get the signature from the class's call method
-    sig = inspect.signature(SearchTool.call)
-    params = list(sig.parameters.items())
-    param_names = [name for name, _ in params]
-
-    # The signature should contain: ctx, query, max_results
-    # (self is handled separately by Python method binding, not in __signature__)
-    assert param_names[0] == "ctx", f"First param should be ctx, got {param_names[0]}"
-    assert "query" in param_names, "Should have query parameter from call_func"
-    assert "max_results" in param_names, "Should have max_results parameter from call_func"
-
-    # Check annotations - the key check is that ctx is RunContext[AgentContext], NOT AgentContext
-    annotations = SearchTool.call.__annotations__
-    assert annotations.get("ctx") == RunContext[AgentContext], (
-        f"ctx should be RunContext[AgentContext], got {annotations.get('ctx')}"
-    )
-    assert annotations.get("query") is str, f"query should be str, got {annotations.get('query')}"
-    assert annotations.get("max_results") is int, f"max_results should be int, got {annotations.get('max_results')}"
-    assert annotations.get("return") is str, f"return should be str, got {annotations.get('return')}"
-
-    # Check signature return annotation
-    assert sig.return_annotation is str, f"Return annotation should be str, got {sig.return_annotation}"
-
-    # Check parameter defaults
-    params_dict = dict(params)
-    if "max_results" in params_dict:
-        max_results_param = params_dict["max_results"]
-        assert max_results_param.default == 10, f"max_results default should be 10, got {max_results_param.default}"
-
-    # Verify the signature parameter types match annotations
-    ctx_param = params_dict["ctx"]
-    assert ctx_param.annotation == RunContext[AgentContext], (
-        f"ctx param annotation should be RunContext[AgentContext], got {ctx_param.annotation}"
-    )
-
-
-def test_creates_tool_class():
-    """Test that create_subagent_tool returns a BaseTool subclass."""
-    SearchTool = create_subagent_tool(
-        name="search",
-        description="Search the web",
-        call_func=mock_search,
+        call_func=call_func,
     )
 
     assert SearchTool.name == "search"
@@ -111,87 +38,64 @@ def test_creates_tool_class():
 
 def test_pascal_case_naming():
     """Test that tool class names are converted to PascalCase."""
+    mock_agent = MagicMock(spec=Agent)
+    mock_agent.name = "web_search"
+
+    call_func = create_subagent_call_func(mock_agent)
+
     Tool1 = create_subagent_tool(
         name="web_search",
         description="desc",
-        call_func=mock_search,
+        call_func=call_func,
     )
     assert Tool1.__name__ == "WebSearchTool"
 
     Tool2 = create_subagent_tool(
         name="analyze-content",
         description="desc",
-        call_func=mock_search,
+        call_func=call_func,
     )
     assert Tool2.__name__ == "AnalyzeContentTool"
 
 
-async def test_call_returns_string(agent_context: AgentContext):
-    """Test that tool call returns string output."""
-    AnalyzeTool = create_subagent_tool(
-        name="analyze",
-        description="Analyze content",
-        call_func=mock_analyze,
-    )
+def test_call_signature_has_correct_parameters():
+    """Test that the call method has the correct signature for pydantic-ai."""
+    mock_agent = MagicMock(spec=Agent)
+    mock_agent.name = "search"
 
-    tool = AnalyzeTool(agent_context)
-    ctx = _create_mock_run_context(agent_context, tool_call_id="test-call-1")
-
-    result = await tool.call(ctx, content="test content")
-
-    # Dict should be converted to string
-    assert isinstance(result, str)
-    assert "analysis" in result
-    assert "test content" in result
-
-
-async def test_usage_recorded(agent_context: AgentContext):
-    """Test that usage is recorded in extra_usages."""
+    call_func = create_subagent_call_func(mock_agent)
     SearchTool = create_subagent_tool(
         name="search",
-        description="Search",
-        call_func=mock_search,
+        description="Search the web",
+        call_func=call_func,
     )
 
-    tool = SearchTool(agent_context)
-    tool_call_id = "test-call-123"
-    ctx = _create_mock_run_context(agent_context, tool_call_id=tool_call_id)
+    # Get the signature from the class's call method
+    sig = inspect.signature(SearchTool.call)
+    params = list(sig.parameters.items())
+    param_names = [name for name, _ in params]
 
-    await tool.call(ctx, query="test query")
+    # The signature should contain: ctx, prompt, agent_id
+    assert "ctx" in param_names, "Should have ctx parameter"
+    assert "prompt" in param_names, "Should have prompt parameter"
+    assert "agent_id" in param_names, "Should have agent_id parameter"
 
-    # Check usage was recorded
-    assert len(agent_context.extra_usages) == 1
-    record = agent_context.extra_usages[0]
-    assert record.uuid == tool_call_id
-    assert record.agent == "search"
-    assert record.usage.requests == 1
-    assert record.usage.input_tokens == 10
-    assert record.usage.output_tokens == 20
-
-
-async def test_usage_not_recorded_without_tool_call_id(agent_context: AgentContext):
-    """Test that usage is not recorded when tool_call_id is None."""
-    SearchTool = create_subagent_tool(
-        name="search",
-        description="Search",
-        call_func=mock_search,
-    )
-
-    tool = SearchTool(agent_context)
-    ctx = _create_mock_run_context(agent_context, tool_call_id=None)
-
-    await tool.call(ctx, query="test query")
-
-    # No usage should be recorded
-    assert len(agent_context.extra_usages) == 0
+    # Check annotations exist (may be string due to PEP 563)
+    annotations = SearchTool.call.__annotations__
+    assert "ctx" in annotations, "Should have ctx annotation"
+    assert "return" in annotations, "Should have return annotation"
 
 
 def test_instruction_string(agent_context: AgentContext):
     """Test static instruction string."""
+    mock_agent = MagicMock(spec=Agent)
+    mock_agent.name = "search"
+
+    call_func = create_subagent_call_func(mock_agent)
     SearchTool = create_subagent_tool(
         name="search",
         description="Search",
-        call_func=mock_search,
+        call_func=call_func,
         instruction="Use this to search the web.",
     )
 
@@ -203,14 +107,17 @@ def test_instruction_string(agent_context: AgentContext):
 
 def test_instruction_callable(agent_context: AgentContext):
     """Test dynamic instruction callable."""
+    mock_agent = MagicMock(spec=Agent)
+    mock_agent.name = "search"
 
     def dynamic_instruction(ctx: RunContext[AgentContext]) -> str:
         return f"Search with run_id: {ctx.deps.run_id}"
 
+    call_func = create_subagent_call_func(mock_agent)
     SearchTool = create_subagent_tool(
         name="search",
         description="Search",
-        call_func=mock_search,
+        call_func=call_func,
         instruction=dynamic_instruction,
     )
 
@@ -223,10 +130,14 @@ def test_instruction_callable(agent_context: AgentContext):
 
 def test_instruction_none(agent_context: AgentContext):
     """Test that no instruction returns None."""
+    mock_agent = MagicMock(spec=Agent)
+    mock_agent.name = "search"
+
+    call_func = create_subagent_call_func(mock_agent)
     SearchTool = create_subagent_tool(
         name="search",
         description="Search",
-        call_func=mock_search,
+        call_func=call_func,
     )
 
     tool = SearchTool(agent_context)
@@ -237,10 +148,14 @@ def test_instruction_none(agent_context: AgentContext):
 
 async def test_with_toolset(agent_context: AgentContext):
     """Test that created tool works with Toolset."""
+    mock_agent = MagicMock(spec=Agent)
+    mock_agent.name = "search"
+
+    call_func = create_subagent_call_func(mock_agent)
     SearchTool = create_subagent_tool(
         name="search",
         description="Search the web",
-        call_func=mock_search,
+        call_func=call_func,
     )
 
     toolset = Toolset(agent_context, tools=[SearchTool])
@@ -290,91 +205,141 @@ async def test_stream_queues_multiple_tools(agent_context: AgentContext):
     assert await queue2.get() == "event2"
 
 
-# Helper functions
+# Tests for create_subagent_call_func
 
 
-async def test_call_method_uses_create_subagent_context(agent_context: AgentContext):
-    """Test that the call method uses create_subagent_context for subagent context creation."""
-    parent_run_id = agent_context.run_id
-
-    async def mock_with_parent_check(
-        ctx: AgentContext,
-        query: str,
-    ) -> tuple[str, RunUsage]:
-        """Mock function that verifies subagent context is created correctly."""
-        # Verify subagent context has run_id set to tool_call_id
-        assert ctx.run_id == "test-call-subagent"
-        # Verify parent_run_id points to the parent's run_id
-        assert ctx.parent_run_id == parent_run_id
-        usage = RunUsage(requests=1, input_tokens=5, output_tokens=10)
-        return f"Query: {query}", usage
-
-    SearchTool = create_subagent_tool(
-        name="search_subagent",
-        description="Search with subagent",
-        call_func=mock_with_parent_check,
-    )
-
-    tool = SearchTool(agent_context)
-    ctx = _create_mock_run_context(agent_context, tool_call_id="test-call-subagent")
-
-    result = await tool.call(ctx, query="test")
-
-    assert "Query: test" in result
-
-
-async def test_create_subagent_call_func():
-    """Test create_subagent_call_func creates a working SubagentCallFunc."""
-    # Create a mock Agent
+async def test_create_subagent_call_func_basic():
+    """Test create_subagent_call_func creates a working call function."""
     mock_agent = MagicMock(spec=Agent)
+    mock_agent.name = "search"
 
-    # Mock the iter context manager and its return
     mock_run = MagicMock()
     mock_run.result = MagicMock()
     mock_run.result.output = "search result"
+    mock_run.result.all_messages = MagicMock(return_value=[])
     mock_run.result.usage = MagicMock(return_value=RunUsage(requests=1, input_tokens=10, output_tokens=20))
 
-    # Create an async iterator that yields nothing (empty iteration)
     async def empty_async_iter():
         return
-        yield  # Make this an async generator
+        yield
 
     mock_run.__aiter__ = lambda _: empty_async_iter()
 
-    # Mock iter as async context manager
     @asynccontextmanager
     async def mock_iter(prompt, deps, message_history=None):
         yield mock_run
 
     mock_agent.iter = mock_iter
-    mock_agent.is_user_prompt_node = MagicMock(return_value=False)
-    mock_agent.is_end_node = MagicMock(return_value=False)
-    mock_agent.is_model_request_node = MagicMock(return_value=False)
-    mock_agent.is_call_tools_node = MagicMock(return_value=False)
 
-    # Create the call func
     call_func = create_subagent_call_func(mock_agent)
 
-    # Create context
+    # Create context and mock tool instance
     ctx = AgentContext()
+    run_ctx = _create_mock_run_context(ctx, tool_call_id="test-call-123")
+
+    # Create a mock self (BaseTool instance)
+    mock_self = MagicMock(spec=BaseTool)
 
     # Call the function
-    output, usage = await call_func(ctx, prompt="test query")
+    output = await call_func(mock_self, run_ctx, prompt="test query")
 
     # Output is wrapped in XML tags
     assert "search result" in output
-    assert usage.requests == 1
+    assert "<id>search-" in output
+
+    # Usage should be recorded
+    assert len(ctx.extra_usages) == 1
+    assert ctx.extra_usages[0].uuid == "test-call-123"
+    # agent field uses agent_id (e.g., "search-xxxx")
+    assert ctx.extra_usages[0].agent.startswith("search-")
+
+
+async def test_create_subagent_call_func_registers_agent():
+    """Test that create_subagent_call_func registers agent in agent_registry."""
+    mock_agent = MagicMock(spec=Agent)
+    mock_agent.name = "analyze"
+
+    mock_run = MagicMock()
+    mock_run.result = MagicMock()
+    mock_run.result.output = "analysis result"
+    mock_run.result.all_messages = MagicMock(return_value=[])
+    mock_run.result.usage = MagicMock(return_value=RunUsage(requests=1))
+
+    async def empty_async_iter():
+        return
+        yield
+
+    mock_run.__aiter__ = lambda _: empty_async_iter()
+
+    @asynccontextmanager
+    async def mock_iter(prompt, deps, message_history=None):
+        yield mock_run
+
+    mock_agent.iter = mock_iter
+
+    call_func = create_subagent_call_func(mock_agent)
+
+    ctx = AgentContext()
+    run_ctx = _create_mock_run_context(ctx)
+    mock_self = MagicMock(spec=BaseTool)
+
+    await call_func(mock_self, run_ctx, prompt="test")
+
+    # Agent should be registered
+    assert len(ctx.agent_registry) == 1
+    agent_id = next(iter(ctx.agent_registry.keys()))
+    assert agent_id.startswith("analyze-")
+    assert ctx.agent_registry[agent_id].agent_name == "analyze"
+    assert ctx.agent_registry[agent_id].parent_agent_id == ctx.run_id
+
+
+async def test_create_subagent_call_func_stores_history():
+    """Test that create_subagent_call_func stores subagent history."""
+    mock_agent = MagicMock(spec=Agent)
+    mock_agent.name = "chat"
+
+    mock_messages = [{"role": "user", "content": "test"}, {"role": "assistant", "content": "response"}]
+    mock_run = MagicMock()
+    mock_run.result = MagicMock()
+    mock_run.result.output = "chat response"
+    mock_run.result.all_messages = MagicMock(return_value=mock_messages)
+    mock_run.result.usage = MagicMock(return_value=RunUsage(requests=1))
+
+    async def empty_async_iter():
+        return
+        yield
+
+    mock_run.__aiter__ = lambda _: empty_async_iter()
+
+    @asynccontextmanager
+    async def mock_iter(prompt, deps, message_history=None):
+        yield mock_run
+
+    mock_agent.iter = mock_iter
+
+    call_func = create_subagent_call_func(mock_agent)
+
+    ctx = AgentContext()
+    run_ctx = _create_mock_run_context(ctx)
+    mock_self = MagicMock(spec=BaseTool)
+
+    await call_func(mock_self, run_ctx, prompt="test")
+
+    # History should be stored
+    assert len(ctx.subagent_history) == 1
+    agent_id = next(iter(ctx.subagent_history.keys()))
+    assert ctx.subagent_history[agent_id] == mock_messages
 
 
 async def test_create_subagent_call_func_with_streaming_nodes():
     """Test create_subagent_call_func handles model request and call tools nodes."""
-    # Create a mock Agent
     mock_agent = MagicMock(spec=Agent)
+    mock_agent.name = "streamer"
 
-    # Mock result
     mock_run = MagicMock()
     mock_run.result = MagicMock()
     mock_run.result.output = "result with streaming"
+    mock_run.result.all_messages = MagicMock(return_value=[])
     mock_run.result.usage = MagicMock(return_value=RunUsage(requests=2, input_tokens=20, output_tokens=30))
     mock_run.ctx = MagicMock()
 
@@ -420,30 +385,22 @@ async def test_create_subagent_call_func_with_streaming_nodes():
     def is_end(node):
         return node is mock_end_node
 
-    mock_agent.is_user_prompt_node = MagicMock(return_value=False)
-    mock_agent.is_end_node = is_end
-    mock_agent.is_model_request_node = is_model_request
-    mock_agent.is_call_tools_node = is_call_tools
-
     # Patch Agent class methods
     Agent.is_user_prompt_node = staticmethod(lambda n: False)
     Agent.is_end_node = staticmethod(is_end)
     Agent.is_model_request_node = staticmethod(is_model_request)
     Agent.is_call_tools_node = staticmethod(is_call_tools)
 
-    # Create the call func
     call_func = create_subagent_call_func(mock_agent)
 
-    # Create context with stream queue enabled
     ctx = AgentContext()
     ctx._stream_queue_enabled = True
+    run_ctx = _create_mock_run_context(ctx)
+    mock_self = MagicMock(spec=BaseTool)
 
-    # Call the function
-    output, usage = await call_func(ctx, prompt="test streaming")
+    output = await call_func(mock_self, run_ctx, prompt="test streaming")
 
-    # Output is wrapped in XML tags
     assert "result with streaming" in output
-    assert usage.requests == 2
 
     # Check that events were put into stream queue
     queue = ctx.agent_stream_queues[ctx.run_id]
@@ -452,31 +409,163 @@ async def test_create_subagent_call_func_with_streaming_nodes():
     assert event == mock_event
 
 
-async def test_subagent_call_func_protocol():
-    """Test SubagentCallFunc protocol checking."""
-
-    # A valid SubagentCallFunc
-    async def valid_func(ctx: AgentContext, query: str) -> tuple[str, RunUsage]:
-        return "result", RunUsage()
-
-    # Check protocol conformance at runtime
-    assert isinstance(valid_func, SubagentCallFunc)
+# Tests for agent_id generation
 
 
-def _create_mock_run_context(
-    agent_context: AgentContext,
-    tool_call_id: str | None = "mock-tool-call-id",
-) -> RunContext[AgentContext]:
-    """Create a mock RunContext for testing."""
-    return RunContext[AgentContext](
-        deps=agent_context,
-        model=None,  # type: ignore[arg-type]
-        usage=RunUsage(),
-        prompt="test",
-        messages=[],
-        run_step=0,
-        tool_call_id=tool_call_id,
+async def test_create_subagent_call_func_agent_id_with_name():
+    """Test that agent_id includes agent name when agent has a name."""
+    mock_agent = MagicMock(spec=Agent)
+    mock_agent.name = "search"
+
+    mock_run = MagicMock()
+    mock_run.result = MagicMock()
+    mock_run.result.output = "search result"
+    mock_run.result.all_messages = MagicMock(return_value=[])
+    mock_run.result.usage = MagicMock(return_value=RunUsage(requests=1))
+
+    async def empty_async_iter():
+        return
+        yield
+
+    mock_run.__aiter__ = lambda _: empty_async_iter()
+
+    @asynccontextmanager
+    async def mock_iter(prompt, deps, message_history=None):
+        yield mock_run
+
+    mock_agent.iter = mock_iter
+
+    call_func = create_subagent_call_func(mock_agent)
+
+    ctx = AgentContext()
+    run_ctx = _create_mock_run_context(ctx)
+    mock_self = MagicMock(spec=BaseTool)
+
+    output = await call_func(mock_self, run_ctx, prompt="test query")
+
+    # Verify agent_id format: {agent.name}-{short_id}
+    assert "<id>search-" in output
+    import re
+
+    match = re.search(r"<id>(search-[a-f0-9]{4})</id>", output)
+    assert match is not None, f"Expected agent_id format 'search-XXXX' not found in: {output}"
+
+
+async def test_create_subagent_call_func_agent_id_without_name():
+    """Test that agent_id uses 'subagent' as default name when agent has no name."""
+    mock_agent = MagicMock(spec=Agent)
+    mock_agent.name = None  # No name
+
+    mock_run = MagicMock()
+    mock_run.result = MagicMock()
+    mock_run.result.output = "result"
+    mock_run.result.all_messages = MagicMock(return_value=[])
+    mock_run.result.usage = MagicMock(return_value=RunUsage(requests=1))
+
+    async def empty_async_iter():
+        return
+        yield
+
+    mock_run.__aiter__ = lambda _: empty_async_iter()
+
+    @asynccontextmanager
+    async def mock_iter(prompt, deps, message_history=None):
+        yield mock_run
+
+    mock_agent.iter = mock_iter
+
+    call_func = create_subagent_call_func(mock_agent)
+
+    ctx = AgentContext()
+    run_ctx = _create_mock_run_context(ctx)
+    mock_self = MagicMock(spec=BaseTool)
+
+    output = await call_func(mock_self, run_ctx, prompt="test query")
+
+    # Verify agent_id uses default name "subagent"
+    assert "<id>subagent-" in output
+
+
+async def test_create_subagent_call_func_resume_with_agent_id():
+    """Test that resuming with explicit agent_id works correctly."""
+    mock_agent = MagicMock(spec=Agent)
+    mock_agent.name = "analyze"
+
+    mock_run = MagicMock()
+    mock_run.result = MagicMock()
+    mock_run.result.output = "resumed result"
+    mock_run.result.all_messages = MagicMock(return_value=[{"role": "user", "content": "prev"}])
+    mock_run.result.usage = MagicMock(return_value=RunUsage(requests=1))
+
+    async def empty_async_iter():
+        return
+        yield
+
+    mock_run.__aiter__ = lambda _: empty_async_iter()
+
+    @asynccontextmanager
+    async def mock_iter(prompt, deps, message_history=None):
+        yield mock_run
+
+    mock_agent.iter = mock_iter
+
+    call_func = create_subagent_call_func(mock_agent)
+
+    ctx = AgentContext()
+    # Pre-populate history for the agent_id
+    ctx.subagent_history["analyze-abcd"] = [{"role": "user", "content": "previous"}]
+    # Pre-register in agent_registry
+    from pai_agent_sdk.context import AgentInfo
+
+    ctx.agent_registry["analyze-abcd"] = AgentInfo(
+        agent_id="analyze-abcd",
+        agent_name="analyze",
+        parent_agent_id=ctx.run_id,
     )
+
+    run_ctx = _create_mock_run_context(ctx)
+    mock_self = MagicMock(spec=BaseTool)
+
+    # Resume with explicit agent_id
+    output = await call_func(mock_self, run_ctx, prompt="continue", agent_id="analyze-abcd")
+
+    # Should use the provided agent_id, not generate a new one
+    assert "<id>analyze-abcd</id>" in output
+
+
+async def test_usage_not_recorded_without_tool_call_id():
+    """Test that usage is not recorded when tool_call_id is None."""
+    mock_agent = MagicMock(spec=Agent)
+    mock_agent.name = "search"
+
+    mock_run = MagicMock()
+    mock_run.result = MagicMock()
+    mock_run.result.output = "result"
+    mock_run.result.all_messages = MagicMock(return_value=[])
+    mock_run.result.usage = MagicMock(return_value=RunUsage(requests=1))
+
+    async def empty_async_iter():
+        return
+        yield
+
+    mock_run.__aiter__ = lambda _: empty_async_iter()
+
+    @asynccontextmanager
+    async def mock_iter(prompt, deps, message_history=None):
+        yield mock_run
+
+    mock_agent.iter = mock_iter
+
+    call_func = create_subagent_call_func(mock_agent)
+
+    ctx = AgentContext()
+    run_ctx = _create_mock_run_context(ctx, tool_call_id=None)
+    mock_self = MagicMock(spec=BaseTool)
+
+    await call_func(mock_self, run_ctx, prompt="test")
+
+    # No usage should be recorded
+    assert len(ctx.extra_usages) == 0
 
 
 # Tests for generate_unique_id function
@@ -506,8 +595,6 @@ def test_generate_unique_id_with_collision():
 def test_generate_unique_id_retries_until_unique():
     """Test that generate_unique_id retries until finding unique ID."""
     run_id = "abcd1234efgh5678"
-    # Create a set that will cause multiple collisions
-    # The function tries run_id[-4:] first, then random UUIDs
     existing = {"5678"}
 
     result = generate_unique_id(run_id, existing)
@@ -518,16 +605,13 @@ def test_generate_unique_id_retries_until_unique():
 
 def test_generate_unique_id_raises_on_max_retries(monkeypatch):
     """Test that generate_unique_id raises RuntimeError after max retries."""
-
     run_id = "abcd1234efgh5678"
 
-    # Mock uuid4 to always return the same value
     class MockUUID:
         hex = "aaaa0000bbbb1111"
 
     monkeypatch.setattr("pai_agent_sdk.toolsets.core.subagent.factory.uuid4", lambda: MockUUID())
 
-    # Both the run_id suffix and the mocked uuid will collide
     existing = {"5678", "aaaa"}
 
     with pytest.raises(RuntimeError, match="Failed to generate unique agent_id after 10 retries"):
@@ -542,3 +626,22 @@ def test_generate_unique_id_with_custom_max_retries():
     result = generate_unique_id(run_id, existing, max_retries=5)
 
     assert result == "5678"
+
+
+# Helper functions
+
+
+def _create_mock_run_context(
+    agent_context: AgentContext,
+    tool_call_id: str | None = "mock-tool-call-id",
+) -> RunContext[AgentContext]:
+    """Create a mock RunContext for testing."""
+    return RunContext[AgentContext](
+        deps=agent_context,
+        model=None,  # type: ignore[arg-type]
+        usage=RunUsage(),
+        prompt="test",
+        messages=[],
+        run_step=0,
+        tool_call_id=tool_call_id,
+    )

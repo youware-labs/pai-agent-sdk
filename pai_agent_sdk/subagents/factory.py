@@ -108,6 +108,7 @@ def create_subagent_tool_from_config(
         model_settings=resolved_settings,  # type: ignore[arg-type]
         deps_type=AgentContext,
         history_processors=history_processors,
+        name=config.name,
     )
 
     required_tools = config.tools
@@ -120,10 +121,9 @@ def create_subagent_tool_from_config(
     return create_subagent_tool(
         name=config.name,
         description=config.description,
-        call_func=create_subagent_call_func(subagent),
+        call_func=create_subagent_call_func(subagent, model_cfg=resolved_model_cfg),
         instruction=config.instruction,
         availability_check=check_tools_available,
-        model_cfg=resolved_model_cfg,
     )
 
 

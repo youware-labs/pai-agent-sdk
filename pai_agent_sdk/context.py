@@ -60,8 +60,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import defaultdict
-from collections.abc import AsyncGenerator, Sequence
-from contextlib import asynccontextmanager
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
@@ -758,21 +757,28 @@ class AgentContext(BaseModel):
 
         return "\n\n".join(parts)
 
-    @asynccontextmanager
-    async def enter_subagent(
+    def create_subagent_context(
         self,
         agent_name: str,
         agent_id: str | None = None,
         **override: Any,
-    ) -> AsyncGenerator[Self, None]:
+    ) -> Self:
         """Create a child context for subagent with independent timing.
 
         The subagent context inherits all fields but gets:
         - A new run_id (uses agent_id if provided, otherwise generates one)
         - parent_run_id set to current run_id
-        - Fresh start_at/end_at for independent timing
+        - Fresh timing (start_at/end_at managed by __aenter__/__aexit__)
         - Shared file_operator and shell from parent
         - Registers agent info in parent's agent_registry
+
+        Note:
+            The returned context should be used with `async with` to properly
+            manage timing and resource cleanup::
+
+                sub_ctx = parent.create_subagent_context("search")
+                async with sub_ctx:
+                    # subagent work here
 
         Args:
             agent_name: Name of the subagent (e.g., "search", "reasoning").
@@ -780,6 +786,9 @@ class AgentContext(BaseModel):
                 Can be tool_call_id for correlation with tool calls.
             **override: Additional fields to override in the subagent context.
                 Subclasses can pass extra fields without overriding this method.
+
+        Returns:
+            A new context instance configured for the subagent.
         """
         # Generate agent_id if not provided
         effective_agent_id = agent_id or _generate_run_id()
@@ -794,18 +803,15 @@ class AgentContext(BaseModel):
         update: dict[str, Any] = {
             "run_id": effective_agent_id,
             "parent_run_id": self.run_id,
-            "start_at": datetime.now(),
-            "end_at": None,
+            "start_at": None,  # Will be set by __aenter__
+            "end_at": None,  # Will be set by __aexit__
             "handoff_message": None,  # Subagents don't inherit handoff state
             "tool_id_wrapper": ToolIdWrapper(),  # Fresh wrapper for subagent
             **override,
         }
         new_ctx = self.model_copy(update=update)
         new_ctx._agent_name = agent_name
-        try:
-            yield new_ctx
-        finally:
-            new_ctx.end_at = datetime.now()
+        return new_ctx
 
     def get_history_processors(self) -> list:
         """Return a list of history processors for this context.

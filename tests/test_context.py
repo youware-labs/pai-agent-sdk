@@ -69,12 +69,12 @@ def test_agent_context_elapsed_time_after_end(file_operator: LocalFileOperator, 
     assert elapsed.total_seconds() == 5
 
 
-async def test_agent_context_enter_subagent(file_operator: LocalFileOperator, shell: LocalShell) -> None:
+async def test_agent_context_create_subagent_context(file_operator: LocalFileOperator, shell: LocalShell) -> None:
     """Should create child context with proper inheritance."""
     parent = AgentContext(file_operator=file_operator, shell=shell)
     parent.start_at = datetime.now()
 
-    async with parent.enter_subagent("search") as child:
+    async with parent.create_subagent_context("search") as child:
         assert child.parent_run_id == parent.run_id
         assert child.run_id != parent.run_id
         assert child._agent_name == "search"
@@ -85,11 +85,13 @@ async def test_agent_context_enter_subagent(file_operator: LocalFileOperator, sh
     assert child.end_at is not None
 
 
-async def test_agent_context_enter_subagent_with_override(file_operator: LocalFileOperator, shell: LocalShell) -> None:
+async def test_agent_context_create_subagent_context_with_override(
+    file_operator: LocalFileOperator, shell: LocalShell
+) -> None:
     """Should allow field overrides in subagent context."""
     parent = AgentContext(file_operator=file_operator, shell=shell)
 
-    async with parent.enter_subagent("reasoning", deferred_tool_metadata={"key": {}}) as child:
+    async with parent.create_subagent_context("reasoning", deferred_tool_metadata={"key": {}}) as child:
         assert child.deferred_tool_metadata == {"key": {}}
 
 
@@ -156,7 +158,7 @@ async def test_agent_context_subagent_shares_environment(tmp_path: Path) -> None
     ctx = AgentContext(file_operator=file_op, shell=shell)
 
     async with ctx:
-        async with ctx.enter_subagent("search") as child:
+        async with ctx.create_subagent_context("search") as child:
             # Should share file_operator
             assert child.file_operator is ctx.file_operator
 
@@ -632,8 +634,8 @@ async def test_export_state_include_subagent_false(file_operator: LocalFileOpera
             ModelResponse(parts=[TextPart(content="Hi there")]),
         ]
 
-        # Simulate entering a subagent to populate agent_registry
-        async with ctx.enter_subagent("search") as child:
+        # Simulate creating a subagent to populate agent_registry
+        async with ctx.create_subagent_context("search") as child:
             child.subagent_history["nested-agent"] = [
                 ModelRequest(parts=[UserPromptPart(content="Nested")]),
             ]
@@ -674,8 +676,8 @@ async def test_export_state_include_subagent_true_default(file_operator: LocalFi
             ModelResponse(parts=[TextPart(content="Hi there")]),
         ]
 
-        # Simulate entering a subagent to populate agent_registry
-        async with ctx.enter_subagent("search") as _:
+        # Simulate creating a subagent to populate agent_registry
+        async with ctx.create_subagent_context("search"):
             pass
 
         # Export with default (include_subagent=True)

@@ -293,8 +293,8 @@ async def test_stream_queues_multiple_tools(agent_context: AgentContext):
 # Helper functions
 
 
-async def test_call_method_uses_enter_subagent(agent_context: AgentContext):
-    """Test that the call method uses enter_subagent for subagent context creation."""
+async def test_call_method_uses_create_subagent_context(agent_context: AgentContext):
+    """Test that the call method uses create_subagent_context for subagent context creation."""
     parent_run_id = agent_context.run_id
 
     async def mock_with_parent_check(

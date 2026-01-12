@@ -162,7 +162,7 @@ def _create_call_method(
         override_kwargs: dict[str, Any] = {}
         if model_cfg is not None:
             override_kwargs["model_cfg"] = model_cfg
-        async with ctx.deps.enter_subagent(self.name, agent_id=ctx.tool_call_id, **override_kwargs) as sub_ctx:
+        async with ctx.deps.create_subagent_context(self.name, agent_id=ctx.tool_call_id, **override_kwargs) as sub_ctx:
             output, usage = await call_func(sub_ctx, **kwargs)
 
         # Record usage in extra_usages

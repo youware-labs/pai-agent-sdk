@@ -101,3 +101,41 @@ async def test_glob_specific_extension(tmp_path: Path) -> None:
         result = await tool.call(mock_run_ctx, pattern="*.json")
         assert len(result) == 1
         assert "test.json" in result[0]
+
+
+async def test_glob_empty_directory(tmp_path: Path) -> None:
+    """Should return empty list for empty directory."""
+    async with AsyncExitStack() as stack:
+        env = await stack.enter_async_context(
+            LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
+        )
+        ctx = await stack.enter_async_context(AgentContext(env=env))
+        tool = GlobTool(ctx)
+
+        # tmp_path is empty, no files created
+        mock_run_ctx = MagicMock(spec=RunContext)
+        mock_run_ctx.deps = ctx
+
+        result = await tool.call(mock_run_ctx, pattern="*.py")
+        assert result == []
+
+
+async def test_glob_matches_directories(tmp_path: Path) -> None:
+    """Should include directories in glob results when pattern matches."""
+    async with AsyncExitStack() as stack:
+        env = await stack.enter_async_context(
+            LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
+        )
+        ctx = await stack.enter_async_context(AgentContext(env=env))
+        tool = GlobTool(ctx)
+
+        (tmp_path / "mydir").mkdir()
+        (tmp_path / "myfile.txt").write_text("content")
+
+        mock_run_ctx = MagicMock(spec=RunContext)
+        mock_run_ctx.deps = ctx
+
+        result = await tool.call(mock_run_ctx, pattern="my*")
+        assert len(result) == 2
+        assert any("mydir" in r for r in result)
+        assert any("myfile.txt" in r for r in result)

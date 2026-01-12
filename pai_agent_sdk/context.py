@@ -876,6 +876,7 @@ class AgentContext(BaseModel):
         from pai_agent_sdk.filters.capability import filter_by_capability
         from pai_agent_sdk.filters.handoff import process_handoff_message
         from pai_agent_sdk.filters.image import drop_extra_images, drop_extra_videos, drop_gif_images
+        from pai_agent_sdk.filters.model_swtich import handle_model_switch
         from pai_agent_sdk.filters.runtime_instructions import inject_runtime_instructions
         from pai_agent_sdk.filters.tool_args import fix_truncated_tool_args
 
@@ -884,6 +885,7 @@ class AgentContext(BaseModel):
             return ctx.deps.tool_id_wrapper.wrap_messages(ctx, messages)
 
         return [
+            handle_model_switch,
             drop_extra_images,
             drop_gif_images,
             drop_extra_videos,

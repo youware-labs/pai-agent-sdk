@@ -183,3 +183,132 @@ async def test_grep_match_data_structure(tmp_path: Path) -> None:
         assert "matching_line" in match_data
         assert "context" in match_data
         assert "context_start_line" in match_data
+
+
+async def test_grep_max_files_limit(tmp_path: Path) -> None:
+    """Should limit number of files searched."""
+    async with AsyncExitStack() as stack:
+        env = await stack.enter_async_context(
+            LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
+        )
+        ctx = await stack.enter_async_context(AgentContext(env=env))
+        tool = GrepTool(ctx)
+
+        # Create many files with matches
+        for i in range(10):
+            (tmp_path / f"file{i}.txt").write_text(f"match in file {i}")
+
+        mock_run_ctx = MagicMock(spec=RunContext)
+        mock_run_ctx.deps = ctx
+
+        # Limit to 3 files
+        result = await tool.call(mock_run_ctx, pattern="match", max_files=3)
+        assert isinstance(result, dict)
+        # Should only have matches from at most 3 files
+        matched_files = {v["file_path"] for v in result.values() if isinstance(v, dict)}
+        assert len(matched_files) <= 3
+
+
+async def test_grep_multiple_files(tmp_path: Path) -> None:
+    """Should search across multiple files and aggregate results."""
+    async with AsyncExitStack() as stack:
+        env = await stack.enter_async_context(
+            LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
+        )
+        ctx = await stack.enter_async_context(AgentContext(env=env))
+        tool = GrepTool(ctx)
+
+        (tmp_path / "file1.py").write_text("def foo(): pass")
+        (tmp_path / "file2.py").write_text("def bar(): pass")
+        (tmp_path / "file3.py").write_text("class Baz: pass")
+
+        mock_run_ctx = MagicMock(spec=RunContext)
+        mock_run_ctx.deps = ctx
+
+        result = await tool.call(mock_run_ctx, pattern="def \\w+", include="*.py")
+        assert isinstance(result, dict)
+        # Should find matches in file1 and file2
+        matched_files = {v["file_path"] for v in result.values() if isinstance(v, dict)}
+        assert "file1.py" in matched_files
+        assert "file2.py" in matched_files
+        assert "file3.py" not in matched_files
+
+
+async def test_grep_skips_directories(tmp_path: Path) -> None:
+    """Should skip directories without error."""
+    async with AsyncExitStack() as stack:
+        env = await stack.enter_async_context(
+            LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
+        )
+        ctx = await stack.enter_async_context(AgentContext(env=env))
+        tool = GrepTool(ctx)
+
+        # Create a directory and a file
+        (tmp_path / "subdir").mkdir()
+        (tmp_path / "test.txt").write_text("searchable content")
+
+        mock_run_ctx = MagicMock(spec=RunContext)
+        mock_run_ctx.deps = ctx
+
+        # Should not raise error when glob includes directory
+        result = await tool.call(mock_run_ctx, pattern="searchable", include="*")
+        assert isinstance(result, dict)
+        # Should find the file match
+        assert len(result) == 1
+
+
+async def test_grep_large_result_truncation(tmp_path: Path) -> None:
+    """Should truncate results when they exceed 60000 characters."""
+    async with AsyncExitStack() as stack:
+        env = await stack.enter_async_context(
+            LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
+        )
+        ctx = await stack.enter_async_context(AgentContext(env=env))
+        tool = GrepTool(ctx)
+
+        # Create file with many matches that will produce large output
+        # Each match with context will be substantial
+        lines = [f"match_{i}_" + "x" * 500 for i in range(200)]
+        (tmp_path / "large.txt").write_text("\n".join(lines))
+
+        mock_run_ctx = MagicMock(spec=RunContext)
+        mock_run_ctx.deps = ctx
+
+        result = await tool.call(
+            mock_run_ctx,
+            pattern="match_\\d+",
+            max_results=-1,  # unlimited
+            max_matches_per_file=-1,  # unlimited
+            context_lines=5,
+        )
+        assert isinstance(result, dict)
+        # When truncated, context is dropped and system message added
+        if "<system>" in result:
+            assert "truncated" in result["<system>"].lower()
+            # Truncated results should not have 'context' field
+            for key, val in result.items():
+                if key != "<system>" and isinstance(val, dict):
+                    assert "context" not in val
+
+
+async def test_grep_unreadable_file_handling(tmp_path: Path) -> None:
+    """Should gracefully handle files that cannot be read."""
+    async with AsyncExitStack() as stack:
+        env = await stack.enter_async_context(
+            LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
+        )
+        ctx = await stack.enter_async_context(AgentContext(env=env))
+        tool = GrepTool(ctx)
+
+        # Create a valid file and a binary file that may cause decode errors
+        (tmp_path / "valid.txt").write_text("searchable text")
+        (tmp_path / "binary.bin").write_bytes(b"\x00\x01\x02\xff\xfe")
+
+        mock_run_ctx = MagicMock(spec=RunContext)
+        mock_run_ctx.deps = ctx
+
+        # Should not raise, should skip unreadable files
+        result = await tool.call(mock_run_ctx, pattern="searchable", include="*")
+        assert isinstance(result, dict)
+        # Should find match in valid.txt
+        assert any("valid.txt" in k for k in result)

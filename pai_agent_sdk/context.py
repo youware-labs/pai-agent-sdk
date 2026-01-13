@@ -757,6 +757,16 @@ class AgentContext(BaseModel):
             usage_elem = SubElement(root, "token-usage")
             SubElement(usage_elem, "total-tokens").text = str(request_usage.total_tokens)
 
+        # Known subagents from agent_registry (excluding main agent)
+        known_subagents = {agent_id: info for agent_id, info in self.agent_registry.items() if agent_id != self.run_id}
+        if known_subagents:
+            subagents_elem = SubElement(root, "known-subagents")
+            subagents_elem.set("hint", "Use subagent_info tool for more details")
+            for _agent_id, info in known_subagents.items():
+                agent_elem = SubElement(subagents_elem, "agent")
+                agent_elem.set("id", info.agent_id)
+                agent_elem.set("name", info.agent_name)
+
         parts.append(_xml_to_string(root))
 
         # Build system-reminder element (sibling to runtime-context)

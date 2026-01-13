@@ -1239,3 +1239,78 @@ def test_tool_id_wrapper_consistency_across_methods() -> None:
     # All should have same normalized ID
     assert call_event.part.tool_call_id == result_event.result.tool_call_id
     assert call_event.part.tool_call_id == messages[0].parts[0].tool_call_id
+
+
+# =============================================================================
+# get_context_instructions Tests
+# =============================================================================
+
+
+async def test_get_context_instructions_returns_xml(env: LocalEnvironment) -> None:
+    """Should return runtime-context XML with elapsed time."""
+    async with AgentContext(env=env) as ctx:
+        instructions = await ctx.get_context_instructions()
+        assert "<runtime-context>" in instructions
+        assert "<elapsed-time>" in instructions
+
+
+async def test_get_context_instructions_with_known_subagents(env: LocalEnvironment) -> None:
+    """Should include known-subagents when agent_registry has subagents."""
+    from pai_agent_sdk.context import AgentInfo
+
+    async with AgentContext(env=env) as ctx:
+        # Register some subagents
+        ctx.agent_registry["sub1"] = AgentInfo(
+            agent_id="sub1",
+            agent_name="search_agent",
+            parent_agent_id=ctx.run_id,
+        )
+        ctx.agent_registry["sub2"] = AgentInfo(
+            agent_id="sub2",
+            agent_name="reasoning_agent",
+            parent_agent_id=ctx.run_id,
+        )
+
+        instructions = await ctx.get_context_instructions()
+
+        # Check known-subagents section exists
+        assert "<known-subagents" in instructions
+        assert 'hint="Use subagent_info tool for more details"' in instructions
+        assert 'id="sub1"' in instructions
+        assert 'name="search_agent"' in instructions
+        assert 'id="sub2"' in instructions
+        assert 'name="reasoning_agent"' in instructions
+
+
+async def test_get_context_instructions_excludes_main_agent(env: LocalEnvironment) -> None:
+    """Should exclude the main agent from known-subagents."""
+    from pai_agent_sdk.context import AgentInfo
+
+    async with AgentContext(env=env) as ctx:
+        # Register main agent (should be excluded)
+        ctx.agent_registry[ctx.run_id] = AgentInfo(
+            agent_id=ctx.run_id,
+            agent_name="main",
+            parent_agent_id=None,
+        )
+        # Register a subagent (should be included)
+        ctx.agent_registry["sub1"] = AgentInfo(
+            agent_id="sub1",
+            agent_name="search_agent",
+            parent_agent_id=ctx.run_id,
+        )
+
+        instructions = await ctx.get_context_instructions()
+
+        # Should include subagent but not main agent's run_id
+        assert 'id="sub1"' in instructions
+        assert f'id="{ctx.run_id}"' not in instructions
+
+
+async def test_get_context_instructions_no_subagents(env: LocalEnvironment) -> None:
+    """Should not include known-subagents section when no subagents."""
+    async with AgentContext(env=env) as ctx:
+        instructions = await ctx.get_context_instructions()
+
+        # Should not have known-subagents section
+        assert "<known-subagents" not in instructions

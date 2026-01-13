@@ -1,10 +1,10 @@
 # pai-agent-sdk
 
-[![Release](https://img.shields.io/github/v/release/wh1isper/pai-agent-sdk)](https://img.shields.io/github/v/release/wh1isper/pai-agent-sdk)
-[![Build status](https://img.shields.io/github/actions/workflow/status/wh1isper/pai-agent-sdk/main.yml?branch=main)](https://github.com/wh1isper/pai-agent-sdk/actions/workflows/main.yml?query=branch%3Amain)
-[![codecov](https://codecov.io/gh/wh1isper/pai-agent-sdk/branch/main/graph/badge.svg)](https://codecov.io/gh/wh1isper/pai-agent-sdk)
-[![Commit activity](https://img.shields.io/github/commit-activity/m/wh1isper/pai-agent-sdk)](https://img.shields.io/github/commit-activity/m/wh1isper/pai-agent-sdk)
-[![License](https://img.shields.io/github/license/wh1isper/pai-agent-sdk)](https://img.shields.io/github/license/wh1isper/pai-agent-sdk)
+[![Release](https://img.shields.io/github/v/release/youware-labs/pai-agent-sdk)](https://img.shields.io/github/v/release/youware-labs/pai-agent-sdk)
+[![Build status](https://img.shields.io/github/actions/workflow/status/youware-labs/pai-agent-sdk/main.yml?branch=main)](https://github.com/youware-labs/pai-agent-sdk/actions/workflows/main.yml?query=branch%3Amain)
+[![codecov](https://codecov.io/gh/youware-labs/pai-agent-sdk/branch/main/graph/badge.svg)](https://codecov.io/gh/youware-labs/pai-agent-sdk)
+[![Commit activity](https://img.shields.io/github/commit-activity/m/youware-labs/pai-agent-sdk)](https://img.shields.io/github/commit-activity/m/youware-labs/pai-agent-sdk)
+[![License](https://img.shields.io/github/license/youware-labs/pai-agent-sdk)](https://img.shields.io/github/license/youware-labs/pai-agent-sdk)
 
 Production-ready SDK for building AI agents with [Pydantic AI](https://ai.pydantic.dev/).
 
@@ -60,7 +60,7 @@ Check out the [examples/](examples/) directory for production-ready patterns:
 If you're using an AI agent (e.g., Claude, Cursor) that supports skills:
 
 - **Clone this repo**: The [SKILL.md](SKILL.md) file in the repository root provides comprehensive guidance for agents
-- **Download release package**: Get the latest `SKILL.zip` from the [Releases](https://github.com/wh1isper/pai-agent-sdk/releases) page (automatically built during each release)
+- **Download release package**: Get the latest `SKILL.zip` from the [Releases](https://github.com/youware-labs/pai-agent-sdk/releases) page (automatically built during each release)
 
 ## Configuration
 

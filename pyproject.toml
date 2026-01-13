@@ -1,8 +1,8 @@
 [project]
 name = "pai-agent-sdk"
 version = "0.0.1"
-description = "Toolsets and context management for building agents with Pydantic AI."
-authors = [{ name = "Wh1isper", email = "jizhongsheng957@gmail.com" }]
+description = "Production-ready SDK for building AI agents with Pydantic AI"
+authors = [{ name = "youware", email = "dev@youware.com" }]
 readme = "README.md"
 keywords = ['python']
 requires-python = ">=3.11,<3.14"
@@ -33,9 +33,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://wh1isper.github.io/pai-agent-sdk/"
-Repository = "https://github.com/wh1isper/pai-agent-sdk"
-Documentation = "https://wh1isper.github.io/pai-agent-sdk/"
+Homepage = "https://youware-labs.github.io/pai-agent-sdk/"
+Repository = "https://github.com/youware-labs/pai-agent-sdk"
+Documentation = "https://youware-labs.github.io/pai-agent-sdk/"
 
 [project.optional-dependencies]
 examples = ["pydantic-ai",

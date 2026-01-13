@@ -8,6 +8,8 @@
 
 Production-ready SDK for building AI agents with [Pydantic AI](https://ai.pydantic.dev/).
 
+> **Early Stage Warning**: This project is in active development. APIs may change frequently between versions. We welcome feedback and contributions to help stabilize the SDK.
+
 ## Key Features
 
 - **Environment-based Architecture**: Inject file operations, shell access, and resources via `Environment` for clean separation of concerns
@@ -70,6 +72,7 @@ Copy `examples/.env.example` to `examples/.env` and configure your API keys.
 - [Toolset Architecture](docs/toolset.md) - Create tools, use hooks, handle errors, extend Toolset
 - [Subagent System](docs/subagent.md) - Hierarchical agents, builtin presets, markdown configuration
 - [Custom Environments](docs/environment.md) - Environment lifecycle, resource management
+- [Resumable Resources](docs/resumable-resources.md) - Export and restore resource states across restarts
 - [Model Configuration](docs/model.md) - Provider setup, gateway mode
 - [Logging Configuration](docs/logging.md) - Configure SDK logging levels
 

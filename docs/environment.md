@@ -128,7 +128,66 @@ class ContainerEnvironment(Environment):
 
 `create_agent` automatically includes `env.toolsets`.
 
+## Resumable Resources
+
+Resources can be exported and restored across process restarts using factories.
+
+### Using BaseResource (Recommended)
+
+`BaseResource` is a convenience abstract class with async `close()` and default export/restore:
+
+```python
+from pai_agent_sdk.environment import BaseResource
+
+class BrowserSession(BaseResource):
+    def __init__(self, browser: Browser):
+        self._browser = browser
+
+    async def close(self) -> None:
+        await self._browser.close()
+
+    async def export_state(self) -> dict[str, Any]:
+        return {"cookies": await self._browser.get_cookies()}
+
+    async def restore_state(self, state: dict[str, Any]) -> None:
+        await self._browser.set_cookies(state.get("cookies", []))
+```
+
+### Using Factories
+
+```python
+async def create_browser() -> BrowserSession:
+    return BrowserSession(await Browser.launch())
+
+# First run: create and export
+async with LocalEnvironment() as env:
+    env.resources.register_factory("browser", create_browser)
+    browser = await env.resources.get_or_create("browser")
+    # ... use browser ...
+    state = await env.export_resource_state()
+    Path("state.json").write_text(state.model_dump_json())
+
+# Later: restore from state
+state = ResourceRegistryState.model_validate_json(Path("state.json").read_text())
+async with LocalEnvironment(
+    resource_state=state,
+    resource_factories={"browser": create_browser},
+) as env:
+    browser = env.resources.get("browser")  # Already restored
+```
+
+### Chaining API
+
+```python
+env = (LocalEnvironment()
+    .with_resource_factory("browser", create_browser)
+    .with_resource_state(state))
+```
+
+> Non-resumable resources (without `export_state`/`restore_state`) are silently skipped during export.
+
 ## See Also
 
 - [context.md](context.md) - AgentContext and session management
 - [toolset.md](toolset.md) - Toolset architecture
+- [resumable-resources.md](resumable-resources.md) - Full resumable resources documentation

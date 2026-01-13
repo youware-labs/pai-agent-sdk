@@ -17,6 +17,8 @@ from pai_agent_sdk.environment.base import (
     Environment,
     FileOperator,
     FileStat,
+    ResourceFactory,
+    ResourceRegistryState,
     Shell,
     TmpFileOperator,
 )
@@ -494,6 +496,8 @@ class LocalEnvironment(Environment):
         shell_timeout: float = 30.0,
         tmp_base_dir: Path | None = None,
         enable_tmp_dir: bool = True,
+        resource_state: ResourceRegistryState | None = None,
+        resource_factories: dict[str, ResourceFactory] | None = None,
     ):
         """Initialize LocalEnvironment.
 
@@ -505,8 +509,15 @@ class LocalEnvironment(Environment):
                 If None, uses system default temp directory.
             enable_tmp_dir: Whether to create a session temporary directory.
                 Defaults to True.
+            resource_state: Optional state to restore resources from.
+                Resources will be restored when entering the context.
+            resource_factories: Optional dictionary of resource factories.
+                Required for any resources in resource_state.
         """
-        super().__init__()  # Initialize ResourceRegistry
+        super().__init__(
+            resource_state=resource_state,
+            resource_factories=resource_factories,
+        )
         self._allowed_paths = allowed_paths
         self._default_path = default_path
         self._shell_timeout = shell_timeout

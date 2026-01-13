@@ -54,12 +54,14 @@ import asyncio
 import shutil
 import tempfile
 from abc import ABC, abstractmethod
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, TypedDict, TypeVar, runtime_checkable
 from xml.etree import ElementTree as ET
 
 import anyio
 import pathspec
+from pydantic import BaseModel, Field
 from pydantic_ai.toolsets import AbstractToolset
 
 from pai_agent_sdk.environment.exceptions import EnvironmentNotEnteredError
@@ -123,23 +125,351 @@ class Resource(Protocol):
         ...
 
 
+@runtime_checkable
+class ResumableResource(Resource, Protocol):
+    """Protocol for resources that support state export/restore.
+
+    Resources implementing this protocol can have their state serialized
+    and restored across process restarts. The factory pattern ensures
+    resources are properly initialized before state restoration.
+
+    Example:
+        class BrowserSession:
+            def __init__(self, browser: Browser):
+                self._browser = browser
+                self._cookies: list[dict] = []
+
+            async def export_state(self) -> dict[str, Any]:
+                # May need to fetch current state from browser
+                self._cookies = await self._browser.get_cookies()
+                return {"cookies": self._cookies}
+
+            async def restore_state(self, state: dict[str, Any]) -> None:
+                self._cookies = state.get("cookies", [])
+                await self._browser.set_cookies(self._cookies)
+
+            def close(self) -> None:
+                self._browser.close()
+    """
+
+    async def export_state(self) -> dict[str, Any]:
+        """Export resource state for serialization.
+
+        Returns:
+            Dictionary of JSON-serializable state data.
+            Should NOT include sensitive data (passwords, tokens, API keys).
+        """
+        ...
+
+    async def restore_state(self, state: dict[str, Any]) -> None:
+        """Restore resource from serialized state.
+
+        Called after the resource is created via factory.
+        Should restore the resource to the state it was in when
+        export_state() was called.
+
+        Args:
+            state: State dictionary from export_state().
+
+        Raises:
+            ValueError: If state is invalid or incompatible.
+        """
+        ...
+
+
+@runtime_checkable
+class InstructableResource(Resource, Protocol):
+    """Protocol for resources that provide context instructions.
+
+    Resources implementing this protocol can contribute instructions
+    to the environment context, which will be included in the agent's
+    system prompt.
+
+    Example:
+        class BrowserSession:
+            async def get_context_instructions(self) -> str | None:
+                return "Browser session is active. Use browser tools for web tasks."
+
+            def close(self) -> None:
+                self._browser.close()
+    """
+
+    async def get_context_instructions(self) -> str | None:
+        """Return context instructions for this resource.
+
+        Returns:
+            Instructions string to include in environment context,
+            or None if no instructions.
+        """
+        ...
+
+
+# --- Resource Factory and State Models ---
+
+
+ResourceFactory = Callable[[], Awaitable[Resource]]
+"""Async callable that creates a Resource instance."""
+
+
+class ResourceEntry(BaseModel):
+    """Serialized entry for a single resource."""
+
+    state: dict[str, Any]
+
+
+class ResourceRegistryState(BaseModel):
+    """Serializable state for ResourceRegistry.
+
+    Can be serialized to JSON and stored for session restoration.
+    Only contains entries for resources that implement ResumableResource.
+    """
+
+    entries: dict[str, ResourceEntry] = Field(default_factory=dict)
+
+
+class BaseResource(ABC):
+    """Abstract base class for resources with default resumable support.
+
+    Provides convenience implementation for Resource and ResumableResource protocols.
+    Subclasses must implement close(), and can optionally override export_state()
+    and restore_state() for resumable functionality.
+
+    Example:
+        class BrowserSession(BaseResource):
+            def __init__(self, browser: Browser):
+                self._browser = browser
+                self._cookies: list[dict] = []
+
+            async def close(self) -> None:
+                await self._browser.close()
+
+            async def export_state(self) -> dict[str, Any]:
+                return {"cookies": await self._browser.get_cookies()}
+
+            async def restore_state(self, state: dict[str, Any]) -> None:
+                await self._browser.set_cookies(state.get("cookies", []))
+    """
+
+    @abstractmethod
+    async def close(self) -> None:
+        """Close the resource and release any held resources."""
+        ...
+
+    async def export_state(self) -> dict[str, Any]:
+        """Export resource state for serialization.
+
+        Default implementation returns empty dict (no state to export).
+        Override to export actual state.
+
+        Returns:
+            Dictionary of JSON-serializable state data.
+        """
+        return {}
+
+    async def restore_state(self, state: dict[str, Any]) -> None:
+        """Restore resource from serialized state.
+
+        Default implementation does nothing.
+        Override to restore actual state.
+
+        Args:
+            state: State dictionary from export_state().
+        """
+        _ = state  # Default: ignore state
+
+    async def get_context_instructions(self) -> str | None:
+        """Return context instructions for this resource.
+
+        Override to provide resource-specific instructions that will be
+        included in the environment context instructions.
+
+        Returns:
+            Instructions string, or None if no instructions.
+        """
+        return None
+
+
 class ResourceRegistry:
-    """Type-safe resource container with protocol validation.
+    """Type-safe resource container with protocol validation and resumption support.
 
     Provides a registry for managing resources with:
     - Protocol validation on set()
     - Type-safe get operations
+    - Factory-based lazy creation
+    - State export/restore for resumable resources
     - Unified cleanup via close_all()
 
-    Example:
+    Example (factory pattern):
         registry = ResourceRegistry()
-        registry.set("browser", browser_instance)  # Validates Resource protocol
-        browser = registry.get_typed("browser", Browser)
-        await registry.close_all()
+        registry.register_factory("browser", create_browser_session)
+        browser = await registry.get_or_create_typed("browser", BrowserSession)
+
+        # Export state
+        state = registry.export_state()
+
+        # Later, restore
+        new_registry = ResourceRegistry(state=state, factories={"browser": create_browser_session})
+        await new_registry.restore_all()
+        browser = new_registry.get_typed("browser", BrowserSession)  # Already restored
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        state: ResourceRegistryState | None = None,
+        factories: dict[str, ResourceFactory] | None = None,
+    ) -> None:
+        """Initialize ResourceRegistry.
+
+        Args:
+            state: Optional state to restore from. Resources will be restored
+                when restore_all() is called (typically by Environment.__aenter__).
+            factories: Optional dictionary of resource factories.
+        """
         self._resources: dict[str, Resource] = {}
+        self._factories: dict[str, ResourceFactory] = dict(factories) if factories else {}
+        self._pending_state: ResourceRegistryState | None = state
+
+    def register_factory(self, key: str, factory: ResourceFactory) -> None:
+        """Register an async factory for a resource key.
+
+        Factories are used by get_or_create() and restore_all() to
+        create resource instances.
+
+        Args:
+            key: Unique identifier for the resource.
+            factory: Async callable that creates the resource.
+        """
+        self._factories[key] = factory
+
+    async def get_or_create(self, key: str) -> Resource:
+        """Get existing resource or create via factory.
+
+        If the resource exists, returns it immediately.
+        If not, creates it using the registered factory.
+
+        Args:
+            key: Resource identifier.
+
+        Returns:
+            The resource instance.
+
+        Raises:
+            KeyError: If no resource exists and no factory is registered.
+        """
+        if key in self._resources:
+            return self._resources[key]
+
+        if key not in self._factories:
+            raise KeyError(f"No resource or factory registered for key: {key}")
+
+        resource = await self._factories[key]()
+        self._resources[key] = resource
+        return resource
+
+    async def get_or_create_typed(self, key: str, resource_type: type[T]) -> T:
+        """Get or create resource with type casting.
+
+        Provides better IDE support by returning the expected type.
+
+        Args:
+            key: Resource identifier.
+            resource_type: Expected type of the resource.
+
+        Returns:
+            Resource cast to the expected type.
+
+        Raises:
+            KeyError: If no resource exists and no factory is registered.
+            TypeError: If resource is not of the expected type.
+        """
+        resource = await self.get_or_create(key)
+        if not isinstance(resource, resource_type):
+            raise TypeError(f"Resource '{key}' is {type(resource).__name__}, expected {resource_type.__name__}")
+        return resource
+
+    async def export_state(self) -> ResourceRegistryState:
+        """Export state of all resumable resources.
+
+        Only resources implementing ResumableResource protocol will be
+        included in the exported state. Other resources are skipped.
+
+        Returns:
+            ResourceRegistryState containing serialized resource states.
+        """
+        entries: dict[str, ResourceEntry] = {}
+        for key, resource in self._resources.items():
+            if isinstance(resource, ResumableResource):
+                state = await resource.export_state()
+                entries[key] = ResourceEntry(state=state)
+        return ResourceRegistryState(entries=entries)
+
+    async def restore_all(self) -> int:
+        """Restore all resources from pending state.
+
+        For each entry in pending state:
+        1. Create resource via registered factory
+        2. Call restore_state() if resource implements ResumableResource
+
+        This method is idempotent - calling it multiple times has no effect
+        after the first successful call (pending_state is cleared).
+
+        Returns:
+            Number of resources restored.
+
+        Raises:
+            KeyError: If a pending state has no registered factory.
+            ValueError: If restore_state() fails (propagated from resource).
+        """
+        if self._pending_state is None:
+            return 0
+
+        count = 0
+        for key, entry in self._pending_state.entries.items():
+            if key not in self._factories:
+                raise KeyError(f"No factory registered for pending resource: {key}")
+
+            # Create resource via factory
+            resource = await self._factories[key]()
+            self._resources[key] = resource
+
+            # Restore state if resumable
+            if isinstance(resource, ResumableResource):
+                await resource.restore_state(entry.state)
+
+            count += 1
+
+        self._pending_state = None
+        return count
+
+    async def restore_one(self, key: str) -> bool:
+        """Restore a single resource from pending state.
+
+        Useful for lazy restoration - restore resources only when needed.
+
+        Args:
+            key: Resource identifier to restore.
+
+        Returns:
+            True if resource was restored, False if not in pending state.
+
+        Raises:
+            KeyError: If key is in pending state but no factory is registered.
+        """
+        if self._pending_state is None or key not in self._pending_state.entries:
+            return False
+
+        entry = self._pending_state.entries.pop(key)
+
+        if key not in self._factories:
+            raise KeyError(f"No factory registered for resource: {key}")
+
+        resource = await self._factories[key]()
+        self._resources[key] = resource
+
+        if isinstance(resource, ResumableResource):
+            await resource.restore_state(entry.state)
+
+        return True
 
     def set(self, key: str, resource: Resource) -> None:
         """Register a resource with protocol validation.
@@ -219,6 +549,7 @@ class ResourceRegistry:
 
         Uses best-effort cleanup - continues even if individual
         resources fail to close. Handles both sync and async close().
+        Also clears registered factories.
         """
         for resource in reversed(list(self._resources.values())):
             try:
@@ -228,6 +559,27 @@ class ResourceRegistry:
             except Exception:  # noqa: S110
                 pass  # Best effort cleanup
         self._resources.clear()
+        self._factories.clear()
+
+    async def get_context_instructions(self) -> str | None:
+        """Return combined context instructions from all resources.
+
+        Collects instructions from resources that implement InstructableResource
+        protocol and returns them combined.
+
+        Returns:
+            Combined instructions string, or None if no instructions.
+        """
+        parts: list[str] = []
+        for key, resource in self._resources.items():
+            if isinstance(resource, InstructableResource):
+                try:
+                    result = await resource.get_context_instructions()
+                    if result:
+                        parts.append(f"<!-- Resource: {key} -->\n{result}")
+                except Exception:  # noqa: S110
+                    pass  # Best effort - skip resources that fail
+        return "\n\n".join(parts) if parts else None
 
 
 # Default directories to skip but mark in file tree
@@ -1118,7 +1470,31 @@ class Environment(ABC):
 
     The base class handles:
     - Calling _setup() in __aenter__
+    - Calling resources.restore_all() after _setup() for resumable resources
     - Calling _teardown() then resources.close_all() in __aexit__
+
+    Resumable Resources:
+        Environment supports resource state persistence via ResourceRegistry.
+        Resources implementing ResumableResource can have their state exported
+        and restored across process restarts.
+
+        Example:
+            # First run
+            async with LocalEnvironment() as env:
+                env.resources.register_factory("browser", create_browser)
+                browser = await env.resources.get_or_create("browser")
+                # ... use browser ...
+                state = env.export_resource_state()
+                save_state(state)
+
+            # Subsequent run
+            state = load_state()
+            async with LocalEnvironment(
+                resource_state=state,
+                resource_factories={"browser": create_browser},
+            ) as env:
+                # Browser automatically restored with previous state
+                browser = env.resources.get("browser")
 
     Example:
         Using AsyncExitStack (recommended for dependent contexts):
@@ -1140,9 +1516,23 @@ class Environment(ABC):
         ```
     """
 
-    def __init__(self) -> None:
-        """Initialize the resource registry."""
-        self._resources = ResourceRegistry()
+    def __init__(
+        self,
+        resource_state: ResourceRegistryState | None = None,
+        resource_factories: dict[str, ResourceFactory] | None = None,
+    ) -> None:
+        """Initialize the environment.
+
+        Args:
+            resource_state: Optional state to restore resources from.
+                Resources will be restored when entering the context.
+            resource_factories: Optional dictionary of resource factories.
+                Required for any resources in resource_state.
+        """
+        self._resources = ResourceRegistry(
+            state=resource_state,
+            factories=resource_factories,
+        )
         self._file_operator: FileOperator | None = None
         self._shell: Shell | None = None
         self._toolsets: list[AbstractToolset[Any]] = []
@@ -1198,6 +1588,61 @@ class Environment(ABC):
         """
         return self._toolsets
 
+    # --- Chaining API for resource factories and state ---
+
+    def with_resource_factory(self, key: str, factory: ResourceFactory) -> "Self":
+        """Register a resource factory. Can be chained.
+
+        Args:
+            key: Unique identifier for the resource.
+            factory: Async callable that creates the resource.
+
+        Returns:
+            Self for method chaining.
+
+        Example:
+            env = (LocalEnvironment()
+                .with_resource_factory("browser", create_browser)
+                .with_resource_factory("db", create_db_pool))
+        """
+        self._resources.register_factory(key, factory)
+        return self
+
+    def with_resource_state(self, state: ResourceRegistryState | None) -> "Self":
+        """Set resource state to restore on enter. Can be chained.
+
+        Args:
+            state: State to restore from, or None to clear pending state.
+
+        Returns:
+            Self for method chaining.
+
+        Example:
+            state = ResourceRegistryState.model_validate_json(saved_json)
+            env = (LocalEnvironment()
+                .with_resource_factory("browser", create_browser)
+                .with_resource_state(state))
+        """
+        if state is not None:
+            self._resources._pending_state = state
+        return self
+
+    # --- Export method ---
+
+    async def export_resource_state(self) -> ResourceRegistryState:
+        """Export resource registry state for serialization.
+
+        Only resources implementing ResumableResource will be included.
+
+        Returns:
+            ResourceRegistryState that can be serialized to JSON.
+
+        Example:
+            state = await env.export_resource_state()
+            Path("state.json").write_text(state.model_dump_json())
+        """
+        return await self._resources.export_state()
+
     # --- Subclass hooks ---
 
     @abstractmethod
@@ -1232,8 +1677,13 @@ class Environment(ABC):
     async def __aenter__(self) -> "Self":
         """Enter context and setup resources.
 
+        This method:
+        1. Calls _setup() to initialize file_operator, shell, etc.
+        2. Calls resources.restore_all() to restore pending resources
+
         Raises:
             RuntimeError: If the environment has already been entered.
+            KeyError: If pending state references a resource without factory.
         """
         async with self._enter_lock:
             if self._entered:
@@ -1243,6 +1693,10 @@ class Environment(ABC):
                 )
             self._entered = True
         await self._setup()
+
+        # Restore resources from pending state (if any)
+        await self._resources.restore_all()
+
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
@@ -1260,11 +1714,11 @@ class Environment(ABC):
                 self._entered = False
 
     async def get_context_instructions(self) -> str:
-        """Return combined context instructions from file_operator and shell.
+        """Return combined context instructions from file_operator, shell, and resources.
 
         Subclasses can override this to provide additional environment-specific
-        instructions. The default implementation combines file_operator and shell
-        instructions.
+        instructions. The default implementation combines file_operator, shell,
+        and resources instructions.
 
         Returns:
             Combined XML-formatted instructions string wrapped in <environment-context> tags.
@@ -1287,6 +1741,11 @@ class Environment(ABC):
                 parts.append(shell_instructions)
         except RuntimeError as e:
             raise EnvironmentNotEnteredError("shell") from e
+
+        # Collect resource instructions
+        resource_instructions = await self._resources.get_context_instructions()
+        if resource_instructions:
+            parts.append(resource_instructions)
 
         if not parts:
             return ""

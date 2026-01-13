@@ -19,7 +19,7 @@ import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from pai_agent_sdk.environment.base import Environment, Shell
+from pai_agent_sdk.environment.base import Environment, ResourceFactory, ResourceRegistryState, Shell
 from pai_agent_sdk.environment.exceptions import (
     EnvironmentNotEnteredError,
     ShellExecutionError,
@@ -220,6 +220,8 @@ class DockerEnvironment(Environment):
         shell_timeout: float = 30.0,
         enable_tmp_dir: bool = True,
         tmp_base_dir: Path | None = None,
+        resource_state: ResourceRegistryState | None = None,
+        resource_factories: dict[str, ResourceFactory] | None = None,
     ):
         """Initialize DockerEnvironment.
 
@@ -237,6 +239,10 @@ class DockerEnvironment(Environment):
             shell_timeout: Default timeout for shell commands.
             enable_tmp_dir: Whether to create a session temporary directory.
             tmp_base_dir: Base directory for creating session temporary directory.
+            resource_state: Optional state to restore resources from.
+                Resources will be restored when entering the context.
+            resource_factories: Optional dictionary of resource factories.
+                Required for any resources in resource_state.
 
         Raises:
             ValueError: If neither container_id nor image is provided.
@@ -244,7 +250,10 @@ class DockerEnvironment(Environment):
         if container_id is None and image is None:
             raise ValueError("Either container_id or image must be provided")
 
-        super().__init__()  # Initialize ResourceRegistry
+        super().__init__(
+            resource_state=resource_state,
+            resource_factories=resource_factories,
+        )
         self._mount_dir = mount_dir.resolve()
         self._container_workdir = container_workdir
         self._container_id = container_id

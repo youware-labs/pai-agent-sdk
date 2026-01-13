@@ -28,7 +28,7 @@ pai_agent_sdk/
 ├── context.py             # AgentContext, ModelConfig, ToolConfig, ResumableState
 │
 ├── environment/           # Environment management
-│   ├── base.py            # Environment ABC, FileOperator, Shell, ResourceRegistry
+│   ├── base.py            # Environment ABC, FileOperator, Shell, ResourceRegistry, BaseResource
 │   ├── local.py           # LocalEnvironment for local filesystem
 │   └── docker.py          # DockerEnvironment for container-based execution
 │
@@ -173,6 +173,15 @@ See [docs/environment.md](docs/environment.md) for details:
 - `_setup`/`_teardown` pattern for custom environments
 - `LocalEnvironment` and `DockerEnvironment` usage
 - `AsyncExitStack` for managing dependent context managers
+
+### Resumable Resources
+
+See [docs/resumable-resources.md](docs/resumable-resources.md) for details:
+
+- `Resource` protocol (requires `close()`) and `ResumableResource` protocol (adds `export_state`/`restore_state`)
+- `BaseResource` abstract base class with async `close()` and default export/restore
+- Factory-based resource creation and lazy initialization
+- State export/restore for session persistence across restarts
 
 ### Model Configuration
 

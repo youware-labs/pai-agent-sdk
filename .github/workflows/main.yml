@@ -63,6 +63,9 @@ jobs:
       - name: Check typing
         run: uv run pyright
 
-      - name: Upload coverage reports to Codecov with GitHub Action on Python 3.13
-        uses: codecov/codecov-action@v4
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: youware-labs/pai-agent-sdk
         if: ${{ matrix.python-version == '3.13' && matrix.extras == 'docker' }}

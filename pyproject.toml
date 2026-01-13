@@ -33,9 +33,7 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://youware-labs.github.io/pai-agent-sdk/"
 Repository = "https://github.com/youware-labs/pai-agent-sdk"
-Documentation = "https://youware-labs.github.io/pai-agent-sdk/"
 
 [project.optional-dependencies]
 examples = ["pydantic-ai",

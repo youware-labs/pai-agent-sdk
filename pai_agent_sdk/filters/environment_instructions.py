@@ -31,7 +31,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from agent_environment import Environment
-from pydantic_ai.messages import ModelMessage, ModelRequest, UserPromptPart
+from pydantic_ai.messages import ModelMessage, ModelRequest, ToolReturnPart, UserPromptPart
 from pydantic_ai.tools import RunContext
 
 
@@ -82,6 +82,11 @@ def create_environment_instructions_filter(
                 break
 
         if not last_request:
+            return message_history
+
+        # Skip injection if last_request contains ToolReturnPart (tool response)
+        # We only inject environment instructions on user input, not tool responses
+        if any(isinstance(part, ToolReturnPart) for part in last_request.parts):
             return message_history
 
         # Get environment instructions

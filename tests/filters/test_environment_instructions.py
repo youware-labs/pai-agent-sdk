@@ -3,7 +3,7 @@
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
+from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, ToolReturnPart, UserPromptPart
 
 from pai_agent_sdk.environment.local import LocalEnvironment
 from pai_agent_sdk.filters.environment_instructions import create_environment_instructions_filter
@@ -98,3 +98,30 @@ async def test_inject_environment_instructions_only_model_response(tmp_path: Pat
 
         assert result == history
         assert len(response.parts) == 1
+
+
+async def test_inject_environment_instructions_skips_tool_response(tmp_path: Path) -> None:
+    """Should skip injection when last_request contains ToolReturnPart."""
+    async with LocalEnvironment(
+        allowed_paths=[tmp_path],
+        default_path=tmp_path,
+        tmp_base_dir=tmp_path,
+    ) as env:
+        filter_func = create_environment_instructions_filter(env)
+        mock_ctx = MagicMock()
+
+        # Create a ModelRequest with ToolReturnPart (tool response)
+        tool_return = ToolReturnPart(
+            tool_name="test_tool",
+            content="tool result",
+            tool_call_id="call_123",
+        )
+        request = ModelRequest(parts=[tool_return])
+        history = [request]
+
+        result = await filter_func(mock_ctx, history)
+
+        # Should not inject environment instructions
+        assert result == history
+        assert len(request.parts) == 1
+        assert isinstance(request.parts[0], ToolReturnPart)

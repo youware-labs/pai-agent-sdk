@@ -290,7 +290,8 @@ async def test_create_subagent_call_func_registers_agent():
     agent_id = next(iter(ctx.agent_registry.keys()))
     assert agent_id.startswith("analyze-")
     assert ctx.agent_registry[agent_id].agent_name == "analyze"
-    assert ctx.agent_registry[agent_id].parent_agent_id == ctx.run_id
+    # parent_agent_id is now the agent_id of the parent context, not run_id
+    assert ctx.agent_registry[agent_id].parent_agent_id == ctx._agent_id
 
 
 async def test_create_subagent_call_func_stores_history():

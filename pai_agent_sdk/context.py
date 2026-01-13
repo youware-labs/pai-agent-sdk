@@ -675,7 +675,7 @@ class AgentContext(BaseModel):
     Populated by enter_subagent when subagents are created.
     """
 
-    _agent_name: str = "main"
+    _agent_id: str = "main"
     _entered: bool = False
     _enter_lock: asyncio.Lock = None  # type: ignore[assignment]  # Initialized in __init__
     _stream_queue_enabled: bool = False
@@ -844,11 +844,11 @@ class AgentContext(BaseModel):
             self.agent_registry[effective_agent_id] = AgentInfo(
                 agent_id=effective_agent_id,
                 agent_name=agent_name,
-                parent_agent_id=self.run_id,
+                parent_agent_id=self._agent_id,
             )
 
         update: dict[str, Any] = {
-            "run_id": effective_agent_id,
+            "run_id": _generate_run_id(),
             "parent_run_id": self.run_id,
             "start_at": None,  # Will be set by __aenter__
             "end_at": None,  # Will be set by __aexit__
@@ -858,7 +858,7 @@ class AgentContext(BaseModel):
             **override,
         }
         new_ctx = self.model_copy(update=update)
-        new_ctx._agent_name = agent_name
+        new_ctx._agent_id = effective_agent_id
         # Reset re-entry protection for subagent (independent lifecycle)
         object.__setattr__(new_ctx, "_entered", False)
         object.__setattr__(new_ctx, "_enter_lock", asyncio.Lock())

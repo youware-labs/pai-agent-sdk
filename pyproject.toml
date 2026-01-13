@@ -162,6 +162,7 @@ source = ["pai_agent_sdk"]
 omit = [
     # Agents require AI API integration tests, not suitable for unit tests
     "pai_agent_sdk/agents/*",
+    "pai_agent_sdk/toolsets/core/multimodal/*",
     # Re-export only __init__.py files
     "pai_agent_sdk/toolsets/core/*/__init__.py",
 ]

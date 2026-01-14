@@ -57,8 +57,8 @@ from typing import TYPE_CHECKING, Any
 from pydantic_ai._agent_graph import HistoryProcessor
 
 from pai_agent_sdk.context import AgentContext, ModelConfig
+from pai_agent_sdk.presets import INHERIT
 from pai_agent_sdk.subagents.config import (
-    INHERIT,
     SubagentConfig,
     load_subagent_from_file,
     load_subagents_from_dir,

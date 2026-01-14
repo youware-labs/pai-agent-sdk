@@ -153,6 +153,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
+"paintress_cli/tests/*" = ["S101", "SIM117", "RUF059", "TRY400", "B904"]
 "tests/*" = ["S101", "SIM117", "RUF059", "TRY400", "B904"]
 "skills/examples/*" = ["S101", "SIM117", "RUF059", "TRY400", "B904", "E402"]
 "examples/*" = ["S101", "SIM117", "RUF059", "TRY400", "B904", "E402"]
@@ -165,7 +166,7 @@ preview = true
 # anthropic is a transitive dependency from pydantic-ai-slim
 # pai-agent-sdk is self-reference in optional dependencies
 ignore = ["DEP001", "DEP002"]
-per_rule_ignores = { DEP001 = ["anthropic"], DEP002 = ["pai-agent-sdk"], DEP003 = ['anthropic', 'paintress_cli']}
+per_rule_ignores = { DEP001 = ["anthropic"], DEP002 = ["pai-agent-sdk"], DEP003 = ["anthropic", "paintress_cli"], DEP004 = ["pytest"]}
 
 [tool.coverage.report]
 skip_empty = true

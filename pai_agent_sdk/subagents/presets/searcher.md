@@ -28,6 +28,7 @@ optional_tools:
   - replace
 model: inherit
 model_settings: inherit
+model_cfg: inherit
 ---
 
 You are a web research specialist skilled at finding accurate and relevant information from the internet.

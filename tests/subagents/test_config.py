@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
+from pai_agent_sdk.presets import INHERIT
 from pai_agent_sdk.subagents.config import (
-    INHERIT,
     SubagentConfig,
     load_subagent_from_file,
     load_subagents_from_dir,
@@ -223,3 +223,35 @@ You are a fast search specialist.
         "compact_threshold": 0.80,
         "max_images": 5,
     }
+
+
+def test_parse_subagent_markdown_with_model_cfg_preset() -> None:
+    """Test parsing subagent markdown with model_cfg as preset string."""
+    content = """---
+name: claude_agent
+description: Claude optimized agent
+model_cfg: claude_200k
+---
+
+You are an agent optimized for Claude.
+"""
+    config = parse_subagent_markdown(content)
+
+    assert config.name == "claude_agent"
+    assert config.model_cfg == "claude_200k"
+
+
+def test_parse_subagent_markdown_with_model_cfg_inherit() -> None:
+    """Test parsing subagent markdown with model_cfg set to inherit."""
+    content = """---
+name: inheriting_agent
+description: Agent that inherits model config
+model_cfg: inherit
+---
+
+You inherit configuration from parent.
+"""
+    config = parse_subagent_markdown(content)
+
+    assert config.name == "inheriting_agent"
+    assert config.model_cfg == INHERIT

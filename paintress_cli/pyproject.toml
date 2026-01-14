@@ -21,7 +21,7 @@ classifiers = [
 Repository = "https://github.com/youware-labs/pai-agent-sdk"
 
 [project.scripts]
-paintress-cli = "paintress_cli:cli"
+paintress-cli = "paintress_cli.cli:cli"
 
 [build-system]
 requires = ["hatchling", "uv-dynamic-versioning>=0.7.0"]

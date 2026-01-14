@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, Generic, cast
 
 import jinja2
 from agent_environment import Environment
-from pydantic_ai import Agent, DeferredToolRequests, DeferredToolResults
+from pydantic_ai import Agent, DeferredToolRequests, DeferredToolResults, UsageLimits
 from pydantic_ai._agent_graph import CallToolsNode, HistoryProcessor, ModelRequestNode
 from pydantic_ai.messages import ModelMessage, UserContent
 from pydantic_ai.models import KnownModelName, Model
@@ -555,6 +555,7 @@ async def stream_agent(  # noqa: C901
     *,
     message_history: Sequence[ModelMessage] | None = None,
     deferred_tool_results: DeferredToolResults | None = None,
+    usage_limits: UsageLimits | None = None,
     # Hooks
     pre_node_hook: NodeHook[AgentDepsT, OutputT] | None = None,
     post_node_hook: NodeHook[AgentDepsT, OutputT] | None = None,
@@ -687,6 +688,7 @@ async def stream_agent(  # noqa: C901
                 agent.iter(
                     user_prompt,
                     deps=ctx,
+                    usage_limits=usage_limits,
                     message_history=message_history,
                     deferred_tool_results=deferred_tool_results,
                     metadata=cast(dict[str, Any], metadata) if metadata else None,

@@ -1,0 +1,7 @@
+# Paintress CLI Project Configuration
+# Location: .paintress/tools.toml
+
+[tools]
+# Tools requiring user approval before execution
+# Example: need_approval = ["shell", "replace"]
+need_approval = []

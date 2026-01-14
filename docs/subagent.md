@@ -67,6 +67,7 @@ optional_tools:
   - edit
 model: inherit
 model_settings: inherit
+model_cfg: inherit
 ---
 
 You are an expert debugger specializing in systematic root cause analysis.
@@ -74,17 +75,17 @@ You are an expert debugger specializing in systematic root cause analysis.
 
 ### Configuration Fields
 
-| Field            | Type          | Required | Description                                                     |
-| ---------------- | ------------- | -------- | --------------------------------------------------------------- |
-| `name`           | `str`         | Yes      | Unique identifier, used as tool name                            |
-| `description`    | `str`         | Yes      | Shown to model when selecting tools                             |
-| `instruction`    | `str`         | No       | Injected into parent's system prompt                            |
-| `system_prompt`  | `str`         | Yes      | Markdown body content (after frontmatter)                       |
-| `tools`          | `list[str]`   | No       | Required tools from parent (ALL must be available)              |
-| `optional_tools` | `list[str]`   | No       | Optional tools (included if available)                          |
-| `model`          | `str`         | No       | `"inherit"` or model name (e.g., `"anthropic:claude-sonnet-4"`) |
-| `model_settings` | `str \| dict` | No       | `"inherit"`, preset name, or dict config                        |
-| `model_cfg`      | `dict`        | No       | ModelConfig for context management                              |
+| Field            | Type          | Required | Description                                                      |
+| ---------------- | ------------- | -------- | ---------------------------------------------------------------- |
+| `name`           | `str`         | Yes      | Unique identifier, used as tool name                             |
+| `description`    | `str`         | Yes      | Shown to model when selecting tools                              |
+| `instruction`    | `str`         | No       | Injected into parent's system prompt                             |
+| `system_prompt`  | `str`         | Yes      | Markdown body content (after frontmatter)                        |
+| `tools`          | `list[str]`   | No       | Required tools from parent (ALL must be available)               |
+| `optional_tools` | `list[str]`   | No       | Optional tools (included if available)                           |
+| `model`          | `str`         | No       | `"inherit"` or model name (e.g., `"anthropic:claude-sonnet-4"`)  |
+| `model_settings` | `str \| dict` | No       | `"inherit"`, preset name, or dict config                         |
+| `model_cfg`      | `str \| dict` | No       | `"inherit"`, preset name (e.g., `"claude_200k"`), or dict config |
 
 ### Tool Availability Rules
 

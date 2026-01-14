@@ -265,3 +265,64 @@ class TestOptionalTools:
 
         # Should be available because tools=None means inherit all (no required check)
         assert tool_instance.is_available(mock_run_ctx) is True
+
+
+class TestModelCfgResolution:
+    """Tests for model_cfg resolution in subagent creation."""
+
+    def test_model_cfg_from_preset_string(self, agent_context) -> None:
+        """Subagent should resolve model_cfg from preset string."""
+        parent_toolset = Toolset(agent_context, tools=[GrepTool])
+
+        config = SubagentConfig(
+            name="test_subagent",
+            description="Test subagent",
+            system_prompt="You are a test agent",
+            model_cfg="claude_200k",  # preset string
+        )
+
+        # Just verify it doesn't raise - actual ModelConfig creation happens internally
+        tool_cls = create_subagent_tool_from_config(config, parent_toolset, model="test")
+        assert tool_cls is not None
+
+    def test_model_cfg_from_dict(self, agent_context) -> None:
+        """Subagent should accept model_cfg as dict."""
+        parent_toolset = Toolset(agent_context, tools=[GrepTool])
+
+        config = SubagentConfig(
+            name="test_subagent",
+            description="Test subagent",
+            system_prompt="You are a test agent",
+            model_cfg={"context_window": 100000, "max_images": 5},
+        )
+
+        tool_cls = create_subagent_tool_from_config(config, parent_toolset, model="test")
+        assert tool_cls is not None
+
+    def test_model_cfg_inherit(self, agent_context) -> None:
+        """Subagent should inherit model_cfg when set to 'inherit'."""
+        parent_toolset = Toolset(agent_context, tools=[GrepTool])
+
+        config = SubagentConfig(
+            name="test_subagent",
+            description="Test subagent",
+            system_prompt="You are a test agent",
+            model_cfg="inherit",
+        )
+
+        tool_cls = create_subagent_tool_from_config(config, parent_toolset, model="test")
+        assert tool_cls is not None
+
+    def test_model_cfg_none_inherits(self, agent_context) -> None:
+        """Subagent should inherit model_cfg when None (default)."""
+        parent_toolset = Toolset(agent_context, tools=[GrepTool])
+
+        config = SubagentConfig(
+            name="test_subagent",
+            description="Test subagent",
+            system_prompt="You are a test agent",
+            model_cfg=None,  # default, inherit
+        )
+
+        tool_cls = create_subagent_tool_from_config(config, parent_toolset, model="test")
+        assert tool_cls is not None

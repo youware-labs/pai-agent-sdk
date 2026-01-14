@@ -29,6 +29,7 @@ optional_tools:
   - fetch
 model: inherit
 model_settings: inherit
+model_cfg: inherit
 ---
 
 You are a senior code reviewer ensuring high standards of code quality, security, and maintainability.

@@ -226,7 +226,7 @@ async def test_create_subagent_call_func_basic():
     mock_run.__aiter__ = lambda _: empty_async_iter()
 
     @asynccontextmanager
-    async def mock_iter(prompt, deps, message_history=None):
+    async def mock_iter(prompt, deps, message_history=None, usage_limits=None):
         yield mock_run
 
     mock_agent.iter = mock_iter
@@ -272,7 +272,7 @@ async def test_create_subagent_call_func_registers_agent():
     mock_run.__aiter__ = lambda _: empty_async_iter()
 
     @asynccontextmanager
-    async def mock_iter(prompt, deps, message_history=None):
+    async def mock_iter(prompt, deps, message_history=None, usage_limits=None):
         yield mock_run
 
     mock_agent.iter = mock_iter
@@ -313,7 +313,7 @@ async def test_create_subagent_call_func_stores_history():
     mock_run.__aiter__ = lambda _: empty_async_iter()
 
     @asynccontextmanager
-    async def mock_iter(prompt, deps, message_history=None):
+    async def mock_iter(prompt, deps, message_history=None, usage_limits=None):
         yield mock_run
 
     mock_agent.iter = mock_iter
@@ -371,7 +371,7 @@ async def test_create_subagent_call_func_with_streaming_nodes():
     mock_run.__aiter__ = lambda _: node_iter()
 
     @asynccontextmanager
-    async def mock_iter(prompt, deps, message_history=None):
+    async def mock_iter(prompt, deps, message_history=None, usage_limits=None):
         yield mock_run
 
     mock_agent.iter = mock_iter
@@ -431,7 +431,7 @@ async def test_create_subagent_call_func_agent_id_with_name():
     mock_run.__aiter__ = lambda _: empty_async_iter()
 
     @asynccontextmanager
-    async def mock_iter(prompt, deps, message_history=None):
+    async def mock_iter(prompt, deps, message_history=None, usage_limits=None):
         yield mock_run
 
     mock_agent.iter = mock_iter
@@ -470,7 +470,7 @@ async def test_create_subagent_call_func_agent_id_without_name():
     mock_run.__aiter__ = lambda _: empty_async_iter()
 
     @asynccontextmanager
-    async def mock_iter(prompt, deps, message_history=None):
+    async def mock_iter(prompt, deps, message_history=None, usage_limits=None):
         yield mock_run
 
     mock_agent.iter = mock_iter
@@ -505,7 +505,7 @@ async def test_create_subagent_call_func_resume_with_agent_id():
     mock_run.__aiter__ = lambda _: empty_async_iter()
 
     @asynccontextmanager
-    async def mock_iter(prompt, deps, message_history=None):
+    async def mock_iter(prompt, deps, message_history=None, usage_limits=None):
         yield mock_run
 
     mock_agent.iter = mock_iter
@@ -552,7 +552,7 @@ async def test_usage_not_recorded_without_tool_call_id():
     mock_run.__aiter__ = lambda _: empty_async_iter()
 
     @asynccontextmanager
-    async def mock_iter(prompt, deps, message_history=None):
+    async def mock_iter(prompt, deps, message_history=None, usage_limits=None):
         yield mock_run
 
     mock_agent.iter = mock_iter

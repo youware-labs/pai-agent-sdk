@@ -31,6 +31,7 @@ optional_tools:
   - replace
 model: inherit
 model_settings: inherit
+model_cfg: inherit
 ---
 
 You are an expert debugger specializing in systematic root cause analysis and problem resolution.

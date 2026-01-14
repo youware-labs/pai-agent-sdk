@@ -1,0 +1,67 @@
+# Paintress CLI Global Configuration
+# Location: ~/.config/youware-labs/paintress-cli/config.toml
+
+[general]
+# Model configuration (required)
+# Format: "provider:model_name"
+# Examples:
+#   - anthropic:claude-sonnet-4-5
+#   - openai:gpt-4o
+#   - google:gemini-2.5-pro
+model = ""
+
+# Model settings: preset name or custom dict
+# Available presets: anthropic_default, openai_default, google_default, etc.
+# model_settings = "anthropic_default"
+
+# Maximum requests per session
+max_requests = 1000
+
+[env]
+# Environment variable overrides for API keys
+# ANTHROPIC_API_KEY = "sk-ant-..."
+# OPENAI_API_KEY = "sk-..."
+# GOOGLE_API_KEY = "..."
+
+[display]
+# Code highlighting theme ("dark" or "light")
+code_theme = "dark"
+# Maximum lines to show for tool results
+max_tool_result_lines = 5
+# Maximum length for tool argument display
+max_arg_length = 100
+# Show token usage in status bar
+show_token_usage = true
+# Show elapsed time
+show_elapsed_time = true
+
+[browser]
+# CDP URL for browser automation
+# Options: null (disabled), "auto" (Docker), or explicit URL
+# cdp_url = "auto"
+# Docker image for auto-start browser
+browser_image = "browserless/chromium:latest"
+# Browser startup timeout in seconds
+browser_timeout = 30
+
+[steering]
+# Enable steering mode (inject messages during execution)
+enabled = true
+# Steering message prefix (empty = any message is steering)
+prefix = ">"
+# Buffer size for pending steering messages
+buffer_size = 10
+
+[subagents]
+# Additional subagent directories to load
+additional_dirs = []
+# Disabled builtin subagents
+disabled_builtins = []
+
+[session]
+# Session persistence directory
+session_dir = ".paintress"
+# Auto-save message history
+auto_save_history = false
+# Auto-restore previous session
+auto_restore = false

@@ -29,6 +29,7 @@ optional_tools:
   - replace
 model: inherit
 model_settings: inherit
+model_cfg: inherit
 ---
 
 You are a codebase exploration specialist skilled at navigating and understanding project structures.

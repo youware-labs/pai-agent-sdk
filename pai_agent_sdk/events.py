@@ -66,3 +66,45 @@ class CompactFailedEvent(AgentEvent):
 
     error: str = ""
     message_count: int = 0
+
+
+# =============================================================================
+# Handoff Events
+# =============================================================================
+
+
+@dataclass
+class HandoffStartEvent(AgentEvent):
+    """Emitted when context handoff starts.
+
+    Attributes:
+        message_count: Number of messages before handoff.
+    """
+
+    message_count: int = 0
+
+
+@dataclass
+class HandoffCompleteEvent(AgentEvent):
+    """Emitted when context handoff completes successfully.
+
+    Attributes:
+        handoff_content: The actual handoff content/summary being passed to next context.
+        original_message_count: Number of messages before handoff.
+    """
+
+    handoff_content: str = ""
+    original_message_count: int = 0
+
+
+@dataclass
+class HandoffFailedEvent(AgentEvent):
+    """Emitted when context handoff fails.
+
+    Attributes:
+        error: Error message describing the failure.
+        message_count: Number of messages at failure time.
+    """
+
+    error: str = ""
+    message_count: int = 0

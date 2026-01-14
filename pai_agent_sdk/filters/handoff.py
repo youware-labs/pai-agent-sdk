@@ -8,6 +8,8 @@ Note:
     See HandoffTool for usage example.
 """
 
+from uuid import uuid4
+
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -19,9 +21,10 @@ from pydantic_ai.messages import (
 from pydantic_ai.tools import RunContext
 
 from pai_agent_sdk.context import AgentContext
+from pai_agent_sdk.events import HandoffCompleteEvent, HandoffFailedEvent, HandoffStartEvent
 
 
-def process_handoff_message(
+async def process_handoff_message(
     ctx: RunContext[AgentContext],
     message_history: list[ModelMessage],
 ) -> list[ModelMessage]:
@@ -52,51 +55,81 @@ def process_handoff_message(
     if not ctx.deps.handoff_message:
         return message_history
 
-    # Find the last true user input ModelRequest (has UserPromptPart, no ToolReturnPart)
-    last_user_request: ModelRequest | None = None
-    for msg in reversed(message_history):
-        if not isinstance(msg, ModelRequest):
-            continue
-        has_user_prompt = any(isinstance(p, UserPromptPart) for p in msg.parts)
-        has_tool_return = any(isinstance(p, ToolReturnPart) for p in msg.parts)
-        if has_user_prompt and not has_tool_return:
-            last_user_request = msg
-            break
+    # Generate event_id to correlate start/complete events
+    event_id = uuid4().hex[:8]
+    agent_ctx = ctx.deps
+    original_message_count = len(message_history)
 
-    if not last_user_request:
+    try:
+        # Emit start event
+        await agent_ctx.emit_event(HandoffStartEvent(event_id=event_id, message_count=original_message_count))
+
+        # Find the last true user input ModelRequest (has UserPromptPart, no ToolReturnPart)
+        last_user_request: ModelRequest | None = None
+        for msg in reversed(message_history):
+            if not isinstance(msg, ModelRequest):
+                continue
+            has_user_prompt = any(isinstance(p, UserPromptPart) for p in msg.parts)
+            has_tool_return = any(isinstance(p, ToolReturnPart) for p in msg.parts)
+            if has_user_prompt and not has_tool_return:
+                last_user_request = msg
+                break
+
+        if not last_user_request:
+            return message_history
+
+        handoff_content = ctx.deps.handoff_message
+
+        # Append handoff summary after user's current request
+        handoff_part = UserPromptPart(
+            content=f"<context-handoff>\n{handoff_content}\n</context-handoff>",
+        )
+        last_user_request.parts = [*last_user_request.parts, handoff_part]
+
+        # Generate a unique tool call id
+        tool_call_id = f"handoff-{ctx.deps.run_id}"
+
+        # Clear handoff state
+        ctx.deps.handoff_message = None
+
+        # Return truncated history with handoff marker
+        result = [
+            last_user_request,
+            ModelResponse(
+                parts=[
+                    ToolCallPart(
+                        tool_call_id=tool_call_id,
+                        tool_name="handoff",
+                        args={"_": "context-reset"},
+                    ),
+                ],
+            ),
+            ModelRequest(
+                parts=[
+                    ToolReturnPart(
+                        tool_call_id=tool_call_id,
+                        tool_name="handoff",
+                        content="Handoff complete. Continue with the task using the context summary above.",
+                    ),
+                ],
+            ),
+        ]
+
+        # Emit complete event with the actual handoff content
+        await agent_ctx.emit_event(
+            HandoffCompleteEvent(
+                event_id=event_id,
+                handoff_content=handoff_content,
+                original_message_count=original_message_count,
+            )
+        )
+
+        return result
+
+    except Exception as e:
+        # Emit failed event so consumers know handoff did not succeed
+        await agent_ctx.emit_event(
+            HandoffFailedEvent(event_id=event_id, error=str(e), message_count=original_message_count)
+        )
+        # On error, return original history
         return message_history
-
-    # Append handoff summary after user's current request
-    handoff_part = UserPromptPart(
-        content=f"<context-handoff>\n{ctx.deps.handoff_message}\n</context-handoff>",
-    )
-    last_user_request.parts = [*last_user_request.parts, handoff_part]
-
-    # Generate a unique tool call id
-    tool_call_id = f"handoff-{ctx.deps.run_id}"
-
-    # Clear handoff state
-    ctx.deps.handoff_message = None
-
-    # Return truncated history with handoff marker
-    return [
-        last_user_request,
-        ModelResponse(
-            parts=[
-                ToolCallPart(
-                    tool_call_id=tool_call_id,
-                    tool_name="handoff",
-                    args={"_": "context-reset"},
-                ),
-            ],
-        ),
-        ModelRequest(
-            parts=[
-                ToolReturnPart(
-                    tool_call_id=tool_call_id,
-                    tool_name="handoff",
-                    content="Handoff complete. Continue with the task using the context summary above.",
-                ),
-            ],
-        ),
-    ]

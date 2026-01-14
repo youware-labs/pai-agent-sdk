@@ -14,6 +14,7 @@ from pydantic_ai.messages import (
 
 from pai_agent_sdk.context import AgentContext
 from pai_agent_sdk.environment.local import LocalEnvironment
+from pai_agent_sdk.events import HandoffCompleteEvent, HandoffStartEvent
 from pai_agent_sdk.filters.handoff import process_handoff_message
 
 
@@ -31,7 +32,7 @@ async def test_process_handoff_no_handoff_message(tmp_path: Path) -> None:
             request = ModelRequest(parts=[UserPromptPart(content="Hello")])
             history = [request]
 
-            result = process_handoff_message(mock_ctx, history)
+            result = await process_handoff_message(mock_ctx, history)
 
             assert result == history
             assert len(request.parts) == 1
@@ -53,7 +54,7 @@ async def test_process_handoff_with_handoff_message(tmp_path: Path) -> None:
             request = ModelRequest(parts=[UserPromptPart(content="Continue task")])
             history = [request]
 
-            result = process_handoff_message(mock_ctx, history)
+            result = await process_handoff_message(mock_ctx, history)
 
             # Should return truncated history with 3 messages
             assert len(result) == 3
@@ -97,7 +98,7 @@ async def test_process_handoff_empty_history(tmp_path: Path) -> None:
             mock_ctx = MagicMock()
             mock_ctx.deps = ctx
 
-            result = process_handoff_message(mock_ctx, [])
+            result = await process_handoff_message(mock_ctx, [])
 
             assert result == []
             # Handoff message should NOT be cleared since no injection happened
@@ -127,7 +128,7 @@ async def test_process_handoff_finds_last_user_request(tmp_path: Path) -> None:
 
             history = [user_request, response, tool_return, final_user]
 
-            result = process_handoff_message(mock_ctx, history)
+            result = await process_handoff_message(mock_ctx, history)
 
             # Should inject into final_user (last true user request)
             assert len(result) == 3
@@ -160,7 +161,7 @@ async def test_process_handoff_skips_tool_return_only_request(tmp_path: Path) ->
 
             history = [user_request, response, tool_return]
 
-            result = process_handoff_message(mock_ctx, history)
+            result = await process_handoff_message(mock_ctx, history)
 
             # Should inject into user_request (skipping tool_return)
             assert len(result) == 3
@@ -170,3 +171,75 @@ async def test_process_handoff_skips_tool_return_only_request(tmp_path: Path) ->
             assert first_msg.parts[0].content == "Start"
             assert isinstance(first_msg.parts[1], UserPromptPart)
             assert "<context-handoff>" in first_msg.parts[1].content
+
+
+async def test_process_handoff_emits_events(tmp_path: Path) -> None:
+    """Should emit HandoffStartEvent and HandoffCompleteEvent with handoff content."""
+    async with LocalEnvironment(
+        allowed_paths=[tmp_path],
+        default_path=tmp_path,
+        tmp_base_dir=tmp_path,
+    ) as env:
+        async with AgentContext(env=env) as ctx:
+            # Enable streaming to capture events
+            ctx._stream_queue_enabled = True
+
+            ctx.handoff_message = "Test handoff content"
+
+            mock_ctx = MagicMock()
+            mock_ctx.deps = ctx
+
+            request = ModelRequest(parts=[UserPromptPart(content="Continue")])
+            history = [request]
+
+            result = await process_handoff_message(mock_ctx, history)
+
+            # Verify result
+            assert len(result) == 3
+
+            # Collect events from queue
+            events = []
+            while not ctx.agent_stream_queues[ctx.run_id].empty():
+                events.append(await ctx.agent_stream_queues[ctx.run_id].get())
+
+            # Should have start and complete events
+            assert len(events) == 2
+
+            start_event = events[0]
+            assert isinstance(start_event, HandoffStartEvent)
+            assert start_event.message_count == 1
+
+            complete_event = events[1]
+            assert isinstance(complete_event, HandoffCompleteEvent)
+            assert complete_event.handoff_content == "Test handoff content"
+            assert complete_event.original_message_count == 1
+            # Event IDs should match
+            assert start_event.event_id == complete_event.event_id
+
+
+async def test_process_handoff_no_events_when_streaming_disabled(tmp_path: Path) -> None:
+    """Should not emit events when streaming is disabled."""
+    async with LocalEnvironment(
+        allowed_paths=[tmp_path],
+        default_path=tmp_path,
+        tmp_base_dir=tmp_path,
+    ) as env:
+        async with AgentContext(env=env) as ctx:
+            # Streaming is disabled by default
+            assert ctx._stream_queue_enabled is False
+
+            ctx.handoff_message = "Test content"
+
+            mock_ctx = MagicMock()
+            mock_ctx.deps = ctx
+
+            request = ModelRequest(parts=[UserPromptPart(content="Continue")])
+            history = [request]
+
+            result = await process_handoff_message(mock_ctx, history)
+
+            # Should still work correctly
+            assert len(result) == 3
+
+            # Queue should be empty since streaming is disabled
+            assert ctx.agent_stream_queues[ctx.run_id].empty()

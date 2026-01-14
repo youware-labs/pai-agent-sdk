@@ -15,7 +15,7 @@ Or to install paintress-cli globally with uv, run:
 ```bash
 uv tool install paintress-cli
 ...
-paintress
+paintress-cli
 ```
 
 Or with pip, run:
@@ -23,7 +23,7 @@ Or with pip, run:
 ```bash
 pip install paintress-cli
 ...
-paintress
+paintress-cli
 ```
 
 Or run as a module:

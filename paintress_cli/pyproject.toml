@@ -5,11 +5,13 @@ description = "TUI reference implementation for pai-agent-sdk"
 authors = [{ name = "youware", email = "lab@youware.com" }]
 readme = "README.md"
 keywords = ["python", "cli", "tui", "ai-agent"]
-requires-python = ">=3.13,<3.14"
+requires-python = ">=3.11,<3.14"
 classifiers = [
     "Intended Audience :: Developers",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Environment :: Console",
     "Topic :: Software Development :: Libraries :: Python Modules",

@@ -166,7 +166,7 @@ preview = true
 # anthropic is a transitive dependency from pydantic-ai-slim
 # pai-agent-sdk is self-reference in optional dependencies
 ignore = ["DEP001", "DEP002"]
-per_rule_ignores = { DEP001 = ["anthropic"], DEP002 = ["pai-agent-sdk"], DEP003 = ['anthropic']}
+per_rule_ignores = { DEP001 = ["anthropic"], DEP002 = ["pai-agent-sdk"], DEP003 = ['anthropic', 'paintress_cli']}
 
 [tool.coverage.report]
 skip_empty = true

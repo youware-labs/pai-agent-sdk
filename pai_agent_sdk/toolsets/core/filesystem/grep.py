@@ -30,7 +30,7 @@ def _load_instruction() -> str:
 class GrepTool(BaseTool):
     """Tool for searching file contents using regular expressions."""
 
-    name = "grep_tool"
+    name = "grep"
     description = "Search file contents using regex patterns. Returns matches with context lines."
 
     def is_available(self, ctx: RunContext[AgentContext]) -> bool:

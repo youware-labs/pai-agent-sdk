@@ -54,11 +54,11 @@ class TestSteeringInjectedEvent:
         event = SteeringInjectedEvent(
             event_id="steer-abc",
             message_count=2,
-            preview="Focus on the UI...",
+            content="Focus on the UI...",
         )
         assert event.event_id == "steer-abc"
         assert event.message_count == 2
-        assert event.preview == "Focus on the UI..."
+        assert event.content == "Focus on the UI..."
 
     def test_inherits_from_agent_event(self):
         """Test that event inherits from AgentEvent."""

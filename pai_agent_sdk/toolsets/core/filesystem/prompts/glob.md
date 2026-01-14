@@ -11,6 +11,6 @@ Returns paths sorted by modification time (newest first).
 <best-practices>
 - Use specific patterns to narrow results
 - Prefer glob over ls for finding files by extension
-- Combine with grep_tool for content + pattern filtering
+- Combine with grep for content + pattern filtering
 </best-practices>
 </glob-tool>

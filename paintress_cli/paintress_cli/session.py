@@ -11,7 +11,6 @@ emits SteeringInjectedEvent when messages are injected.
 
 from __future__ import annotations
 
-import logging
 import uuid
 from typing import TYPE_CHECKING, Any
 
@@ -25,12 +24,13 @@ from pydantic_ai.messages import (
 
 from pai_agent_sdk.context import AgentContext
 from paintress_cli.events import SteeringInjectedEvent
+from paintress_cli.logging import get_logger
 from paintress_cli.steering import LocalSteeringManager, SteeringMessage
 
 if TYPE_CHECKING:
     from pydantic_ai import RunContext
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 # -----------------------------------------------------------------------------
@@ -164,10 +164,12 @@ class TUIContext(AgentContext):
         )
 
         # Emit event via ctx.deps (which is TUIContext)
+        # Include full content for user audit
+        full_content = "\n".join(m.prompt for m in steering_messages)
         event = SteeringInjectedEvent(
             event_id=f"steer-{uuid.uuid4().hex[:8]}",
             message_count=len(steering_messages),
-            preview=steering_messages[0].prompt[:100] if steering_messages else "",
+            content=full_content,
         )
         await ctx.deps.emit_event(event)
 

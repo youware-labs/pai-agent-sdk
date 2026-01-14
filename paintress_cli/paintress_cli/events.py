@@ -67,11 +67,11 @@ class SteeringInjectedEvent(AgentEvent):
 
     Attributes:
         message_count: Number of messages injected.
-        preview: Preview of the first message content.
+        content: Full content of all injected messages for user audit.
     """
 
     message_count: int = 0
-    preview: str = ""
+    content: str = ""
 
 
 # -----------------------------------------------------------------------------

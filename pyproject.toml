@@ -1,8 +1,8 @@
 [project]
 name = "pai-agent-sdk"
-version = "0.0.1"
+dynamic = ["version"]
 description = "Production-ready SDK for building AI agents with Pydantic AI"
-authors = [{ name = "youware", email = "dev@youware.com" }]
+authors = [{ name = "youware", email = "lab@youware.com" }]
 readme = "README.md"
 keywords = ['python']
 requires-python = ">=3.11,<3.14"
@@ -72,11 +72,27 @@ dev = [
 ]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "uv-dynamic-versioning>=0.7.0"]
 build-backend = "hatchling.build"
 
-[tool.setuptools]
-py-modules = ["pai_agent_sdk"]
+[tool.hatch.version]
+source = "uv-dynamic-versioning"
+
+[tool.uv-dynamic-versioning]
+vcs = "git"
+style = "pep440"
+tag-branch = "main"
+fallback-version = "0.0.0"
+
+[tool.hatch.build.targets.wheel]
+packages = ["pai_agent_sdk"]
+
+# uv workspace configuration
+[tool.uv.workspace]
+members = ["paintress_cli"]
+
+[tool.uv.sources]
+pai-agent-sdk = { workspace = true }
 
 [tool.pyright]
 include = ["pai_agent_sdk"]

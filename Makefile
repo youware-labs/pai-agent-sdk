@@ -1,7 +1,7 @@
 .PHONY: install
 install: ## Install the virtual environment and install the pre-commit hooks
 	@echo "🚀 Creating virtual environment using uv"
-	@uv sync
+	@uv sync --all-packages
 	@uv run pre-commit install
 
 .PHONY: lint
@@ -10,6 +10,11 @@ lint: ## Lint the code
 	@uv lock --locked
 	@echo "🚀 Linting code: Running pre-commit"
 	@uv run pre-commit run -a
+
+.PHONY: cli
+cli: ## Run the CLI
+	@echo "🚀 Running paintress-cli CLI"
+	@uv run paintress
 
 .PHONY: check
 check: ## Run code quality tools.
@@ -33,9 +38,14 @@ test-fix: ## Test and auto-fix inline snapshots
 	@uv run python -m pytest -vv --inline-snapshot=fix
 
 .PHONY: build
-build: clean-build ## Build wheel file
+build: clean-build ## Build wheel file for pai-agent-sdk only
 	@echo "🚀 Creating wheel file"
 	@uvx --from build pyproject-build --installer uv
+
+.PHONY: build-all
+build-all: clean-build ## Build wheel files for all packages in monorepo
+	@echo "🚀 Creating wheel files for all packages"
+	@uv build --all-packages
 
 .PHONY: clean-build
 clean-build: ## Clean build artifacts

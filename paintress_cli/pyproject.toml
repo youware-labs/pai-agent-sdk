@@ -1,0 +1,46 @@
+[project]
+name = "paintress-cli"
+dynamic = ["version", "dependencies"]
+description = "TUI reference implementation for pai-agent-sdk"
+authors = [{ name = "youware", email = "lab@youware.com" }]
+readme = "README.md"
+keywords = ["python", "cli", "tui", "ai-agent"]
+requires-python = ">=3.13,<3.14"
+classifiers = [
+    "Intended Audience :: Developers",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Environment :: Console",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.urls]
+Repository = "https://github.com/youware-labs/pai-agent-sdk"
+
+[project.scripts]
+paintress = "paintress_cli:cli"
+
+[build-system]
+requires = ["hatchling", "uv-dynamic-versioning>=0.7.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "uv-dynamic-versioning"
+
+[tool.uv-dynamic-versioning]
+vcs = "git"
+style = "pep440"
+tag-branch = "main"
+fallback-version = "0.0.0"
+
+[tool.hatch.metadata.hooks.uv-dynamic-versioning]
+dependencies = [
+    "pai-agent-sdk[all]=={{ version }}",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["paintress_cli"]
+
+[tool.uv.sources]
+pai-agent-sdk = { workspace = true }

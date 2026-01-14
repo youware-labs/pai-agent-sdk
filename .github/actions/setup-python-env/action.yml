@@ -31,10 +31,10 @@ runs:
 
     - name: Install Python dependencies (no extras)
       if: ${{ inputs.extras == '' }}
-      run: uv sync --frozen --python=${{ matrix.python-version }}
+      run: uv sync --frozen --all-packages --python=${{ matrix.python-version }}
       shell: bash
 
     - name: Install Python dependencies (with extras)
       if: ${{ inputs.extras != '' }}
-      run: uv sync --frozen --python=${{ matrix.python-version }} --extra ${{ inputs.extras }}
+      run: uv sync --frozen --all-packages --python=${{ matrix.python-version }} --extra ${{ inputs.extras }}
       shell: bash

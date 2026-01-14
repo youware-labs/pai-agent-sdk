@@ -94,7 +94,7 @@ members = ["paintress_cli"]
 pai-agent-sdk = { workspace = true }
 
 [tool.pyright]
-include = ["pai_agent_sdk"]
+include = ["pai_agent_sdk", "paintress_cli"]
 pythonVersion = "3.11"
 typeCheckingMode = "standard"
 reportTypedDictNotRequiredAccess = false

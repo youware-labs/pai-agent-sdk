@@ -484,3 +484,43 @@ def _load_template(name: str) -> str:
     """Load a template file."""
     template_files = resources.files("paintress_cli").joinpath("templates")
     return template_files.joinpath(name).read_text(encoding="utf-8")
+
+
+# =============================================================================
+# Convenience Functions
+# =============================================================================
+
+
+def load_config(
+    config_dir: Path | None = None,
+    project_dir: Path | None = None,
+) -> PaintressConfig:
+    """Load configuration from all sources.
+
+    Convenience function that creates a ConfigManager and loads config.
+
+    Args:
+        config_dir: Optional custom global config directory.
+        project_dir: Optional custom project directory.
+
+    Returns:
+        Loaded PaintressConfig.
+    """
+    manager = ConfigManager(config_dir=config_dir, project_dir=project_dir)
+    return manager.load()
+
+
+def get_config_manager(
+    config_dir: Path | None = None,
+    project_dir: Path | None = None,
+) -> ConfigManager:
+    """Get a ConfigManager instance.
+
+    Args:
+        config_dir: Optional custom global config directory.
+        project_dir: Optional custom project directory.
+
+    Returns:
+        ConfigManager instance.
+    """
+    return ConfigManager(config_dir=config_dir, project_dir=project_dir)

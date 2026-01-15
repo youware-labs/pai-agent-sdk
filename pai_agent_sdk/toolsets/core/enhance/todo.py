@@ -72,7 +72,7 @@ class TodoReadTool(BaseTool):
     async def call(
         self,
         ctx: RunContext[AgentContext],
-    ) -> list[TodoItem] | str:
+    ) -> str:
         file_op = cast(FileOperator, ctx.deps.file_operator)
         todo_file = _get_todo_file_name(ctx.deps.run_id)
 
@@ -84,8 +84,9 @@ class TodoReadTool(BaseTool):
             if not file_content.strip():
                 return "No TO-DOs found"
 
+            # Validate and return JSON string for consistent parsing
             todos = TodoItemsTypeAdapter.validate_json(file_content)
-            return todos
+            return TodoItemsTypeAdapter.dump_json(todos).decode("utf-8")
 
         except Exception:
             # Remove the file if it is corrupted
@@ -118,7 +119,7 @@ class TodoWriteTool(BaseTool):
         self,
         ctx: RunContext[AgentContext],
         to_dos: Annotated[list[TodoItem], Field(description="The updated TO-DO list.")],
-    ) -> list[TodoItem] | str:
+    ) -> str:
         file_op = cast(FileOperator, ctx.deps.file_operator)
         todo_file = _get_todo_file_name(ctx.deps.run_id)
 
@@ -128,10 +129,10 @@ class TodoWriteTool(BaseTool):
                     await file_op.delete_tmp_file(todo_file)
                 return "TO-DO list cleared successfully."
 
-            # Write TO-DOs to file
+            # Write TO-DOs to file and return JSON string for consistent parsing
             to_do_json = TodoItemsTypeAdapter.dump_json(to_dos)
             await file_op.write_tmp_file(todo_file, to_do_json)
-            return to_dos
+            return to_do_json.decode("utf-8")
 
         except Exception as e:
             # If there is an error, remove the file

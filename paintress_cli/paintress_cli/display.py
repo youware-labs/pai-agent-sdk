@@ -383,26 +383,24 @@ class ToolMessage(BaseModel):
             return self.to_panel()
 
     def _create_to_do_panel(self) -> Panel:
-        """Create a special panel for to_do tools."""
+        """Create a special panel for to_do tools.
+
+        Both to_do_read and to_do_write return JSON string in content.
+        """
         panel_content = ""
         try:
-            if self.content:
-                if self.content.startswith("[") and self.content.endswith("]"):
-                    to_dos = json.loads(self.content)
-                    if isinstance(to_dos, list) and to_dos:
-                        panel_content = self._format_to_do_list(to_dos)
-                    else:
-                        panel_content = "No to_dos found"
-                elif isinstance(self.content, str):
-                    panel_content = self.content
+            if self.content and self.content.startswith("["):
+                to_dos = json.loads(self.content)
+                if isinstance(to_dos, list) and to_dos:
+                    panel_content = self._format_to_do_list(to_dos)
                 else:
-                    panel_content = str(self.content)
+                    panel_content = "No to_dos found"
+            elif self.content:
+                panel_content = str(self.content)
             else:
                 panel_content = "No to_do data available"
         except json.JSONDecodeError:
-            panel_content = f"Raw content:\n{self.content}"
-        except Exception:
-            panel_content = "Error processing to_do data"
+            panel_content = str(self.content) if self.content else "Invalid to_do data"
 
         return Panel(
             panel_content,
@@ -412,23 +410,29 @@ class ToolMessage(BaseModel):
         )
 
     def _create_thinking_panel(self, code_theme: str = "monokai") -> Panel:
-        """Create a special panel for thinking tools."""
+        """Create a special panel for thinking tools.
+
+        The thought content is in args['thought'], not in the result content.
+        """
         panel_content: Any = ""
         try:
-            if self.content:
-                if self.content.startswith("{") and self.content.endswith("}"):
-                    thinking_data = json.loads(self.content)
-                    if isinstance(thinking_data, dict) and "thought" in thinking_data:
-                        thought = thinking_data["thought"]
-                        panel_content = Markdown(thought, code_theme=code_theme)
-                    else:
-                        panel_content = Markdown(f"```json\n{self.content}\n```", code_theme=code_theme)
-                else:
-                    panel_content = Markdown(self.content, code_theme=code_theme)
+            # Extract thought from args (where thinking tool stores the content)
+            thought = None
+            if isinstance(self.args, dict) and "thought" in self.args:
+                thought = self.args["thought"]
+            elif isinstance(self.args, str):
+                # Try parsing args as JSON string
+                try:
+                    args_data = json.loads(self.args)
+                    if isinstance(args_data, dict) and "thought" in args_data:
+                        thought = args_data["thought"]
+                except json.JSONDecodeError:
+                    pass
+
+            if thought:
+                panel_content = Markdown(thought, code_theme=code_theme)
             else:
                 panel_content = "No thinking content available"
-        except json.JSONDecodeError:
-            panel_content = Markdown(self.content or "", code_theme=code_theme)
         except Exception:
             panel_content = "Error processing thinking data"
 
@@ -727,6 +731,42 @@ class EventRenderer:
     def get_current_thinking(self) -> str:
         """Get current accumulated thinking content."""
         return self._current_thinking
+
+    def update_thinking(self, delta: str) -> None:
+        """Update current thinking content with delta."""
+        self._current_thinking += delta
+
+    def start_thinking(self, content: str = "") -> None:
+        """Start a new thinking block."""
+        self._current_thinking = content
+
+    def render_thinking(self, content: str | None = None, width: int | None = None) -> str:
+        """Render thinking content as a styled blockquote.
+
+        Uses dim style with '>' prefix for each line to visually distinguish
+        model's internal reasoning from regular output.
+
+        Args:
+            content: Optional content to render. If None, uses current thinking.
+            width: Optional render width.
+
+        Returns:
+            Rendered ANSI string.
+        """
+        thinking_content = content if content is not None else self._current_thinking
+        if not thinking_content:
+            return ""
+
+        # Format as blockquote with dim style
+        lines = thinking_content.split("\n")
+        text = Text()
+        for i, line in enumerate(lines):
+            if i > 0:
+                text.append("\n")
+            text.append("> ", style="dim magenta")
+            text.append(line, style="dim italic")
+
+        return self._renderer.render(text, width=width)
 
     def render_tool_call_start(self, name: str, tool_call_id: str) -> str:
         """Render tool call start indicator."""

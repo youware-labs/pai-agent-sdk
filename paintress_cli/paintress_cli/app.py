@@ -46,6 +46,8 @@ from pydantic_ai.messages import (
     PartStartEvent,
     TextPart,
     TextPartDelta,
+    ThinkingPart,
+    ThinkingPartDelta,
 )
 from rich.text import Text
 
@@ -172,6 +174,10 @@ class TUIApp:
     # Streaming text tracking for markdown rendering
     _streaming_text: str = field(default="", init=False)
     _streaming_line_index: int | None = field(default=None, init=False)
+
+    # Streaming thinking tracking for extended thinking display
+    _streaming_thinking: str = field(default="", init=False)
+    _streaming_thinking_line_index: int | None = field(default=None, init=False)
 
     # Real-time context usage tracking
     _current_context_tokens: int = field(default=0, init=False)
@@ -379,6 +385,46 @@ class TUIApp:
                 self._output_lines[self._streaming_line_index] = rendered
         self._streaming_text = ""
         self._streaming_line_index = None
+
+    def _start_streaming_thinking(self, initial_content: str = "") -> None:
+        """Start tracking a new streaming thinking block."""
+        self._streaming_thinking = initial_content
+        self._streaming_thinking_line_index = len(self._output_lines)
+        # Render initial content with thinking style
+        rendered = self._event_renderer.render_thinking(initial_content, width=self._get_terminal_width()).rstrip("\n")
+        self._output_lines.append(rendered)
+        if self._app:
+            self._app.invalidate()
+
+    def _update_streaming_thinking(self, delta: str) -> None:
+        """Update current streaming thinking with delta."""
+        self._streaming_thinking += delta
+        # Re-render thinking for the complete text so far
+        if self._streaming_thinking_line_index is not None and self._streaming_thinking_line_index < len(
+            self._output_lines
+        ):
+            rendered = self._event_renderer.render_thinking(
+                self._streaming_thinking,
+                width=self._get_terminal_width(),
+            ).rstrip("\n")
+            self._output_lines[self._streaming_thinking_line_index] = rendered
+            if self._state == TUIState.RUNNING:
+                self._scroll_to_bottom()
+            if self._app:
+                self._app.invalidate()
+
+    def _finalize_streaming_thinking(self) -> None:
+        """Finalize the current streaming thinking block."""
+        if self._streaming_thinking and self._streaming_thinking_line_index is not None:
+            # Final render
+            rendered = self._event_renderer.render_thinking(
+                self._streaming_thinking,
+                width=self._get_terminal_width(),
+            ).rstrip("\n")
+            if self._streaming_thinking_line_index < len(self._output_lines):
+                self._output_lines[self._streaming_thinking_line_index] = rendered
+        self._streaming_thinking = ""
+        self._streaming_thinking_line_index = None
 
     def _append_user_input(self, text: str) -> None:
         """Render user input with styled prompt indicator and word wrap."""
@@ -619,14 +665,17 @@ class TUIApp:
 
         except asyncio.CancelledError:
             self._finalize_streaming_text()
+            self._finalize_streaming_thinking()
             self._append_output("[Cancelled]")
         except Exception as e:
             self._finalize_streaming_text()
+            self._finalize_streaming_thinking()
             self._append_output(f"\n[Error: {e}]")
             logger.exception("Agent execution failed")
         finally:
-            # Finalize any remaining streaming text
+            # Finalize any remaining streaming text/thinking
             self._finalize_streaming_text()
+            self._finalize_streaming_thinking()
             self._state = TUIState.IDLE
             if self._app:
                 self._app.invalidate()
@@ -638,7 +687,13 @@ class TUIApp:
         if isinstance(message_event, PartStartEvent) and isinstance(message_event.part, TextPart):
             # Start new streaming text block
             self._finalize_streaming_text()  # Finalize any previous
+            self._finalize_streaming_thinking()  # Finalize any thinking
             self._start_streaming_text(message_event.part.content)
+
+        elif isinstance(message_event, PartStartEvent) and isinstance(message_event.part, ThinkingPart):
+            # Start new streaming thinking block (extended thinking from model)
+            self._finalize_streaming_thinking()  # Finalize any previous
+            self._start_streaming_thinking(message_event.part.content)
 
         elif isinstance(message_event, PartDeltaEvent) and isinstance(message_event.delta, TextPartDelta):
             # Update streaming text with delta
@@ -648,9 +703,19 @@ class TUIApp:
                 # Fallback if no streaming started
                 self._start_streaming_text(message_event.delta.content_delta)
 
+        elif isinstance(message_event, PartDeltaEvent) and isinstance(message_event.delta, ThinkingPartDelta):
+            # Update streaming thinking with delta
+            if message_event.delta.content_delta:
+                if self._streaming_thinking_line_index is not None:
+                    self._update_streaming_thinking(message_event.delta.content_delta)
+                else:
+                    # Fallback if no streaming started
+                    self._start_streaming_thinking(message_event.delta.content_delta)
+
         elif isinstance(message_event, FunctionToolCallEvent):
             # Finalize any streaming text before tool call
             self._finalize_streaming_text()
+            self._finalize_streaming_thinking()
 
             tool_call_id = message_event.part.tool_call_id
             tool_name = message_event.part.tool_name
@@ -685,6 +750,7 @@ class TUIApp:
         # Handle SDK events (compact, handoff)
         elif isinstance(message_event, CompactStartEvent):
             self._finalize_streaming_text()
+            self._finalize_streaming_thinking()
             rendered = self._event_renderer.render_compact_start(message_event.message_count)
             self._append_output(rendered.rstrip())
 
@@ -702,6 +768,7 @@ class TUIApp:
 
         elif isinstance(message_event, HandoffStartEvent):
             self._finalize_streaming_text()
+            self._finalize_streaming_thinking()
             rendered = self._event_renderer.render_handoff_start(message_event.message_count)
             self._append_output(rendered.rstrip())
 
@@ -1140,6 +1207,8 @@ class TUIApp:
         # Reset streaming state
         self._streaming_text = ""
         self._streaming_line_index = None
+        self._streaming_thinking = ""
+        self._streaming_thinking_line_index = None
         self._printed_tool_calls.clear()
         self._tool_messages.clear()
         self._steering_items.clear()

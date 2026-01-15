@@ -198,6 +198,31 @@ def reset_logging() -> None:
     _log_queue = None
 
 
+def configure_logging(verbose: bool = False) -> None:
+    """Configure basic stderr logging for CLI startup.
+
+    This is used before TUI is initialized, for early startup messages.
+    Once TUI starts, call configure_tui_logging() to switch to queue mode.
+
+    Args:
+        verbose: If True, set DEBUG level; otherwise INFO.
+    """
+    level = logging.DEBUG if verbose else logging.INFO
+
+    # Configure both loggers with stderr handler
+    for name in [TUI_LOGGER_NAME, SDK_LOGGER_NAME]:
+        logger = logging.getLogger(name)
+        logger.handlers.clear()
+
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter("%(levelname)s: %(message)s")
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+
+        logger.setLevel(level)
+        logger.propagate = False
+
+
 def get_logger(name: str) -> logging.Logger:
     """Get a logger for the given module name.
 

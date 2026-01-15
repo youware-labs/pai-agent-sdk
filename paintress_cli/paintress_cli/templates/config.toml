@@ -40,7 +40,7 @@ show_elapsed_time = true
 # Options: null (disabled), "auto" (Docker), or explicit URL
 # cdp_url = "auto"
 # Docker image for auto-start browser
-browser_image = "browserless/chromium:latest"
+browser_image = "zenika/alpine-chrome:latest"
 # Browser startup timeout in seconds
 browser_timeout = 30
 

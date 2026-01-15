@@ -53,7 +53,7 @@ show_elapsed_time = true
 #   - "ws://localhost:9222": Use existing browser
 cdp_url = null
 # Docker image for auto-start browser
-browser_image = "browserless/chromium:latest"
+browser_image = "zenika/alpine-chrome:latest"
 # Browser startup timeout in seconds
 browser_timeout = 30
 
@@ -146,7 +146,7 @@ class DisplayConfig(BaseModel):
 
 class BrowserConfig(BaseModel):
     cdp_url: str | None = None  # None, "auto", or explicit URL
-    browser_image: str = "browserless/chromium:latest"
+    browser_image: str = "zenika/alpine-chrome:latest"
     browser_timeout: int = 30
 
 class ToolsConfig(BaseModel):

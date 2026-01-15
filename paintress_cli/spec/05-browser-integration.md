@@ -11,7 +11,7 @@ Paintress CLI integrates browser automation capabilities through the Chrome DevT
 ```toml
 [browser]
 cdp_url = "auto"
-browser_image = "browserless/chromium:latest"
+browser_image = "zenika/alpine-chrome:latest"
 browser_timeout = 30
 ```
 
@@ -122,7 +122,7 @@ sequenceDiagram
 class DockerBrowserConfig:
     """Configuration for Docker browser sandbox."""
 
-    image: str = "browserless/chromium:latest"
+    image: str = "zenika/alpine-chrome:latest"
     """Docker image to use for the browser."""
 
     container_name_prefix: str = "paintress-browser"

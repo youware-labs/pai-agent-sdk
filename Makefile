@@ -25,7 +25,7 @@ check: ## Run code quality tools.
 	@echo "🚀 Static type checking: Running pyright"
 	@uv run pyright
 	@echo "🚀 Checking for obsolete dependencies: Running deptry"
-	@uv run deptry .
+	@uv run deptry pai_agent_sdk
 
 .PHONY: test
 test: ## Test the code with pytest

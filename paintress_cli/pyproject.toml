@@ -38,6 +38,11 @@ bump = true
 [tool.hatch.metadata.hooks.uv-dynamic-versioning]
 dependencies = [
     "pai-agent-sdk[all]=={{ version }}",
+    "click>=8.0",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "pydantic-ai",
+    "agent-environment>=0.1.0",
 ]
 
 [tool.hatch.build.targets.wheel]

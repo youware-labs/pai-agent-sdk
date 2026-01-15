@@ -79,7 +79,7 @@ class BrowserConfig(BaseModel):
     cdp_url: str | None = None
     """CDP URL for browser automation."""
 
-    browser_image: str = "browserless/chromium:latest"
+    browser_image: str = "zenika/alpine-chrome:latest"
     """Docker image for auto-start browser."""
 
     browser_timeout: int = 30

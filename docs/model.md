@@ -27,12 +27,83 @@ See official docs: [pydantic-ai Models](https://ai.pydantic.dev/models/)
 
 **Common formats:**
 
-| Provider  | Format              | Example                                |
-| --------- | ------------------- | -------------------------------------- |
-| OpenAI    | `openai:<model>`    | `openai:gpt-4o`                        |
-| Anthropic | `anthropic:<model>` | `anthropic:claude-3-5-sonnet-20241022` |
-| Google    | `gemini:<model>`    | `gemini:gemini-1.5-pro`                |
-| Groq      | `groq:<model>`      | `groq:llama-3.1-70b-versatile`         |
+| Provider         | Format                  | Example                                |
+| ---------------- | ----------------------- | -------------------------------------- |
+| OpenAI           | `openai:<model>`        | `openai:gpt-4o`                        |
+| Anthropic        | `anthropic:<model>`     | `anthropic:claude-3-5-sonnet-20241022` |
+| Google           | `gemini:<model>`        | `gemini:gemini-1.5-pro`                |
+| Google           | `google-gla:<model>`    | `google-gla:gemini-2.5-pro`            |
+| Google Vertex AI | `google-vertex:<model>` | `google-vertex:gemini-2.5-pro`         |
+| Groq             | `groq:<model>`          | `groq:llama-3.1-70b-versatile`         |
+
+## Google Vertex AI Configuration
+
+Google Vertex AI requires additional configuration via environment variables. pydantic-ai automatically reads these variables when using `google-vertex:` prefix.
+
+### Environment Variables
+
+| Variable                         | Description                          | Required                  |
+| -------------------------------- | ------------------------------------ | ------------------------- |
+| `GOOGLE_API_KEY`                 | API key for Vertex AI authentication | One of API key or ADC     |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Path to service account JSON file    | For service account auth  |
+| `GOOGLE_CLOUD_PROJECT`           | GCP project ID                       | Recommended for Vertex AI |
+| `GOOGLE_CLOUD_LOCATION`          | GCP region (default: `us-central1`)  | Optional                  |
+
+### Authentication Methods
+
+**Method 1: API Key**
+
+```bash
+export GOOGLE_API_KEY=your-api-key
+```
+
+```python
+model = infer_model("google-vertex:gemini-2.5-pro")
+```
+
+**Method 2: Application Default Credentials (ADC)**
+
+```bash
+# Login with gcloud CLI
+gcloud auth application-default login
+
+# Set project and location
+export GOOGLE_CLOUD_PROJECT=my-project-id
+export GOOGLE_CLOUD_LOCATION=us-central1
+```
+
+```python
+model = infer_model("google-vertex:gemini-2.5-pro")
+```
+
+**Method 3: Service Account**
+
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
+export GOOGLE_CLOUD_PROJECT=my-project-id
+export GOOGLE_CLOUD_LOCATION=us-central1
+```
+
+```python
+model = infer_model("google-vertex:gemini-2.5-pro")
+```
+
+### Available Regions
+
+Common regions for Vertex AI:
+
+- `us-central1` (default, most model support)
+- `us-east1`, `us-east4`, `us-east5`, `us-west1`, `us-west4`
+- `europe-west1`, `europe-west2`, `europe-west3`, `europe-west4`
+- `asia-east1`, `asia-northeast1`, `asia-southeast1`
+- `global` (higher availability, fewer models)
+
+For full list, see [Vertex AI Locations](https://cloud.google.com/vertex-ai/generative-ai/docs/learn/locations).
+
+### References
+
+- [pydantic-ai Google Models](https://ai.pydantic.dev/models/google/)
+- [Vertex AI Authentication](https://cloud.google.com/vertex-ai/docs/authentication)
 
 ## Gateway Mode
 

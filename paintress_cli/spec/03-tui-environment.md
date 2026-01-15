@@ -561,7 +561,7 @@ sequenceDiagram
 # config.toml
 [browser]
 cdp_url = "auto"
-browser_image = "browserless/chromium:latest"
+browser_image = "zenika/alpine-chrome:latest"
 ```
 
 The TUIEnvironment will:

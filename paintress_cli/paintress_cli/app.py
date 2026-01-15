@@ -352,11 +352,12 @@ class TUIApp:
     def _update_streaming_text(self, delta: str) -> None:
         """Update the current streaming text block with delta."""
         self._streaming_text += delta
-        # Re-render markdown for the complete text so far
+        # Re-render markdown for the complete text so far with dynamic width
         if self._streaming_line_index is not None and self._streaming_line_index < len(self._output_lines):
             rendered = self._renderer.render_markdown(
                 self._streaming_text,
                 code_theme=self._get_code_theme(),
+                width=self._get_terminal_width(),
             ).rstrip("\n")
             self._output_lines[self._streaming_line_index] = rendered
             if self._state == TUIState.RUNNING:
@@ -367,10 +368,11 @@ class TUIApp:
     def _finalize_streaming_text(self) -> None:
         """Finalize the current streaming text block."""
         if self._streaming_text and self._streaming_line_index is not None:
-            # Final render with complete text
+            # Final render with complete text and dynamic width
             rendered = self._renderer.render_markdown(
                 self._streaming_text,
                 code_theme=self._get_code_theme(),
+                width=self._get_terminal_width(),
             ).rstrip("\n")
             if self._streaming_line_index < len(self._output_lines):
                 self._output_lines[self._streaming_line_index] = rendered

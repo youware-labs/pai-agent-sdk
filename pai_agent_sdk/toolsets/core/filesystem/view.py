@@ -209,7 +209,7 @@ class ViewTool(BaseTool):
         file_path: str,
         ctx: RunContext[AgentContext],
     ) -> str | ToolReturn:
-        """Read video file, falling back to image description if video not supported."""
+        """Read video file, falling back to video understanding agent if not supported."""
         # Check if current model supports video understanding
         has_video = ctx.deps.model_cfg.has_video_understanding
 
@@ -223,37 +223,38 @@ class ViewTool(BaseTool):
                 content=[BinaryContent(data=content, media_type=media_type)],
             )
         else:
-            # Fall back to image understanding agent for video frames
+            # Fall back to video understanding agent
             try:
-                from pai_agent_sdk.agents.image_understanding import get_image_description
+                from pai_agent_sdk.agents.video_understanding import get_video_description
 
                 # Read video file
                 video_data = await file_operator.read_bytes(file_path)
+                media_type = self._get_video_media_type(file_path)
 
                 # Get model and settings from tool_config if available
                 model = None
                 model_settings = None
                 if ctx.deps.tool_config:
                     tool_config = ctx.deps.tool_config
-                    model = tool_config.image_understanding_model
-                    model_settings = tool_config.image_understanding_model_settings
+                    model = tool_config.video_understanding_model
+                    model_settings = tool_config.video_understanding_model_settings
 
-                # Use image understanding to describe video
-                description, usage = await get_image_description(
-                    image_data=video_data,
-                    media_type="image/png",
-                    instruction="This is a video file. Please describe what you can see in this video content.",
+                # Use video understanding to describe video
+                description, usage = await get_video_description(
+                    video_data=video_data,
+                    media_type=media_type,
+                    instruction="Please describe what you can see in this video content.",
                     model=model,
                     model_settings=model_settings,
                 )
 
                 # Store usage in extra_usages with tool_call_id
                 if ctx.tool_call_id:
-                    ctx.deps.add_extra_usage(agent="image_understanding", usage=usage, uuid=ctx.tool_call_id)
+                    ctx.deps.add_extra_usage(agent="video_understanding", usage=usage, uuid=ctx.tool_call_id)
 
-                return f"Video description (via image analysis):\n{description}"
+                return f"Video description (via video understanding agent):\n{description}"
             except Exception as e:
-                logger.warning(f"Failed to analyze video with image understanding: {e}")
+                logger.warning(f"Failed to analyze video with video understanding: {e}")
                 return (
                     f"Video file: {file_path}. Model does not support video understanding and fallback analysis failed."
                 )

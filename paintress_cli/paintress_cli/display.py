@@ -164,9 +164,9 @@ class RichRenderer:
         console.print(renderable)
         return string_io.getvalue()
 
-    def render_markdown(self, text: str, code_theme: str = "monokai") -> str:
+    def render_markdown(self, text: str, code_theme: str = "monokai", width: int | None = None) -> str:
         """Render markdown text to ANSI string."""
-        return self.render(Markdown(text, code_theme=code_theme))
+        return self.render(Markdown(text, code_theme=code_theme), width=width)
 
     def render_text(self, text: str, style: str | None = None) -> str:
         """Render styled text to ANSI string."""
@@ -260,9 +260,7 @@ class ToolMessage(BaseModel):
         """Convert the tool message to inline Rich Text format (no panel border).
 
         Format:
-            Complete: tool_name (0.1s)
-              Args: {...}
-              Output: {...}
+            Complete: tool_name (0.1s) | Args: {...} | Output: {...}
         """
         # Check if tool execution failed
         is_error = self.content and self.content.startswith("Tool execution error")
@@ -276,73 +274,100 @@ class ToolMessage(BaseModel):
             content.append(self.name, style="bold green")
         content.append(f" ({duration:.1f}s)", style="dim")
 
-        # Add args preview
-        args_preview = self._format_inline_args(max_arg_length)
+        # Add args preview (inline, no newline)
+        args_preview, args_truncated = self._format_inline_args_with_info(max_arg_length)
         if args_preview:
-            content.append("\n  ", style="dim")
+            content.append(" | ", style="dim")
             content.append("Args: ", style="dim cyan")
             content.append(args_preview, style="dim")
+            if args_truncated > 0:
+                content.append(f" (+{args_truncated} chars)", style="dim italic")
 
-        # Add output preview
-        output_preview = self._format_inline_output(max_result_lines, max_line_length)
+        # Add output preview (inline, no newline)
+        output_preview, output_truncated = self._format_inline_output_with_info(max_result_lines, max_line_length)
         if output_preview and output_preview != "[no output]":
-            content.append("\n  ", style="dim")
+            content.append(" | ", style="dim")
             if is_error:
                 content.append("Error: ", style="dim red")
             else:
                 content.append("Output: ", style="dim yellow")
             content.append(output_preview, style="dim")
+            if output_truncated > 0:
+                content.append(f" (+{output_truncated} chars)", style="dim italic")
 
         return content
 
     def _format_inline_args(self, max_length: int = 80) -> str:
         """Format tool arguments for inline display."""
+        result, _ = self._format_inline_args_with_info(max_length)
+        return result
+
+    def _format_inline_args_with_info(self, max_length: int = 80) -> tuple[str, int]:
+        """Format tool arguments for inline display with truncation info.
+
+        Returns:
+            Tuple of (formatted_args, truncated_chars)
+        """
         if not self.args:
-            return ""
+            return "", 0
         try:
             if isinstance(self.args, dict):
                 args_str = json.dumps(self.args, ensure_ascii=False)
             else:
                 args_str = str(self.args)
             if len(args_str) > max_length:
-                return args_str[: max_length - 3] + "..."
-            return args_str
+                return args_str[: max_length - 3] + "...", len(args_str) - max_length + 3
+            return args_str, 0
         except Exception:
-            return str(self.args)[:max_length]
+            s = str(self.args)
+            if len(s) > max_length:
+                return s[:max_length], len(s) - max_length
+            return s, 0
 
     def _format_inline_output(self, max_lines: int = 8, max_line_length: int = 100) -> str:
         """Format tool output for inline display."""
+        result, _ = self._format_inline_output_with_info(max_lines, max_line_length)
+        return result
+
+    def _format_inline_output_with_info(self, max_lines: int = 8, max_line_length: int = 100) -> tuple[str, int]:
+        """Format tool output for inline display with truncation info.
+
+        Returns:
+            Tuple of (formatted_output, truncated_chars)
+        """
         if not self.content:
-            return "[no output]"
+            return "[no output]", 0
+
+        original_len = len(self.content)
         try:
             # Try to parse as JSON for prettier formatting
             try:
                 parsed = json.loads(self.content)
                 if isinstance(parsed, dict):
                     lines = []
-                    for key, value in list(parsed.items())[: max_lines - 2]:
+                    for key, value in list(parsed.items())[:3]:  # Limit to 3 fields
                         str_value = str(value)
                         if len(str_value) > max_line_length:
                             str_value = str_value[: max_line_length - 3] + "..."
                         lines.append(f"{key}: {str_value}")
-                    if len(parsed) > max_lines - 2:
-                        lines.append("...")
-                    return "{" + ", ".join(lines) + "}"
+                    result = "{" + ", ".join(lines) + "}"
+                    truncated = original_len - len(result) if len(parsed) > 3 else 0
+                    return result, max(0, truncated)
             except (json.JSONDecodeError, TypeError):
                 pass
 
-            # Plain text handling
-            content_lines = self.content.split("\n")
-            result_lines = []
-            for line in content_lines[:max_lines]:
-                if len(line) > max_line_length:
-                    line = line[: max_line_length - 3] + "..."
-                result_lines.append(line)
-            if len(content_lines) > max_lines:
-                result_lines.append("...")
-            return "\n".join(result_lines)
+            # Plain text handling - single line preview
+            first_line = self.content.split("\n")[0]
+            if len(first_line) > max_line_length:
+                result = first_line[: max_line_length - 3] + "..."
+                truncated = original_len - max_line_length + 3
+            else:
+                result = first_line
+                truncated = original_len - len(first_line) if "\n" in self.content else 0
+            return result, max(0, truncated)
         except Exception:
-            return str(self.content)[:max_line_length]
+            s = str(self.content)[:max_line_length]
+            return s, max(0, original_len - len(s))
 
     def to_special_panel(self, code_theme: str = "monokai") -> Panel:
         """Create special panel for to_do and thinking tools."""

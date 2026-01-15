@@ -13,6 +13,7 @@ Example:
 
 from __future__ import annotations
 
+import difflib
 import enum
 import json
 import time
@@ -23,6 +24,7 @@ from pydantic import BaseModel
 from rich.console import Console, Group
 from rich.markdown import Markdown
 from rich.panel import Panel
+from rich.syntax import Syntax
 from rich.text import Text
 
 if TYPE_CHECKING:
@@ -438,14 +440,60 @@ class ToolMessage(BaseModel):
         )
 
     def _create_edit_panel(self, code_theme: str = "monokai") -> Panel:
-        """Create a special panel for edit tools."""
+        """Create a special panel for edit tools with diff display."""
         try:
             args_dict = self._parse_edit_args()
+
             if args_dict:
                 file_path = args_dict.get("file_path", "unknown")
-                content_parts = [Text(f"Editing: {file_path}", style="bold cyan")]
+                edits_list = args_dict.get("edits", [])
 
-                # Show result if available
+                content_parts = []
+
+                # Add file header
+                file_info = Text(f"Editing file: {file_path}", style="bold cyan")
+                content_parts.append(file_info)
+
+                if edits_list:
+                    # Add edit summary for multi_edit
+                    summary = self._create_edit_summary(edits_list)
+                    content_parts.append(summary)
+                    content_parts.append(Text(""))
+
+                    # Format and add edit sequence
+                    edit_sequence = self._format_edit_sequence(edits_list, code_theme)
+                    content_parts.extend(edit_sequence)
+                else:
+                    # Handle single edit format
+                    old_string = args_dict.get("old_string", "")
+                    new_string = args_dict.get("new_string", "")
+
+                    if old_string or new_string:
+                        if not old_string:
+                            # New file creation
+                            if new_string:
+                                lines = new_string.split("\n")
+                                content_preview = (
+                                    "\n".join(lines[:20]) + "\n...(truncated)" if len(lines) > 20 else new_string
+                                )
+                                syntax_content = Syntax(
+                                    content_preview, lexer="text", theme=code_theme, line_numbers=False
+                                )
+                                content_parts.append(syntax_content)
+                            else:
+                                content_parts.append(Text("Empty file"))
+                        else:
+                            # Content modification - show diff
+                            diff_content = self._generate_clean_diff_content(old_string, new_string)
+                            if diff_content.strip():
+                                syntax_diff = Syntax(diff_content, lexer="diff", theme=code_theme, line_numbers=False)
+                                content_parts.append(syntax_diff)
+                            else:
+                                content_parts.append(Text("No changes detected"))
+                    else:
+                        content_parts.append(Text("No edit operations found", style="dim"))
+
+                # Add operation result if available
                 if self.content:
                     content_parts.append(Text(""))
                     result_text = Text(f"Result: {self.content}", style="bold green")
@@ -453,9 +501,19 @@ class ToolMessage(BaseModel):
 
                 rendered_content = Group(*content_parts)
             else:
-                rendered_content = Text("No edit parameters available")
+                # Fallback content
+                fallback_parts = [Text("No edit parameters available")]
+                if self.args and "raw_args" in self._parse_edit_args():
+                    fallback_parts.append(Text(f"Raw args: {self._parse_edit_args()['raw_args']}"))
+                if self.content:
+                    fallback_parts.append(Text(f"Result: {self.content}"))
+                rendered_content = Group(*fallback_parts)
+
         except Exception as e:
-            rendered_content = Text(f"Error processing edit data: {e!s}")
+            error_parts = [Text(f"Error processing edit data: {e!s}")]
+            if self.content:
+                error_parts.append(Text(f"Raw result: {self.content}"))
+            rendered_content = Group(*error_parts)
 
         return Panel(
             rendered_content,
@@ -463,6 +521,89 @@ class ToolMessage(BaseModel):
             title_align="left",
             border_style="green",
         )
+
+    def _format_edit_sequence(self, edits_list: list[dict], code_theme: str = "monokai") -> list:
+        """Format a sequence of edit operations for display."""
+        content_parts = []
+
+        for i, edit_item in enumerate(edits_list, 1):
+            old_string = edit_item.get("old_string", "")
+            new_string = edit_item.get("new_string", "")
+            replace_all = edit_item.get("replace_all", False)
+
+            # Add edit operation header
+            operation_type = "New file creation" if not old_string else "Content modification"
+            replace_info = " (replace all)" if replace_all else ""
+            edit_header = Text(f"Edit #{i}: {operation_type}{replace_info}", style="bold blue")
+            content_parts.append(edit_header)
+
+            # Handle new file creation (empty old_string)
+            if not old_string:
+                if new_string:
+                    lines = new_string.split("\n")
+                    content_preview = "\n".join(lines[:15]) + "\n...(truncated)" if len(lines) > 15 else new_string
+                    syntax_content = Syntax(content_preview, lexer="text", theme=code_theme, line_numbers=False)
+                    content_parts.append(syntax_content)
+                else:
+                    content_parts.append(Text("Empty file", style="dim"))
+            else:
+                # Generate diff content for modification
+                diff_content = self._generate_clean_diff_content(old_string, new_string)
+                if diff_content.strip():
+                    syntax_diff = Syntax(diff_content, lexer="diff", theme=code_theme, line_numbers=False)
+                    content_parts.append(syntax_diff)
+                else:
+                    content_parts.append(Text("No changes detected", style="dim"))
+
+            # Add spacing between edits
+            if i < len(edits_list):
+                content_parts.append(Text(""))
+
+        return content_parts
+
+    def _create_edit_summary(self, edits_list: list[dict]) -> Text:
+        """Create a summary of edit operations."""
+        total_edits = len(edits_list)
+        new_files = sum(1 for edit in edits_list if not edit.get("old_string", ""))
+        modifications = total_edits - new_files
+        replace_all_count = sum(1 for edit in edits_list if edit.get("replace_all", False))
+
+        summary_parts = []
+        if new_files > 0:
+            summary_parts.append(f"{new_files} new file{'s' if new_files > 1 else ''}")
+        if modifications > 0:
+            summary_parts.append(f"{modifications} modification{'s' if modifications > 1 else ''}")
+        if replace_all_count > 0:
+            summary_parts.append(f"{replace_all_count} replace-all operation{'s' if replace_all_count > 1 else ''}")
+
+        summary_text = ", ".join(summary_parts) if summary_parts else "No operations"
+        return Text(f"Summary: {total_edits} edit{'s' if total_edits > 1 else ''} ({summary_text})", style="bold green")
+
+    def _generate_clean_diff_content(self, old_string: str, new_string: str) -> str:
+        """Generate a clean diff between old and new content."""
+        old_lines = old_string.splitlines(keepends=True)
+        new_lines = new_string.splitlines(keepends=True)
+
+        diff = difflib.unified_diff(old_lines, new_lines, fromfile="before", tofile="after", lineterm="")
+
+        diff_lines = list(diff)
+        if diff_lines:
+            # Skip the header lines (first 2 lines with @@ and ---)
+            content_lines = diff_lines[2:] if len(diff_lines) > 2 else diff_lines
+
+            # Remove excessive consecutive blank lines
+            cleaned_lines = []
+            prev_empty = False
+            for line in content_lines:
+                is_empty = line.strip() == ""
+                if not (is_empty and prev_empty):
+                    cleaned_lines.append(line)
+                prev_empty = is_empty
+
+            diff_content = "\n".join(cleaned_lines).rstrip()
+            return diff_content if diff_content.strip() else "No changes detected"
+
+        return "No changes detected"
 
     def _parse_edit_args(self) -> dict:
         """Parse the edit tool arguments into a dictionary."""

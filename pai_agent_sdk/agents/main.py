@@ -40,7 +40,7 @@ from pai_agent_sdk.environment.local import LocalEnvironment
 from pai_agent_sdk.filters.environment_instructions import create_environment_instructions_filter
 from pai_agent_sdk.filters.system_prompt import create_system_prompt_filter
 from pai_agent_sdk.toolsets.core.base import BaseTool, GlobalHooks, Toolset
-from pai_agent_sdk.utils import add_toolset_instructions
+from pai_agent_sdk.utils import AgentDepsT, add_toolset_instructions
 
 if TYPE_CHECKING:
     from pydantic_ai import ModelSettings
@@ -69,8 +69,7 @@ class AgentInterrupted(Exception):
 # Type Variables
 # =============================================================================
 
-AgentDepsT = TypeVar("AgentDepsT", bound=AgentContext, default=AgentContext)
-OutputT = TypeVar("OutputT", default=str)
+OutputT = TypeVar("OutputT")
 
 
 # =============================================================================

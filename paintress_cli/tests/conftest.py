@@ -40,6 +40,12 @@ def config_manager(temp_config_dir: Path, temp_project_dir: Path) -> ConfigManag
     return ConfigManager(config_dir=temp_config_dir, project_dir=temp_project_dir)
 
 
+@pytest.fixture(autouse=True)
+def mock_openai_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Mock OPENAI_API_KEY for all tests that might need it."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-fake-key-for-testing")
+
+
 @pytest.fixture
 def clean_env() -> Generator[None, None, None]:
     """Clean PAINTRESS_* environment variables before and after test."""

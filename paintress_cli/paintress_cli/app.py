@@ -380,11 +380,16 @@ class TUIApp:
         self._streaming_line_index = None
 
     def _append_user_input(self, text: str) -> None:
-        """Render user input with styled prompt indicator."""
-        # Use ANSI codes for green bold prompt
-        GREEN_BOLD = "\033[1;32m"
-        RESET = "\033[0m"
-        self._append_output(f"{GREEN_BOLD}> {RESET}{text}")
+        """Render user input with styled prompt indicator and word wrap."""
+        width = self._get_terminal_width()
+        # Use Rich Text for proper word wrapping
+        from rich.text import Text as RichText
+
+        user_text = RichText()
+        user_text.append("> ", style="bold green")
+        user_text.append(text)
+        rendered = self._renderer.render(user_text, width=width).rstrip("\n")
+        self._append_output(rendered)
 
     # =========================================================================
     # Steering Pane
@@ -581,7 +586,7 @@ class TUIApp:
 
         try:
             async with stream_agent(
-                self.runtime,
+                self.runtime,  # type: ignore[arg-type]
                 user_prompt=user_prompt,
                 message_history=self._message_history,
                 post_node_hook=emit_context_update,

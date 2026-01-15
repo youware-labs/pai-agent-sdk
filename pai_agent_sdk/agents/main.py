@@ -797,6 +797,12 @@ async def stream_agent(  # noqa: C901
         if (run := streamer.run) and (result := run.result) and isinstance(result.output, DeferredToolRequests):
             result.output = ctx.tool_id_wrapper.wrap_deferred_tool_requests(result.output)
     finally:
+        # Cancel all running tasks first to ensure clean shutdown
+        # This handles both explicit interrupt() calls and external cancellation (e.g., Ctrl+C)
+        for task in streamer._tasks:
+            if not task.done():
+                task.cancel()
+
         # Wait for tasks to complete and capture any exception
         results = await asyncio.gather(main_task, poll_task, return_exceptions=True)
 

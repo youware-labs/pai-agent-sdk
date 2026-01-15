@@ -18,6 +18,12 @@ uv tool install paintress-cli
 paintress-cli
 ```
 
+To update to the latest version:
+
+```bash
+uv tool upgrade paintress-cli
+```
+
 Or with pip, run:
 
 ```bash

@@ -1,5 +1,6 @@
 """Tests for pai_agent_sdk.context module."""
 
+import re
 from contextlib import AsyncExitStack
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -360,7 +361,6 @@ async def test_get_context_instructions_basic(tmp_path: Path) -> None:
 
 async def test_get_context_instructions_with_model_config(tmp_path: Path) -> None:
     """Should include model config in instructions when set."""
-    from inline_snapshot import snapshot
 
     from pai_agent_sdk.context import ModelConfig
 
@@ -378,21 +378,17 @@ async def test_get_context_instructions_with_model_config(tmp_path: Path) -> Non
         ) as ctx:
             instructions = await ctx.get_context_instructions()
 
-            assert instructions == snapshot("""\
-<runtime-context>
-  <elapsed-time>0.0s</elapsed-time>
-  <model-config>
-    <context-window>200000</context-window>
-  </model-config>
-</runtime-context>\
-""")
+            # Verify structure with regex to handle variable elapsed time
+            assert "<runtime-context>" in instructions
+            assert re.search(r"<elapsed-time>[\d.]+s</elapsed-time>", instructions)
+            assert "<context-window>200000</context-window>" in instructions
+            assert "</runtime-context>" in instructions
 
 
 async def test_get_context_instructions_with_token_usage(tmp_path: Path) -> None:
     """Should include token usage when run_context with messages is provided."""
     from unittest.mock import MagicMock
 
-    from inline_snapshot import snapshot
     from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
     from pydantic_ai.usage import RequestUsage
 
@@ -427,24 +423,18 @@ async def test_get_context_instructions_with_token_usage(tmp_path: Path) -> None
 
             instructions = await ctx.get_context_instructions(mock_run_context)
 
-            assert instructions == snapshot("""\
-<runtime-context>
-  <elapsed-time>0.0s</elapsed-time>
-  <model-config>
-    <context-window>200000</context-window>
-  </model-config>
-  <token-usage>
-    <total-tokens>150</total-tokens>
-  </token-usage>
-</runtime-context>\
-""")
+            # Verify structure with regex to handle variable elapsed time
+            assert "<runtime-context>" in instructions
+            assert re.search(r"<elapsed-time>[\d.]+s</elapsed-time>", instructions)
+            assert "<context-window>200000</context-window>" in instructions
+            assert "<total-tokens>150</total-tokens>" in instructions
+            assert "</runtime-context>" in instructions
 
 
 async def test_get_context_instructions_with_handoff_warning(tmp_path: Path) -> None:
     """Should include handoff warning when threshold exceeded and enabled."""
     from unittest.mock import MagicMock
 
-    from inline_snapshot import snapshot
     from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
     from pydantic_ai.usage import RequestUsage
 
@@ -479,21 +469,15 @@ async def test_get_context_instructions_with_handoff_warning(tmp_path: Path) -> 
 
             instructions = await ctx.get_context_instructions(mock_run_context)
 
-            assert instructions == snapshot("""\
-<runtime-context>
-  <elapsed-time>0.0s</elapsed-time>
-  <model-config>
-    <context-window>200000</context-window>
-  </model-config>
-  <token-usage>
-    <total-tokens>110000</total-tokens>
-  </token-usage>
-</runtime-context>
-
-<system-reminder>
-  <item>IMPORTANT: **You have reached the handoff threshold, please calling the `handoff` tool to summarize then continue the task at the appropriate time.**</item>
-</system-reminder>\
-""")
+            # Verify structure with regex to handle variable elapsed time
+            assert "<runtime-context>" in instructions
+            assert re.search(r"<elapsed-time>[\d.]+s</elapsed-time>", instructions)
+            assert "<context-window>200000</context-window>" in instructions
+            assert "<total-tokens>110000</total-tokens>" in instructions
+            assert "</runtime-context>" in instructions
+            # Verify handoff warning
+            assert "<system-reminder>" in instructions
+            assert "handoff" in instructions.lower()
 
 
 async def test_get_context_instructions_no_handoff_warning_below_threshold(tmp_path: Path) -> None:

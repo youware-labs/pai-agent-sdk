@@ -595,14 +595,15 @@ class ToolMessage(BaseModel):
 
     def _generate_clean_diff_content(self, old_string: str, new_string: str) -> str:
         """Generate a clean diff between old and new content."""
-        old_lines = old_string.splitlines(keepends=True)
-        new_lines = new_string.splitlines(keepends=True)
+        # Use splitlines() without keepends to normalize line handling
+        old_lines = old_string.splitlines()
+        new_lines = new_string.splitlines()
 
         diff = difflib.unified_diff(old_lines, new_lines, fromfile="before", tofile="after", lineterm="")
 
         diff_lines = list(diff)
         if diff_lines:
-            # Skip the header lines (first 2 lines with @@ and ---)
+            # Skip the header lines (first 2 lines with --- and +++)
             content_lines = diff_lines[2:] if len(diff_lines) > 2 else diff_lines
 
             # Remove excessive consecutive blank lines

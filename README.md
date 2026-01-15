@@ -58,7 +58,7 @@ async with stream_agent(runtime, "Hello") as streamer:
 
 ### Using Paintress CLI
 
-For a ready-to-use terminal interface, try [paintress-cli](paintress_cli/) - a TUI reference implementation built on top of pai-agent-sdk:
+For a ready-to-use terminal interface, try [paintress-cli](paintress_cli/README.md) - a TUI reference implementation built on top of pai-agent-sdk:
 
 ```bash
 # Run directly with uvx (no installation needed)

@@ -59,6 +59,7 @@ from pai_agent_sdk.events import (
     HandoffFailedEvent,
     HandoffStartEvent,
 )
+from pai_agent_sdk.utils import get_latest_request_usage
 from paintress_cli.browser import BrowserManager
 from paintress_cli.config import ConfigManager, PaintressConfig
 from paintress_cli.display import EventRenderer, RichRenderer, ToolMessage
@@ -600,8 +601,10 @@ class TUIApp:
                 if stream.run:
                     self._message_history = list(stream.run.all_messages())
                     # Update context usage from run
+                    # Use latest request usage for accurate context tokens (not cumulative)
                     usage = stream.run.usage()
-                    self._current_context_tokens = usage.total_tokens
+                    latest_usage = get_latest_request_usage(self._message_history)
+                    self._current_context_tokens = latest_usage.total_tokens if latest_usage else usage.total_tokens
 
                     # Accumulate session usage
                     model_id = self.config.general.model or "unknown"

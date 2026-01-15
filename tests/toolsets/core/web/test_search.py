@@ -39,7 +39,7 @@ async def test_search_tool_is_available_with_google(tmp_path: Path) -> None:
                 tool_config=ToolConfig(google_search_api_key="test-key", google_search_cx="test-cx"),
             )
         )
-        tool = SearchTool(ctx)
+        tool = SearchTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
@@ -59,7 +59,7 @@ async def test_search_tool_is_available_with_tavily(tmp_path: Path) -> None:
                 tool_config=ToolConfig(tavily_api_key="test-key"),
             )
         )
-        tool = SearchTool(ctx)
+        tool = SearchTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
@@ -84,7 +84,7 @@ async def test_search_tool_not_available_without_keys(tmp_path: Path) -> None:
                 ),
             )
         )
-        tool = SearchTool(ctx)
+        tool = SearchTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
@@ -114,7 +114,7 @@ async def test_search_tool_google_search(tmp_path: Path, httpx_mock) -> None:
                 tool_config=ToolConfig(google_search_api_key="test-key", google_search_cx="test-cx"),
             )
         )
-        tool = SearchTool(ctx)
+        tool = SearchTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
@@ -151,7 +151,7 @@ async def test_search_stock_image_tool_is_available(tmp_path: Path) -> None:
                 tool_config=ToolConfig(pixabay_api_key="test-key"),
             )
         )
-        tool = SearchStockImageTool(ctx)
+        tool = SearchStockImageTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
@@ -194,7 +194,7 @@ async def test_search_stock_image_tool_search(tmp_path: Path, httpx_mock) -> Non
                 tool_config=ToolConfig(pixabay_api_key="test-key"),
             )
         )
-        tool = SearchStockImageTool(ctx)
+        tool = SearchStockImageTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
@@ -228,7 +228,7 @@ async def test_search_image_tool_is_available(tmp_path: Path) -> None:
                 tool_config=ToolConfig(rapidapi_api_key="test-key"),
             )
         )
-        tool = SearchImageTool(ctx)
+        tool = SearchImageTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
@@ -267,7 +267,7 @@ async def test_search_image_tool_search(tmp_path: Path, httpx_mock) -> None:
                 tool_config=ToolConfig(rapidapi_api_key="test-key"),
             )
         )
-        tool = SearchImageTool(ctx)
+        tool = SearchImageTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx

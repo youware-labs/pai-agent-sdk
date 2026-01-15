@@ -138,14 +138,6 @@ class BaseTool(ABC):
     description: str
     """Description of what the tool does, shown to the model."""
 
-    def __init__(self, ctx: AgentContext) -> None:
-        """Initialize the tool with the agent context.
-
-        Args:
-            ctx: The agent context for this tool instance.
-        """
-        self.ctx = ctx
-
     def is_available(self, ctx: RunContext[AgentContext]) -> bool:
         """Check if tool is available in current context.
 
@@ -261,9 +253,7 @@ class Toolset(BaseToolset[AgentDepsT]):
     """A toolset that manages tools with hooks and HITL support.
 
     Example:
-        ctx = AgentContext()
         toolset = Toolset(
-            ctx,
             tools=[ReadFileTool, WriteFileTool],
             pre_hooks={"read_file": my_pre_hook},
             post_hooks={"write_file": my_post_hook},
@@ -275,7 +265,6 @@ class Toolset(BaseToolset[AgentDepsT]):
 
     def __init__(
         self,
-        ctx: AgentContext,
         tools: Sequence[type[BaseTool]],
         *,
         pre_hooks: dict[str, PreHookFunc[AgentDepsT]] | None = None,
@@ -289,7 +278,6 @@ class Toolset(BaseToolset[AgentDepsT]):
         """Initialize the toolset.
 
         Args:
-            ctx: The agent context, passed to all tool instances.
             tools: Sequence of BaseTool classes to include in this toolset.
             pre_hooks: Dict mapping tool names to pre-hook functions.
             post_hooks: Dict mapping tool names to post-hook functions.
@@ -299,7 +287,6 @@ class Toolset(BaseToolset[AgentDepsT]):
             toolset_id: Optional unique ID for the toolset.
             skip_unavailable: If True, skip tools where is_available() returns False in get_tools().
         """
-        self.ctx = ctx
         self.max_retries = max_retries
         self.timeout = timeout
         self._id = toolset_id
@@ -309,58 +296,64 @@ class Toolset(BaseToolset[AgentDepsT]):
         self.post_hooks = post_hooks or {}
         self.global_hooks = global_hooks or GlobalHooks()
 
-        self._tool_instances: dict[str, BaseTool] = {}
+        # Store tool classes, instances created lazily in get_tools
         self._tool_classes: dict[str, type[BaseTool]] = {}
+        self._tool_instances: dict[str, BaseTool] = {}
 
         logger.debug(f"Initializing Toolset with {len(tools)} tool classes")
         for tool_cls in tools:
-            tool_instance = tool_cls(ctx)
-            name = tool_instance.name
-
-            if name in self._tool_instances:
+            name = tool_cls.name
+            if name in self._tool_classes:
                 msg = f"Duplicate tool name: {name!r}"
                 raise UserError(msg)
-            self._tool_instances[name] = tool_instance
             self._tool_classes[name] = tool_cls
-            logger.debug(f"Registered tool: {name!r}")
+            logger.debug(f"Registered tool class: {name!r}")
 
         self._pydantic_tools: dict[str, Tool[AgentDepsT]] = {}
-        logger.debug(f"Toolset initialized with tools: {list(self._tool_instances.keys())}")
+        logger.debug(f"Toolset initialized with tools: {list(self._tool_classes.keys())}")
 
     @property
     def id(self) -> str | None:
-        """Return the toolset ID."""
+        """Get the toolset ID."""
         return self._id
 
     @property
     def tool_names(self) -> list[str]:
-        """Return list of available tool names in this toolset."""
+        """Get list of tool names in this toolset."""
         return list(self._tool_classes.keys())
 
-    def is_tool_available(self, tool_name: str, ctx: RunContext[AgentDepsT] | None = None) -> bool:
-        """Check if a tool is registered and available by name.
+    def _get_tool_instance(self, name: str) -> BaseTool:
+        """Get or create a tool instance by name."""
+        if name not in self._tool_instances:
+            if name not in self._tool_classes:
+                msg = f"Tool {name!r} not found in toolset"
+                raise UserError(msg)
+            self._tool_instances[name] = self._tool_classes[name]()
+        return self._tool_instances[name]
 
-        This method checks both that the tool exists in this toolset and that
-        its is_available() method returns True.
+    def is_tool_available(
+        self,
+        tool_name: str,
+        ctx: RunContext[AgentDepsT],
+    ) -> bool:
+        """Check if a tool is available.
 
         Args:
             tool_name: The name of the tool to check.
-            ctx: The run context for availability check. If None, only checks registration.
+            ctx: The run context for checking runtime availability.
 
         Returns:
             True if the tool exists and is available, False otherwise.
         """
-        if tool_name not in self._tool_instances:
+        if tool_name not in self._tool_classes:
             return False
-        if ctx is None:
-            return True  # Only check registration if no ctx provided
-        return self._tool_instances[tool_name].is_available(ctx)
+        tool_instance = self._get_tool_instance(tool_name)
+        return tool_instance.is_available(ctx)
 
     def subset(
         self,
         tool_names: list[str] | None = None,
         *,
-        ctx: AgentContext | None = None,
         inherit_hooks: bool = False,
     ) -> Toolset[AgentDepsT]:
         """Create a subset Toolset with only the specified tools.
@@ -370,7 +363,6 @@ class Toolset(BaseToolset[AgentDepsT]):
 
         Args:
             tool_names: List of tool names to include. None means all tools.
-            ctx: Optional new context for the subset. If None, uses self.ctx.
             inherit_hooks: Whether to inherit pre/post hooks for selected tools.
 
         Returns:
@@ -379,13 +371,10 @@ class Toolset(BaseToolset[AgentDepsT]):
         Example::
 
             # Create main toolset
-            main_toolset = Toolset(ctx, tools=[ViewTool, EditTool, ShellTool])
+            main_toolset = Toolset(tools=[ViewTool, EditTool, ShellTool])
 
             # Create subset for subagent (only view and edit)
             sub_toolset = main_toolset.subset(["view", "edit"])
-
-            # Create subset with new context
-            sub_toolset = main_toolset.subset(["view"], ctx=subagent_ctx)
         """
         if tool_names is None:
             selected_classes = list(self._tool_classes.values())
@@ -410,7 +399,6 @@ class Toolset(BaseToolset[AgentDepsT]):
             global_hooks = self.global_hooks
 
         return Toolset(
-            ctx=ctx or self.ctx,
             tools=selected_classes,
             pre_hooks=pre_hooks,
             post_hooks=post_hooks,
@@ -480,7 +468,6 @@ class Toolset(BaseToolset[AgentDepsT]):
         all_tools = list(self._tool_classes.values()) + subagent_tools
 
         return Toolset(
-            ctx=self.ctx,
             tools=all_tools,
             pre_hooks=self.pre_hooks,
             post_hooks=self.post_hooks,
@@ -507,10 +494,11 @@ class Toolset(BaseToolset[AgentDepsT]):
 
     async def get_tools(self, ctx: RunContext[AgentDepsT]) -> dict[str, ToolsetTool[AgentDepsT]]:
         """Return all tools in this toolset."""
-        logger.debug(f"get_tools called, preparing {len(self._tool_instances)} tools")
+        logger.debug(f"get_tools called, preparing {len(self._tool_classes)} tools")
         tools: dict[str, ToolsetTool[AgentDepsT]] = {}
 
-        for name, tool_instance in self._tool_instances.items():
+        for name in self._tool_classes:
+            tool_instance = self._get_tool_instance(name)
             # Check availability at get_tools time (when env is entered)
             if self._skip_unavailable and not tool_instance.is_available(ctx):
                 logger.debug(f"Skipping unavailable tool {name!r}")
@@ -641,7 +629,8 @@ class Toolset(BaseToolset[AgentDepsT]):
         Returns a combined instruction string or None if no tools have instructions.
         """
         instructions: list[str] = []
-        for tool_instance in self._tool_instances.values():
+        for name in self._tool_classes:
+            tool_instance = self._get_tool_instance(name)
             instruction = tool_instance.get_instruction(ctx)
             if instruction:
                 instructions.append(f'<tool-instruction name="{tool_instance.name}">{instruction}</tool-instruction>')
@@ -650,16 +639,20 @@ class Toolset(BaseToolset[AgentDepsT]):
 
     def _get_tool_impl_by_name(self, name: str) -> BaseTool | None:
         """Get a tool instance by name."""
-        return self._tool_instances.get(name)
+        if name not in self._tool_classes:
+            return None
+        return self._get_tool_instance(name)
 
     async def process_hitl_call(
         self,
+        ctx: AgentContext,
         user_interactions: list[UserInteraction] | None,
         message_history: list[ModelMessage],
     ) -> DeferredToolResults | None:
         """Process HITL interactions and return deferred tool results.
 
         Args:
+            ctx: The agent context for processing user input.
             user_interactions: List of user interactions for deferred tool calls.
             message_history: The message history to look up tool names from call IDs.
 
@@ -680,7 +673,7 @@ class Toolset(BaseToolset[AgentDepsT]):
                     if tool_name and (tool_impl := self._get_tool_impl_by_name(tool_name)):
                         try:
                             process_result = await tool_impl.process_user_input(
-                                self.ctx,
+                                ctx,
                                 user_input=interaction.user_input,
                             )
                             if process_result:

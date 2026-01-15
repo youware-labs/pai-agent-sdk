@@ -131,24 +131,30 @@ def run_setup_wizard(config_manager: ConfigManager) -> bool:  # noqa: C901
             shutil.copy(src, config_path)
         click.echo(f"Created: {config_path}")
 
-    # Copy mcp.json template
+    # Copy mcp.json template (only if not exists - never overwrite user's mcp.json)
     if not mcp_path.exists():
         mcp_template = resources.files("paintress_cli.templates").joinpath("mcp.json")
         with resources.as_file(mcp_template) as src:
             shutil.copy(src, mcp_path)
         click.echo(f"Created: {mcp_path}")
+    else:
+        click.echo(f"Skipped: {mcp_path} (already exists)")
 
-    # Copy builtin subagents from pai_agent_sdk
+    # Copy builtin subagents from pai_agent_sdk (only missing files - never overwrite)
     subagents_dir.mkdir(parents=True, exist_ok=True)
-    # Check if subagents already exist
-    existing_subagents = list(subagents_dir.glob("*.md"))
-    if not existing_subagents:
-        sdk_presets = resources.files("pai_agent_sdk.subagents.presets")
-        for item in sdk_presets.iterdir():
-            if item.name.endswith(".md"):
+    sdk_presets = resources.files("pai_agent_sdk.subagents.presets")
+    copied_subagents = []
+    for item in sdk_presets.iterdir():
+        if item.name.endswith(".md"):
+            target_path = subagents_dir / item.name
+            if not target_path.exists():
                 with resources.as_file(item) as src:
-                    shutil.copy(src, subagents_dir / item.name)
-        click.echo(f"Created: {subagents_dir}/ (with builtin subagents)")
+                    shutil.copy(src, target_path)
+                copied_subagents.append(item.name)
+    if copied_subagents:
+        click.echo(f"Created: {subagents_dir}/ (added: {', '.join(copied_subagents)})")
+    else:
+        click.echo(f"Skipped: {subagents_dir}/ (all subagents already exist)")
 
     click.echo()
 
@@ -223,6 +229,7 @@ def run_setup_wizard(config_manager: ConfigManager) -> bool:  # noqa: C901
 
     # Update model_settings if we have a preset
     if model_settings_preset:
+        # Check for existing uncommented model_settings line
         if re.search(r"^model_settings\s*=", config_content, re.MULTILINE):
             config_content = re.sub(
                 r"^model_settings\s*=\s*.*$",
@@ -230,8 +237,16 @@ def run_setup_wizard(config_manager: ConfigManager) -> bool:  # noqa: C901
                 config_content,
                 flags=re.MULTILINE,
             )
+        # Check for commented model_settings line and uncomment it
+        elif re.search(r"^#\s*model_settings\s*=", config_content, re.MULTILINE):
+            config_content = re.sub(
+                r"^#\s*model_settings\s*=\s*.*$",
+                f'model_settings = "{model_settings_preset}"',
+                config_content,
+                flags=re.MULTILINE,
+            )
         else:
-            # Add after model line
+            # Add after model line as last resort
             config_content = re.sub(
                 r'^(model\s*=\s*"[^"]*")$',
                 f'\\1\nmodel_settings = "{model_settings_preset}"',
@@ -336,13 +351,10 @@ async def _run_tui(
     config_manager: ConfigManager,
 ) -> None:
     """Run the TUI application."""
-    from paintress_cli.app import TUIApplication
+    from paintress_cli.app import TUIApp
 
-    app = TUIApplication(
-        config=config,
-        config_manager=config_manager,
-    )
-    await app.run()
+    async with TUIApp(config=config, config_manager=config_manager) as app:
+        await app.run()
 
 
 def main() -> None:

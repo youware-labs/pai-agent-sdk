@@ -1,6 +1,5 @@
 """Tests for pai_agent_sdk.toolsets.base module."""
 
-from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -21,9 +20,8 @@ from pai_agent_sdk.toolsets.core.base import (
     UserInteraction,
 )
 
+
 # --- UserInteraction tests ---
-
-
 def test_user_interaction_approved() -> None:
     """Should create approved interaction."""
     interaction = UserInteraction(
@@ -48,8 +46,6 @@ def test_user_interaction_rejected() -> None:
 
 
 # --- UserInputPreprocessResult tests ---
-
-
 def test_user_input_preprocess_result_with_override_args() -> None:
     """Should store override args."""
     result = UserInputPreprocessResult(
@@ -68,8 +64,6 @@ def test_user_input_preprocess_result_empty() -> None:
 
 
 # --- GlobalHooks tests ---
-
-
 def test_global_hooks_empty() -> None:
     """Should create with no hooks."""
     hooks = GlobalHooks()
@@ -92,8 +86,6 @@ def test_global_hooks_with_hooks() -> None:
 
 
 # --- Test tool classes ---
-
-
 class DummyTool(BaseTool):
     """A simple test tool."""
 
@@ -121,15 +113,13 @@ class UnavailableTool(BaseTool):
 
 
 # --- BaseTool tests ---
-
-
 def test_base_tool_default_availability(agent_context: AgentContext) -> None:
     """Should be available by default."""
     from unittest.mock import MagicMock
 
     from pydantic_ai import RunContext
 
-    tool = DummyTool(agent_context)
+    tool = DummyTool()
     mock_run_ctx = MagicMock(spec=RunContext)
     mock_run_ctx.deps = agent_context
     assert tool.is_available(mock_run_ctx) is True
@@ -141,32 +131,27 @@ def test_base_tool_unavailable(agent_context: AgentContext) -> None:
 
     from pydantic_ai import RunContext
 
-    tool = UnavailableTool(agent_context)
+    tool = UnavailableTool()
     mock_run_ctx = MagicMock(spec=RunContext)
     mock_run_ctx.deps = agent_context
     assert tool.is_available(mock_run_ctx) is False
 
 
 def test_base_tool_initialization(agent_context: AgentContext) -> None:
-    """Should initialize with context."""
-    ctx = agent_context
-    tool = DummyTool(ctx)
-    assert tool.ctx is ctx
+    """Should initialize without context."""
+    tool = DummyTool()
     assert tool.name == "dummy_tool"
     assert tool.description == "A dummy tool for testing"
 
 
 async def test_base_tool_process_user_input_returns_none(agent_context: AgentContext) -> None:
     """Should return None by default."""
-    ctx = agent_context
-    tool = DummyTool(ctx)
-    result = await tool.process_user_input(ctx, {"input": "data"})
+    tool = DummyTool()
+    result = await tool.process_user_input(agent_context, {"input": "data"})
     assert result is None
 
 
 # --- BaseToolset tests ---
-
-
 def test_base_toolset_get_instructions_returns_none() -> None:
     """Should return None by default."""
 
@@ -187,14 +172,11 @@ def test_base_toolset_get_instructions_returns_none() -> None:
 
 
 # --- Toolset tests ---
-
-
 def test_toolset_initialization(agent_context: AgentContext) -> None:
     """Should initialize with tools."""
-    ctx = agent_context
-    toolset = Toolset(ctx, tools=[DummyTool])
-    assert len(toolset._tool_instances) == 1
-    assert "dummy_tool" in toolset._tool_instances
+    toolset = Toolset(tools=[DummyTool])
+    assert len(toolset._tool_classes) == 1
+    assert "dummy_tool" in toolset._tool_classes
 
 
 async def test_toolset_skip_unavailable_tools(agent_context: AgentContext) -> None:
@@ -203,16 +185,13 @@ async def test_toolset_skip_unavailable_tools(agent_context: AgentContext) -> No
 
     from pydantic_ai import RunContext
 
-    ctx = agent_context
-    toolset = Toolset(ctx, tools=[DummyTool, UnavailableTool], skip_unavailable=True)
-
-    # All tools are registered in _tool_instances
-    assert "dummy_tool" in toolset._tool_instances
-    assert "unavailable_tool" in toolset._tool_instances
-
+    toolset = Toolset(tools=[DummyTool, UnavailableTool], skip_unavailable=True)
+    # All tools are registered in _tool_classes
+    assert "dummy_tool" in toolset._tool_classes
+    assert "unavailable_tool" in toolset._tool_classes
     # But unavailable tools are filtered out in get_tools()
     mock_run_ctx = MagicMock(spec=RunContext)
-    mock_run_ctx.deps = ctx
+    mock_run_ctx.deps = agent_context
     tools = await toolset.get_tools(mock_run_ctx)
     assert "dummy_tool" in tools
     assert "unavailable_tool" not in tools
@@ -222,22 +201,19 @@ def test_toolset_duplicate_tool_name_raises(agent_context: AgentContext) -> None
     """Should raise on duplicate tool names."""
     from pydantic_ai import UserError
 
-    ctx = agent_context
     with pytest.raises(UserError, match="Duplicate tool name"):
-        Toolset(ctx, tools=[DummyTool, DummyTool])
+        Toolset(tools=[DummyTool, DummyTool])
 
 
 def test_toolset_id(agent_context: AgentContext) -> None:
     """Should store and return toolset ID."""
-    ctx = agent_context
-    toolset = Toolset(ctx, tools=[DummyTool], toolset_id="my-toolset")
+    toolset = Toolset(tools=[DummyTool], toolset_id="my-toolset")
     assert toolset.id == "my-toolset"
 
 
 def test_toolset_get_instructions(agent_context: AgentContext) -> None:
     """Should collect instructions from tools."""
-    ctx = agent_context
-    toolset = Toolset(ctx, tools=[DummyTool])
+    toolset = Toolset(tools=[DummyTool])
     mock_run_ctx = MagicMock(spec=RunContext)
     instructions = toolset.get_instructions(mock_run_ctx)
     assert instructions is not None
@@ -246,10 +222,9 @@ def test_toolset_get_instructions(agent_context: AgentContext) -> None:
 
 async def test_toolset_get_tools(agent_context: AgentContext) -> None:
     """Should return tool definitions."""
-    ctx = agent_context
-    toolset = Toolset(ctx, tools=[DummyTool])
+    toolset = Toolset(tools=[DummyTool])
     mock_run_ctx = MagicMock(spec=RunContext)
-    mock_run_ctx.deps = ctx
+    mock_run_ctx.deps = agent_context
     tools = await toolset.get_tools(mock_run_ctx)
     assert "dummy_tool" in tools
     assert isinstance(tools["dummy_tool"], HookableToolsetTool)
@@ -257,7 +232,6 @@ async def test_toolset_get_tools(agent_context: AgentContext) -> None:
 
 async def test_toolset_call_tool_with_hooks(agent_context: AgentContext) -> None:
     """Should execute hooks in order."""
-    ctx = agent_context
     call_order: list[str] = []
 
     async def global_pre(ctx: Any, name: str, args: dict, metadata: dict) -> dict:
@@ -277,25 +251,21 @@ async def test_toolset_call_tool_with_hooks(agent_context: AgentContext) -> None
         return result
 
     toolset = Toolset(
-        ctx,
         tools=[DummyTool],
         pre_hooks={"dummy_tool": tool_pre},
         post_hooks={"dummy_tool": tool_post},
         global_hooks=GlobalHooks(pre=global_pre, post=global_post),
     )
-
     mock_run_ctx = MagicMock(spec=RunContext)
-    mock_run_ctx.deps = ctx
+    mock_run_ctx.deps = agent_context
     tools = await toolset.get_tools(mock_run_ctx)
     tool = tools["dummy_tool"]
-
     await toolset.call_tool("dummy_tool", {"message": "test"}, mock_run_ctx, tool)
     assert call_order == ["global_pre", "tool_pre", "tool_post", "global_post"]
 
 
 async def test_toolset_call_tool_metadata_shared_across_hooks(agent_context: AgentContext) -> None:
     """Should share metadata dict across all hooks in a single call_tool invocation."""
-    ctx = agent_context
     captured_metadata: list[dict] = []
 
     async def global_pre(ctx: Any, name: str, args: dict, metadata: dict) -> dict:
@@ -319,20 +289,16 @@ async def test_toolset_call_tool_metadata_shared_across_hooks(agent_context: Age
         return result
 
     toolset = Toolset(
-        ctx,
         tools=[DummyTool],
         pre_hooks={"dummy_tool": tool_pre},
         post_hooks={"dummy_tool": tool_post},
         global_hooks=GlobalHooks(pre=global_pre, post=global_post),
     )
-
     mock_run_ctx = MagicMock(spec=RunContext)
-    mock_run_ctx.deps = ctx
+    mock_run_ctx.deps = agent_context
     tools = await toolset.get_tools(mock_run_ctx)
     tool = tools["dummy_tool"]
-
     await toolset.call_tool("dummy_tool", {"message": "test"}, mock_run_ctx, tool)
-
     # Verify metadata accumulates across hooks
     assert len(captured_metadata) == 4
     assert captured_metadata[0] == {"global_pre_time": "t0"}
@@ -348,14 +314,11 @@ async def test_toolset_call_tool_metadata_shared_across_hooks(agent_context: Age
 
 async def test_toolset_process_hitl_call_approved(agent_context: AgentContext) -> None:
     """Should process approved HITL interactions."""
-    ctx = agent_context
-    toolset = Toolset(ctx, tools=[DummyTool])
-
+    toolset = Toolset(tools=[DummyTool])
     interactions = [
         UserInteraction(tool_call_id="call-1", approved=True),
     ]
-
-    result = await toolset.process_hitl_call(interactions, [])
+    result = await toolset.process_hitl_call(agent_context, interactions, [])
     assert result is not None
     assert "call-1" in result.approvals
     assert isinstance(result.approvals["call-1"], ToolApproved)
@@ -363,14 +326,11 @@ async def test_toolset_process_hitl_call_approved(agent_context: AgentContext) -
 
 async def test_toolset_process_hitl_call_rejected(agent_context: AgentContext) -> None:
     """Should process rejected HITL interactions."""
-    ctx = agent_context
-    toolset = Toolset(ctx, tools=[DummyTool])
-
+    toolset = Toolset(tools=[DummyTool])
     interactions = [
         UserInteraction(tool_call_id="call-1", approved=False, reason="Not safe"),
     ]
-
-    result = await toolset.process_hitl_call(interactions, [])
+    result = await toolset.process_hitl_call(agent_context, interactions, [])
     assert result is not None
     assert "call-1" in result.approvals
     denied = result.approvals["call-1"]
@@ -380,25 +340,20 @@ async def test_toolset_process_hitl_call_rejected(agent_context: AgentContext) -
 
 async def test_toolset_process_hitl_call_none(agent_context: AgentContext) -> None:
     """Should return None when no interactions."""
-    ctx = agent_context
-    toolset = Toolset(ctx, tools=[DummyTool])
-
-    result = await toolset.process_hitl_call(None, [])
+    toolset = Toolset(tools=[DummyTool])
+    result = await toolset.process_hitl_call(agent_context, None, [])
     assert result is None
 
 
 async def test_toolset_process_hitl_with_user_input(agent_context: AgentContext) -> None:
     """Should process user input for approved interactions."""
-    ctx = agent_context
-    toolset = Toolset(ctx, tools=[DummyTool])
-
+    toolset = Toolset(tools=[DummyTool])
     tool_call = ToolCallPart(
         tool_name="dummy_tool",
         tool_call_id="call-1",
         args={},
     )
     message_history = [ModelResponse(parts=[tool_call])]
-
     interactions = [
         UserInteraction(
             tool_call_id="call-1",
@@ -406,25 +361,19 @@ async def test_toolset_process_hitl_with_user_input(agent_context: AgentContext)
             user_input={"custom": "data"},
         ),
     ]
-
-    result = await toolset.process_hitl_call(interactions, message_history)
+    result = await toolset.process_hitl_call(agent_context, interactions, message_history)
     assert result is not None
     assert isinstance(result.approvals["call-1"], ToolApproved)
 
 
 # --- InstructableToolset protocol tests ---
-
-
 def test_instructable_toolset_protocol_check(agent_context: AgentContext) -> None:
     """Should recognize conforming toolsets."""
-    ctx = agent_context
-    toolset = Toolset(ctx, tools=[DummyTool])
+    toolset = Toolset(tools=[DummyTool])
     assert isinstance(toolset, InstructableToolset)
 
 
 # --- Toolset.subset tests ---
-
-
 class AnotherTool(BaseTool):
     """Another test tool for subset tests."""
 
@@ -437,43 +386,24 @@ class AnotherTool(BaseTool):
 
 def test_toolset_tool_names(agent_context: AgentContext) -> None:
     """Should return list of tool names."""
-    ctx = agent_context
-    toolset = Toolset(ctx, tools=[DummyTool, AnotherTool])
+    toolset = Toolset(tools=[DummyTool, AnotherTool])
     names = toolset.tool_names
     assert set(names) == {"dummy_tool", "another_tool"}
 
 
 def test_toolset_subset_all_tools(agent_context: AgentContext) -> None:
     """Should return all tools when tool_names is None."""
-    ctx = agent_context
-    toolset = Toolset(ctx, tools=[DummyTool, AnotherTool])
+    toolset = Toolset(tools=[DummyTool, AnotherTool])
     subset = toolset.subset(None)
-
     assert set(subset.tool_names) == {"dummy_tool", "another_tool"}
 
 
 def test_toolset_subset_specific_tools(agent_context: AgentContext) -> None:
     """Should return only specified tools."""
-    ctx = agent_context
-    toolset = Toolset(ctx, tools=[DummyTool, AnotherTool])
+    toolset = Toolset(tools=[DummyTool, AnotherTool])
     subset = toolset.subset(["dummy_tool"])
-
     assert subset.tool_names == ["dummy_tool"]
     assert "another_tool" not in subset.tool_names
-
-
-def test_toolset_subset_with_new_context(agent_context: AgentContext, tmp_path: Path) -> None:
-    """Should use new context when provided."""
-    ctx1 = agent_context
-
-    # Create another context with a different env reference (simulated)
-    ctx2 = AgentContext(env=ctx1.env)
-
-    toolset = Toolset(ctx1, tools=[DummyTool])
-    subset = toolset.subset(None, ctx=ctx2)
-
-    assert subset.ctx is ctx2
-    assert subset.ctx is not ctx1
 
 
 def test_toolset_subset_inherit_hooks(agent_context: AgentContext) -> None:
@@ -488,17 +418,13 @@ def test_toolset_subset_inherit_hooks(agent_context: AgentContext) -> None:
     async def global_pre(ctx: Any, name: str, args: dict, metadata: dict) -> dict:
         return args
 
-    ctx = agent_context
     toolset = Toolset(
-        ctx,
         tools=[DummyTool, AnotherTool],
         pre_hooks={"dummy_tool": pre_hook},
         post_hooks={"dummy_tool": post_hook},
         global_hooks=GlobalHooks(pre=global_pre),
     )
-
     subset = toolset.subset(["dummy_tool"], inherit_hooks=True)
-
     assert "dummy_tool" in subset.pre_hooks
     assert "dummy_tool" in subset.post_hooks
     assert subset.global_hooks.pre is global_pre
@@ -510,15 +436,11 @@ def test_toolset_subset_no_inherit_hooks(agent_context: AgentContext) -> None:
     async def pre_hook(ctx: Any, args: dict, metadata: dict) -> dict:
         return args
 
-    ctx = agent_context
     toolset = Toolset(
-        ctx,
         tools=[DummyTool],
         pre_hooks={"dummy_tool": pre_hook},
     )
-
     subset = toolset.subset(["dummy_tool"], inherit_hooks=False)
-
     assert subset.pre_hooks == {}
     assert subset.post_hooks == {}
     assert subset.global_hooks.pre is None
@@ -526,22 +448,16 @@ def test_toolset_subset_no_inherit_hooks(agent_context: AgentContext) -> None:
 
 def test_toolset_subset_nonexistent_tool_skipped(agent_context: AgentContext) -> None:
     """Should skip non-existent tools with warning."""
-    ctx = agent_context
-    toolset = Toolset(ctx, tools=[DummyTool])
+    toolset = Toolset(tools=[DummyTool])
     subset = toolset.subset(["dummy_tool", "nonexistent_tool"])
-
     assert subset.tool_names == ["dummy_tool"]
 
 
 # --- Toolset.with_subagents tests ---
-
-
 def test_toolset_with_subagents_empty_configs(agent_context: AgentContext) -> None:
     """Should return self when configs is empty."""
-    ctx = agent_context
-    toolset = Toolset(ctx, tools=[DummyTool])
+    toolset = Toolset(tools=[DummyTool])
     result = toolset.with_subagents([])
-
     assert result is toolset
 
 
@@ -549,9 +465,7 @@ def test_toolset_with_subagents_creates_new_toolset(agent_context: AgentContext)
     """Should create new toolset with subagent tools added."""
     from pai_agent_sdk.subagents import SubagentConfig
 
-    ctx = agent_context
-    toolset = Toolset(ctx, tools=[DummyTool])
-
+    toolset = Toolset(tools=[DummyTool])
     config = SubagentConfig(
         name="test_subagent",
         description="A test subagent",
@@ -559,7 +473,6 @@ def test_toolset_with_subagents_creates_new_toolset(agent_context: AgentContext)
         tools=["dummy_tool"],
     )
     result = toolset.with_subagents([config])
-
     assert result is not toolset
     assert "dummy_tool" in result.tool_names
     assert "test_subagent" in result.tool_names
@@ -572,22 +485,18 @@ def test_toolset_with_subagents_preserves_hooks(agent_context: AgentContext) -> 
     async def pre_hook(ctx: Any, args: dict, metadata: dict) -> dict:
         return args
 
-    ctx = agent_context
     toolset = Toolset(
-        ctx,
         tools=[DummyTool],
         pre_hooks={"dummy_tool": pre_hook},
         max_retries=5,
         timeout=30.0,
     )
-
     config = SubagentConfig(
         name="test_subagent",
         description="A test subagent",
         system_prompt="You are a test subagent.",
     )
     result = toolset.with_subagents([config])
-
     assert result.max_retries == 5
     assert result.timeout == 30.0
     assert "dummy_tool" in result.pre_hooks
@@ -597,9 +506,7 @@ def test_toolset_with_subagents_multiple_configs(agent_context: AgentContext) ->
     """Should handle multiple subagent configs."""
     from pai_agent_sdk.subagents import SubagentConfig
 
-    ctx = agent_context
-    toolset = Toolset(ctx, tools=[DummyTool])
-
+    toolset = Toolset(tools=[DummyTool])
     configs = [
         SubagentConfig(
             name="subagent_a",
@@ -613,7 +520,6 @@ def test_toolset_with_subagents_multiple_configs(agent_context: AgentContext) ->
         ),
     ]
     result = toolset.with_subagents(configs)
-
     assert "dummy_tool" in result.tool_names
     assert "subagent_a" in result.tool_names
     assert "subagent_b" in result.tool_names

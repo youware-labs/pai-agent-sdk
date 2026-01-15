@@ -58,7 +58,7 @@ class TestSubagentToolAvailability:
 
     def test_subagent_available_when_all_tools_exist(self, agent_context, mock_run_ctx) -> None:
         """Subagent should be available when all required tools exist and are available."""
-        parent_toolset = Toolset(agent_context, tools=[GrepTool, ViewTool])
+        parent_toolset = Toolset(tools=[GrepTool, ViewTool])
 
         config = SubagentConfig(
             name="test_subagent",
@@ -68,13 +68,13 @@ class TestSubagentToolAvailability:
         )
 
         tool_cls = create_subagent_tool_from_config(config, parent_toolset, model="test")
-        tool_instance = tool_cls(agent_context)
+        tool_instance = tool_cls()
 
         assert tool_instance.is_available(mock_run_ctx) is True
 
     def test_subagent_unavailable_when_tool_missing(self, agent_context, mock_run_ctx) -> None:
         """Subagent should be unavailable when a required tool is missing."""
-        parent_toolset = Toolset(agent_context, tools=[GrepTool])  # ViewTool missing
+        parent_toolset = Toolset(tools=[GrepTool])  # ViewTool missing
 
         config = SubagentConfig(
             name="test_subagent",
@@ -84,14 +84,14 @@ class TestSubagentToolAvailability:
         )
 
         tool_cls = create_subagent_tool_from_config(config, parent_toolset, model="test")
-        tool_instance = tool_cls(agent_context)
+        tool_instance = tool_cls()
 
         assert tool_instance.is_available(mock_run_ctx) is False
 
     def test_subagent_unavailable_when_tool_not_available(self, agent_context, mock_run_ctx) -> None:
         """Subagent should be unavailable when a required tool exists but is_available=False."""
         # UnavailableTool will be skipped by Toolset due to skip_unavailable=True
-        parent_toolset = Toolset(agent_context, tools=[GrepTool, UnavailableTool])
+        parent_toolset = Toolset(tools=[GrepTool, UnavailableTool])
 
         config = SubagentConfig(
             name="test_subagent",
@@ -101,14 +101,14 @@ class TestSubagentToolAvailability:
         )
 
         tool_cls = create_subagent_tool_from_config(config, parent_toolset, model="test")
-        tool_instance = tool_cls(agent_context)
+        tool_instance = tool_cls()
 
         # unavailable_tool is not in parent_toolset because it was skipped
         assert tool_instance.is_available(mock_run_ctx) is False
 
     def test_subagent_available_when_tools_none(self, agent_context, mock_run_ctx) -> None:
         """Subagent should be available when tools=None (inherit all)."""
-        parent_toolset = Toolset(agent_context, tools=[GrepTool, ViewTool])
+        parent_toolset = Toolset(tools=[GrepTool, ViewTool])
 
         config = SubagentConfig(
             name="test_subagent",
@@ -118,7 +118,7 @@ class TestSubagentToolAvailability:
         )
 
         tool_cls = create_subagent_tool_from_config(config, parent_toolset, model="test")
-        tool_instance = tool_cls(agent_context)
+        tool_instance = tool_cls()
 
         assert tool_instance.is_available(mock_run_ctx) is True
 
@@ -126,7 +126,7 @@ class TestSubagentToolAvailability:
         """Subagent availability should be checked dynamically."""
         # Start with dynamic tool available
         DynamicTool._available = True
-        parent_toolset = Toolset(agent_context, tools=[GrepTool, DynamicTool])
+        parent_toolset = Toolset(tools=[GrepTool, DynamicTool])
 
         config = SubagentConfig(
             name="test_subagent",
@@ -136,7 +136,7 @@ class TestSubagentToolAvailability:
         )
 
         tool_cls = create_subagent_tool_from_config(config, parent_toolset, model="test")
-        tool_instance = tool_cls(agent_context)
+        tool_instance = tool_cls()
 
         # Initially available
         assert tool_instance.is_available(mock_run_ctx) is True
@@ -155,24 +155,24 @@ class TestSubagentToolAvailability:
 class TestToolsetIsToolAvailable:
     """Tests for Toolset.is_tool_available method."""
 
-    def test_is_tool_available_for_existing_tool(self, agent_context) -> None:
+    def test_is_tool_available_for_existing_tool(self, agent_context, mock_run_ctx) -> None:
         """Should return True for existing and available tool."""
-        toolset = Toolset(agent_context, tools=[GrepTool, ViewTool])
+        toolset = Toolset(tools=[GrepTool, ViewTool])
 
-        assert toolset.is_tool_available("grep") is True
-        assert toolset.is_tool_available("view") is True
+        assert toolset.is_tool_available("grep", mock_run_ctx) is True
+        assert toolset.is_tool_available("view", mock_run_ctx) is True
 
-    def test_is_tool_available_for_missing_tool(self, agent_context) -> None:
+    def test_is_tool_available_for_missing_tool(self, agent_context, mock_run_ctx) -> None:
         """Should return False for non-existent tool."""
-        toolset = Toolset(agent_context, tools=[GrepTool])
+        toolset = Toolset(tools=[GrepTool])
 
-        assert toolset.is_tool_available("view") is False
-        assert toolset.is_tool_available("nonexistent") is False
+        assert toolset.is_tool_available("view", mock_run_ctx) is False
+        assert toolset.is_tool_available("nonexistent", mock_run_ctx) is False
 
     def test_is_tool_available_for_unavailable_tool(self, agent_context, mock_run_ctx) -> None:
         """Should return False for tool that was skipped due to is_available=False."""
         # UnavailableTool is registered but is_available returns False
-        toolset = Toolset(agent_context, tools=[GrepTool, UnavailableTool])
+        toolset = Toolset(tools=[GrepTool, UnavailableTool])
 
         assert toolset.is_tool_available("grep", mock_run_ctx) is True
         assert toolset.is_tool_available("unavailable_tool", mock_run_ctx) is False
@@ -180,7 +180,7 @@ class TestToolsetIsToolAvailable:
     def test_is_tool_available_dynamic(self, agent_context, mock_run_ctx) -> None:
         """Should dynamically check tool availability."""
         DynamicTool._available = True
-        toolset = Toolset(agent_context, tools=[DynamicTool])
+        toolset = Toolset(tools=[DynamicTool])
 
         assert toolset.is_tool_available("dynamic_tool", mock_run_ctx) is True
 
@@ -197,7 +197,7 @@ class TestOptionalTools:
 
     def test_subagent_available_with_optional_tools_missing(self, agent_context, mock_run_ctx) -> None:
         """Subagent should be available even if optional tools are missing."""
-        parent_toolset = Toolset(agent_context, tools=[GrepTool, ViewTool])
+        parent_toolset = Toolset(tools=[GrepTool, ViewTool])
 
         config = SubagentConfig(
             name="test_subagent",
@@ -208,14 +208,14 @@ class TestOptionalTools:
         )
 
         tool_cls = create_subagent_tool_from_config(config, parent_toolset, model="test")
-        tool_instance = tool_cls(agent_context)
+        tool_instance = tool_cls()
 
         # Should still be available because required tools exist
         assert tool_instance.is_available(mock_run_ctx) is True
 
     def test_subagent_unavailable_when_required_missing_but_optional_present(self, agent_context, mock_run_ctx) -> None:
         """Subagent should be unavailable if required tools are missing, even with optional present."""
-        parent_toolset = Toolset(agent_context, tools=[GrepTool, ViewTool])
+        parent_toolset = Toolset(tools=[GrepTool, ViewTool])
 
         config = SubagentConfig(
             name="test_subagent",
@@ -226,14 +226,14 @@ class TestOptionalTools:
         )
 
         tool_cls = create_subagent_tool_from_config(config, parent_toolset, model="test")
-        tool_instance = tool_cls(agent_context)
+        tool_instance = tool_cls()
 
         # Should be unavailable because required tool is missing
         assert tool_instance.is_available(mock_run_ctx) is False
 
     def test_subagent_with_both_required_and_optional_tools(self, agent_context, mock_run_ctx) -> None:
         """Subagent should include both required and optional tools in subset."""
-        parent_toolset = Toolset(agent_context, tools=[GrepTool, ViewTool])
+        parent_toolset = Toolset(tools=[GrepTool, ViewTool])
 
         config = SubagentConfig(
             name="test_subagent",
@@ -244,13 +244,13 @@ class TestOptionalTools:
         )
 
         tool_cls = create_subagent_tool_from_config(config, parent_toolset, model="test")
-        tool_instance = tool_cls(agent_context)
+        tool_instance = tool_cls()
 
         assert tool_instance.is_available(mock_run_ctx) is True
 
     def test_subagent_only_optional_tools_always_available(self, agent_context, mock_run_ctx) -> None:
         """Subagent with only optional_tools (no required) should always be available."""
-        parent_toolset = Toolset(agent_context, tools=[GrepTool, ViewTool])
+        parent_toolset = Toolset(tools=[GrepTool, ViewTool])
 
         config = SubagentConfig(
             name="test_subagent",
@@ -261,7 +261,7 @@ class TestOptionalTools:
         )
 
         tool_cls = create_subagent_tool_from_config(config, parent_toolset, model="test")
-        tool_instance = tool_cls(agent_context)
+        tool_instance = tool_cls()
 
         # Should be available because tools=None means inherit all (no required check)
         assert tool_instance.is_available(mock_run_ctx) is True
@@ -272,7 +272,7 @@ class TestModelCfgResolution:
 
     def test_model_cfg_from_preset_string(self, agent_context) -> None:
         """Subagent should resolve model_cfg from preset string."""
-        parent_toolset = Toolset(agent_context, tools=[GrepTool])
+        parent_toolset = Toolset(tools=[GrepTool])
 
         config = SubagentConfig(
             name="test_subagent",
@@ -287,7 +287,7 @@ class TestModelCfgResolution:
 
     def test_model_cfg_from_dict(self, agent_context) -> None:
         """Subagent should accept model_cfg as dict."""
-        parent_toolset = Toolset(agent_context, tools=[GrepTool])
+        parent_toolset = Toolset(tools=[GrepTool])
 
         config = SubagentConfig(
             name="test_subagent",
@@ -301,7 +301,7 @@ class TestModelCfgResolution:
 
     def test_model_cfg_inherit(self, agent_context) -> None:
         """Subagent should inherit model_cfg when set to 'inherit'."""
-        parent_toolset = Toolset(agent_context, tools=[GrepTool])
+        parent_toolset = Toolset(tools=[GrepTool])
 
         config = SubagentConfig(
             name="test_subagent",
@@ -315,7 +315,7 @@ class TestModelCfgResolution:
 
     def test_model_cfg_none_inherits(self, agent_context) -> None:
         """Subagent should inherit model_cfg when None (default)."""
-        parent_toolset = Toolset(agent_context, tools=[GrepTool])
+        parent_toolset = Toolset(tools=[GrepTool])
 
         config = SubagentConfig(
             name="test_subagent",

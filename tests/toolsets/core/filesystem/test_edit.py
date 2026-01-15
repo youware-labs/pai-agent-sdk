@@ -17,7 +17,7 @@ def test_edit_tool_attributes(agent_context: AgentContext) -> None:
     """Should have correct name and description."""
     assert EditTool.name == "edit"
     assert "string replacement" in EditTool.description
-    tool = EditTool(agent_context)
+    tool = EditTool()
     mock_run_ctx = MagicMock(spec=RunContext)
     mock_run_ctx.deps = agent_context
     instruction = tool.get_instruction(mock_run_ctx)
@@ -40,7 +40,7 @@ async def test_edit_create_new_file(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = EditTool(ctx)
+        tool = EditTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
@@ -57,7 +57,7 @@ async def test_edit_create_file_already_exists(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = EditTool(ctx)
+        tool = EditTool()
 
         # Create existing file
         (tmp_path / "existing.txt").write_text("existing content")
@@ -76,7 +76,7 @@ async def test_edit_file_not_found(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = EditTool(ctx)
+        tool = EditTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
@@ -92,7 +92,7 @@ async def test_edit_path_is_directory(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = EditTool(ctx)
+        tool = EditTool()
 
         (tmp_path / "testdir").mkdir()
 
@@ -110,7 +110,7 @@ async def test_edit_text_not_found(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = EditTool(ctx)
+        tool = EditTool()
 
         (tmp_path / "test.txt").write_text("Hello World")
 
@@ -128,7 +128,7 @@ async def test_edit_single_replacement(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = EditTool(ctx)
+        tool = EditTool()
 
         (tmp_path / "test.txt").write_text("Hello World")
 
@@ -147,7 +147,7 @@ async def test_edit_multiple_occurrences_error(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = EditTool(ctx)
+        tool = EditTool()
 
         (tmp_path / "test.txt").write_text("foo bar foo baz foo")
 
@@ -165,7 +165,7 @@ async def test_edit_replace_all(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = EditTool(ctx)
+        tool = EditTool()
 
         (tmp_path / "test.txt").write_text("foo bar foo baz foo")
 
@@ -189,7 +189,7 @@ async def test_multi_edit_empty_edits(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = MultiEditTool(ctx)
+        tool = MultiEditTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
@@ -205,7 +205,7 @@ async def test_multi_edit_create_new_file(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = MultiEditTool(ctx)
+        tool = MultiEditTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
@@ -226,7 +226,7 @@ async def test_multi_edit_file_already_exists(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = MultiEditTool(ctx)
+        tool = MultiEditTool()
 
         (tmp_path / "existing.txt").write_text("content")
 
@@ -245,7 +245,7 @@ async def test_multi_edit_file_not_found(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = MultiEditTool(ctx)
+        tool = MultiEditTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
@@ -262,7 +262,7 @@ async def test_multi_edit_path_is_directory(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = MultiEditTool(ctx)
+        tool = MultiEditTool()
 
         (tmp_path / "testdir").mkdir()
 
@@ -281,7 +281,7 @@ async def test_multi_edit_sequential_edits(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = MultiEditTool(ctx)
+        tool = MultiEditTool()
 
         (tmp_path / "test.txt").write_text("aaa bbb ccc")
 
@@ -305,7 +305,7 @@ async def test_multi_edit_text_not_found(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = MultiEditTool(ctx)
+        tool = MultiEditTool()
 
         (tmp_path / "test.txt").write_text("Hello World")
 
@@ -327,7 +327,7 @@ async def test_multi_edit_multiple_occurrences_error(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = MultiEditTool(ctx)
+        tool = MultiEditTool()
 
         (tmp_path / "test.txt").write_text("foo foo foo")
 
@@ -346,7 +346,7 @@ async def test_multi_edit_with_replace_all(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = MultiEditTool(ctx)
+        tool = MultiEditTool()
 
         (tmp_path / "test.txt").write_text("foo bar foo baz foo")
 

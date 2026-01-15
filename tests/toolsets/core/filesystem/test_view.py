@@ -22,7 +22,7 @@ def test_view_tool_attributes(agent_context: AgentContext) -> None:
     """Should have correct name and description."""
     assert ViewTool.name == "view"
     assert "Read files" in ViewTool.description
-    tool = ViewTool(agent_context)
+    tool = ViewTool()
     mock_run_ctx = MagicMock(spec=RunContext)
     mock_run_ctx.deps = agent_context
     instruction = tool.get_instruction(mock_run_ctx)
@@ -31,20 +31,19 @@ def test_view_tool_attributes(agent_context: AgentContext) -> None:
 
 def test_view_tool_initialization(agent_context: AgentContext) -> None:
     """Should initialize with context."""
-    tool = ViewTool(agent_context)
-    assert tool.ctx is agent_context
+    tool = ViewTool()
     assert tool.name == "view"
 
 
 def test_view_tool_is_available(agent_context: AgentContext, mock_run_ctx) -> None:
     """Should be available by default."""
-    tool = ViewTool(agent_context)
+    tool = ViewTool()
     assert tool.is_available(mock_run_ctx) is True
 
 
 def test_is_image_file(agent_context: AgentContext) -> None:
     """Should correctly identify image files."""
-    tool = ViewTool(agent_context)
+    tool = ViewTool()
     for ext in IMAGE_EXTENSIONS:
         assert tool._is_image_file(f"test{ext}") is True
         assert tool._is_image_file(f"test{ext.upper()}") is True
@@ -54,7 +53,7 @@ def test_is_image_file(agent_context: AgentContext) -> None:
 
 def test_is_video_file(agent_context: AgentContext) -> None:
     """Should correctly identify video files."""
-    tool = ViewTool(agent_context)
+    tool = ViewTool()
     for ext in VIDEO_EXTENSIONS:
         assert tool._is_video_file(f"test{ext}") is True
         assert tool._is_video_file(f"test{ext.upper()}") is True
@@ -64,7 +63,7 @@ def test_is_video_file(agent_context: AgentContext) -> None:
 
 def test_get_media_type(agent_context: AgentContext) -> None:
     """Should return correct media type for extensions."""
-    tool = ViewTool(agent_context)
+    tool = ViewTool()
     for ext, expected in MEDIA_TYPE_MAP.items():
         assert tool._get_media_type(f"test{ext}") == expected
     assert tool._get_media_type("test.unknown") == "application/octet-stream"
@@ -77,7 +76,7 @@ async def test_view_text_file_simple(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = ViewTool(ctx)
+        tool = ViewTool()
 
         # Create test file
         test_file = tmp_path / "test.txt"
@@ -97,7 +96,7 @@ async def test_view_text_file_with_offset(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = ViewTool(ctx)
+        tool = ViewTool()
 
         # Create test file with multiple lines
         lines = [f"Line {i}" for i in range(10)]
@@ -122,7 +121,7 @@ async def test_view_text_file_with_limit(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = ViewTool(ctx)
+        tool = ViewTool()
 
         # Create file with many lines
         lines = [f"Line {i}" for i in range(100)]
@@ -145,7 +144,7 @@ async def test_view_text_file_line_truncation(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = ViewTool(ctx)
+        tool = ViewTool()
 
         # Create file with long line
         long_line = "A" * 3000
@@ -168,7 +167,7 @@ async def test_view_file_not_found(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = ViewTool(ctx)
+        tool = ViewTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
@@ -184,7 +183,7 @@ async def test_view_directory_error(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = ViewTool(ctx)
+        tool = ViewTool()
 
         # Create a directory
         test_dir = tmp_path / "testdir"
@@ -212,7 +211,7 @@ async def test_view_image_file(tmp_path: Path) -> None:
                 model_cfg=ModelConfig(capabilities={ModelCapability.vision}),
             )
         )
-        tool = ViewTool(ctx)
+        tool = ViewTool()
 
         # Create a minimal PNG file (1x1 transparent pixel)
         png_data = bytes([
@@ -313,7 +312,7 @@ async def test_view_video_file_with_video_model(tmp_path: Path) -> None:
                 model_cfg=ModelConfig(capabilities={ModelCapability.video_understanding}),
             )
         )
-        tool = ViewTool(ctx)
+        tool = ViewTool()
 
         # Create a minimal video file
         test_file = tmp_path / "test.mp4"
@@ -338,7 +337,7 @@ async def test_view_video_file_fallback_to_image_understanding(tmp_path: Path) -
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = ViewTool(ctx)
+        tool = ViewTool()
 
         # Create a minimal video file
         test_file = tmp_path / "test.mp4"
@@ -365,7 +364,7 @@ async def test_view_video_fallback_failure(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = ViewTool(ctx)
+        tool = ViewTool()
 
         # Create a minimal video file
         test_file = tmp_path / "test.mp4"
@@ -399,7 +398,7 @@ async def test_view_webm_video(tmp_path: Path) -> None:
                 model_cfg=ModelConfig(capabilities={ModelCapability.video_understanding}),
             )
         )
-        tool = ViewTool(ctx)
+        tool = ViewTool()
 
         test_file = tmp_path / "test.webm"
         test_file.write_bytes(b"fake webm data")

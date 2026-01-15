@@ -2397,7 +2397,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.12.5" },
     { name = "pydantic-ai", marker = "extra == 'all'" },
     { name = "pydantic-ai", marker = "extra == 'examples'" },
-    { name = "pydantic-ai-slim", specifier = ">=1.41.0" },
+    { name = "pydantic-ai-slim", specifier = ">=1.42.0" },
     { name = "pydantic-settings", specifier = ">=2.0.0" },
     { name = "pymupdf", marker = "extra == 'all'", specifier = ">=1.26.6" },
     { name = "pymupdf", marker = "extra == 'document'", specifier = ">=1.26.6" },

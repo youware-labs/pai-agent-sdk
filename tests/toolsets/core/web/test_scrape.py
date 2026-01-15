@@ -30,7 +30,7 @@ async def test_scrape_tool_forbidden_url(tmp_path: Path) -> None:
                 tool_config=ToolConfig(skip_url_verification=False),
             )
         )
-        tool = ScrapeTool(ctx)
+        tool = ScrapeTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
@@ -54,7 +54,7 @@ async def test_scrape_tool_fallback_to_markitdown(tmp_path: Path) -> None:
                 tool_config=ToolConfig(),  # No firecrawl key
             )
         )
-        tool = ScrapeTool(ctx)
+        tool = ScrapeTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
@@ -83,7 +83,7 @@ async def test_scrape_tool_truncates_long_content(tmp_path: Path) -> None:
                 tool_config=ToolConfig(firecrawl_api_key=None),  # Force MarkItDown fallback
             )
         )
-        tool = ScrapeTool(ctx)
+        tool = ScrapeTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx

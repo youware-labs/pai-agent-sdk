@@ -15,6 +15,8 @@ import uuid
 from typing import TYPE_CHECKING, Any
 
 from pydantic import PrivateAttr
+from pydantic_ai import RunContext
+from pydantic_ai._agent_graph import HistoryProcessor
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -28,7 +30,7 @@ from paintress_cli.logging import get_logger
 from paintress_cli.steering import LocalSteeringManager, SteeringMessage
 
 if TYPE_CHECKING:
-    from pydantic_ai import RunContext
+    pass
 
 logger = get_logger(__name__)
 
@@ -110,70 +112,8 @@ class TUIContext(AgentContext):
             List of history processor functions.
         """
         processors = super().get_history_processors()
-        processors.append(self._inject_steering)
+        processors.append(create_steering_filter(self))
         return processors
-
-    async def _inject_steering(
-        self,
-        ctx: RunContext[AgentContext],
-        message_history: list[ModelMessage],
-    ) -> list[ModelMessage]:
-        """Inject pending steering messages into message history.
-
-        This history processor:
-        1. Checks for pending steering messages
-        2. Draws messages from buffer (consuming them)
-        3. Appends to the last ModelRequest
-        4. Emits SteeringInjectedEvent via agent_stream_queues
-
-        Args:
-            ctx: The run context (deps is self).
-            message_history: Current message history.
-
-        Returns:
-            Modified message history with steering messages injected.
-        """
-        # Only inject into requests (not responses)
-        if not message_history or not isinstance(message_history[-1], ModelRequest):
-            return message_history
-
-        # Check for pending messages (fast path)
-        if not self._steering_manager.has_pending():
-            return message_history
-
-        # Draw pending messages
-        try:
-            steering_messages = await self._steering_manager.draw_messages()
-        except Exception:
-            logger.exception("Failed to draw steering messages")
-            return message_history
-
-        if not steering_messages:
-            return message_history
-
-        # Inject into the last request
-        rendered = render_steering_messages(steering_messages)
-        message_history[-1] = ModelRequest(
-            parts=[*message_history[-1].parts, *rendered],
-        )
-
-        logger.info(
-            "Injected %d steering message(s): %s",
-            len(steering_messages),
-            steering_messages[0].prompt[:50] if steering_messages else "",
-        )
-
-        # Emit event via ctx.deps (which is TUIContext)
-        # Include full content for user audit
-        full_content = "\n".join(m.prompt for m in steering_messages)
-        event = SteeringInjectedEvent(
-            event_id=f"steer-{uuid.uuid4().hex[:8]}",
-            message_count=len(steering_messages),
-            content=full_content,
-        )
-        await ctx.deps.emit_event(event)
-
-        return message_history
 
     def create_subagent_context(
         self,
@@ -200,3 +140,76 @@ class TUIContext(AgentContext):
             agent_id=agent_id,
             **override,
         )
+
+
+# -----------------------------------------------------------------------------
+# Steering Filter Factory
+# -----------------------------------------------------------------------------
+
+
+def create_steering_filter(
+    context: TUIContext,
+) -> HistoryProcessor[AgentContext]:
+    """Create a history processor that injects steering messages.
+
+    This factory creates an async function that:
+    1. Checks for pending steering messages in context._steering_manager
+    2. Draws messages from buffer (consuming them)
+    3. Appends to the last ModelRequest
+    4. Emits SteeringInjectedEvent via context
+
+    Args:
+        context: The TUIContext containing the steering manager.
+
+    Returns:
+        An async HistoryProcessor function with proper signature.
+    """
+
+    async def inject_steering(
+        ctx: RunContext[AgentContext],
+        message_history: list[ModelMessage],
+    ) -> list[ModelMessage]:
+        """Inject pending steering messages into message history."""
+        # Only inject into requests (not responses)
+        if not message_history or not isinstance(message_history[-1], ModelRequest):
+            return message_history
+
+        # Check for pending messages (fast path)
+        if not context._steering_manager.has_pending():
+            return message_history
+
+        # Draw pending messages
+        try:
+            steering_messages = await context._steering_manager.draw_messages()
+        except Exception:
+            logger.exception("Failed to draw steering messages")
+            return message_history
+
+        if not steering_messages:
+            return message_history
+
+        # Inject into the last request
+        rendered = render_steering_messages(steering_messages)
+        message_history[-1] = ModelRequest(
+            parts=[*message_history[-1].parts, *rendered],
+        )
+
+        logger.info(
+            "Injected %d steering message(s): %s",
+            len(steering_messages),
+            steering_messages[0].prompt[:50] if steering_messages else "",
+        )
+
+        # Emit event via context (which is TUIContext)
+        # Include full content for user audit
+        full_content = "\n".join(m.prompt for m in steering_messages)
+        event = SteeringInjectedEvent(
+            event_id=f"steer-{uuid.uuid4().hex[:8]}",
+            message_count=len(steering_messages),
+            content=full_content,
+        )
+        await context.emit_event(event)
+
+        return message_history
+
+    return inject_steering

@@ -155,7 +155,7 @@ def test_subagent_info_tool_is_not_available_without_subagents(
     mock_ctx: AgentContext, mock_run_context: RunContext[AgentContext]
 ):
     """Should not be available when no subagent info exists."""
-    tool = SubagentInfoTool(mock_ctx)
+    tool = SubagentInfoTool()
     assert tool.is_available(mock_run_context) is False
 
 
@@ -163,7 +163,7 @@ def test_subagent_info_tool_is_available_with_subagents(ctx_with_subagents: Agen
     """Should be available when subagent info exists."""
     run_ctx = MagicMock(spec=RunContext)
     run_ctx.deps = ctx_with_subagents
-    tool = SubagentInfoTool(ctx_with_subagents)
+    tool = SubagentInfoTool()
     assert tool.is_available(run_ctx) is True
 
 
@@ -171,7 +171,7 @@ async def test_subagent_info_tool_lists_subagents(ctx_with_subagents: AgentConte
     """Should list all subagents."""
     run_ctx = MagicMock(spec=RunContext)
     run_ctx.deps = ctx_with_subagents
-    tool = SubagentInfoTool(ctx_with_subagents)
+    tool = SubagentInfoTool()
     result = await tool.call(run_ctx)
 
     assert result["total_count"] == 2  # search-001 and reason-002 (excludes main)
@@ -186,7 +186,7 @@ async def test_subagent_info_tool_returns_empty_list_when_only_main(mock_ctx: Ag
     mock_ctx.agent_registry = {"main-123": AgentInfo("main-123", "main", None)}
     run_ctx = MagicMock(spec=RunContext)
     run_ctx.deps = mock_ctx
-    tool = SubagentInfoTool(mock_ctx)
+    tool = SubagentInfoTool()
     result = await tool.call(run_ctx)
 
     assert result["subagents"] == []
@@ -197,7 +197,7 @@ async def test_subagent_info_tool_includes_history_length(ctx_with_subagents: Ag
     """Should include history length for subagents with history."""
     run_ctx = MagicMock(spec=RunContext)
     run_ctx.deps = ctx_with_subagents
-    tool = SubagentInfoTool(ctx_with_subagents)
+    tool = SubagentInfoTool()
     result = await tool.call(run_ctx)
 
     # Find search subagent
@@ -209,7 +209,7 @@ async def test_subagent_info_tool_includes_hint(ctx_with_subagents: AgentContext
     """Should include hint from first user prompt."""
     run_ctx = MagicMock(spec=RunContext)
     run_ctx.deps = ctx_with_subagents
-    tool = SubagentInfoTool(ctx_with_subagents)
+    tool = SubagentInfoTool()
     result = await tool.call(run_ctx)
 
     # Find search subagent and check hint
@@ -226,11 +226,11 @@ async def test_subagent_info_tool_includes_hint(ctx_with_subagents: AgentContext
 
 def test_subagent_info_tool_has_correct_name(mock_ctx: AgentContext):
     """SubagentInfoTool should have correct name."""
-    tool = SubagentInfoTool(mock_ctx)
+    tool = SubagentInfoTool()
     assert tool.name == "subagent_info"
 
 
 def test_subagent_info_tool_has_description(mock_ctx: AgentContext):
     """Tool should have meaningful description."""
-    tool = SubagentInfoTool(mock_ctx)
+    tool = SubagentInfoTool()
     assert len(tool.description) > 20

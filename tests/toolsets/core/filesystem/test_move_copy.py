@@ -15,7 +15,7 @@ def test_move_tool_attributes(agent_context: AgentContext) -> None:
     """Should have correct name and description."""
     assert MoveTool.name == "move"
     assert "Move" in MoveTool.description
-    tool = MoveTool(agent_context)
+    tool = MoveTool()
     mock_run_ctx = MagicMock(spec=RunContext)
     mock_run_ctx.deps = agent_context
     instruction = tool.get_instruction(mock_run_ctx)
@@ -38,7 +38,7 @@ async def test_move_file(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = MoveTool(ctx)
+        tool = MoveTool()
 
         (tmp_path / "source.txt").write_text("content")
 
@@ -59,7 +59,7 @@ async def test_move_source_not_found(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = MoveTool(ctx)
+        tool = MoveTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
@@ -76,7 +76,7 @@ async def test_move_dest_exists_no_overwrite(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = MoveTool(ctx)
+        tool = MoveTool()
 
         (tmp_path / "source.txt").write_text("source")
         (tmp_path / "dest.txt").write_text("existing")
@@ -96,7 +96,7 @@ async def test_move_dest_exists_with_overwrite(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = MoveTool(ctx)
+        tool = MoveTool()
 
         (tmp_path / "source.txt").write_text("new content")
         (tmp_path / "dest.txt").write_text("old content")
@@ -116,7 +116,7 @@ async def test_move_multiple_pairs(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = MoveTool(ctx)
+        tool = MoveTool()
 
         (tmp_path / "file1.txt").write_text("content1")
         (tmp_path / "file2.txt").write_text("content2")
@@ -142,7 +142,7 @@ async def test_move_directory(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = MoveTool(ctx)
+        tool = MoveTool()
 
         (tmp_path / "srcdir").mkdir()
         (tmp_path / "srcdir" / "file.txt").write_text("content")
@@ -166,7 +166,7 @@ async def test_copy_file(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = CopyTool(ctx)
+        tool = CopyTool()
 
         (tmp_path / "source.txt").write_text("content")
 
@@ -186,7 +186,7 @@ async def test_copy_source_not_found(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = CopyTool(ctx)
+        tool = CopyTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
@@ -203,7 +203,7 @@ async def test_copy_source_is_directory(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = CopyTool(ctx)
+        tool = CopyTool()
 
         (tmp_path / "srcdir").mkdir()
 
@@ -222,7 +222,7 @@ async def test_copy_dest_exists_no_overwrite(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = CopyTool(ctx)
+        tool = CopyTool()
 
         (tmp_path / "source.txt").write_text("source")
         (tmp_path / "dest.txt").write_text("existing")
@@ -242,7 +242,7 @@ async def test_copy_dest_exists_with_overwrite(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = CopyTool(ctx)
+        tool = CopyTool()
 
         (tmp_path / "source.txt").write_text("new content")
         (tmp_path / "dest.txt").write_text("old content")
@@ -263,7 +263,7 @@ async def test_copy_multiple_pairs(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = CopyTool(ctx)
+        tool = CopyTool()
 
         (tmp_path / "file1.txt").write_text("content1")
         (tmp_path / "file2.txt").write_text("content2")

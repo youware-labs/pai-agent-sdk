@@ -30,7 +30,7 @@ async def test_download_tool_single_file(tmp_path: Path, httpx_mock) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = DownloadTool(ctx)
+        tool = DownloadTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
@@ -70,7 +70,7 @@ async def test_download_tool_multiple_files(tmp_path: Path, httpx_mock) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = DownloadTool(ctx)
+        tool = DownloadTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
@@ -99,7 +99,7 @@ async def test_download_tool_forbidden_url(tmp_path: Path) -> None:
                 tool_config=ToolConfig(skip_url_verification=False),
             )
         )
-        tool = DownloadTool(ctx)
+        tool = DownloadTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx

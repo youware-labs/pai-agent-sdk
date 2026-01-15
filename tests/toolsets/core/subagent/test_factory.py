@@ -99,7 +99,7 @@ def test_instruction_string(agent_context: AgentContext):
         instruction="Use this to search the web.",
     )
 
-    tool = SearchTool(agent_context)
+    tool = SearchTool()
     ctx = _create_mock_run_context(agent_context)
 
     assert tool.get_instruction(ctx) == "Use this to search the web."
@@ -121,7 +121,7 @@ def test_instruction_callable(agent_context: AgentContext):
         instruction=dynamic_instruction,
     )
 
-    tool = SearchTool(agent_context)
+    tool = SearchTool()
     ctx = _create_mock_run_context(agent_context)
 
     instruction = tool.get_instruction(ctx)
@@ -140,7 +140,7 @@ def test_instruction_none(agent_context: AgentContext):
         call_func=call_func,
     )
 
-    tool = SearchTool(agent_context)
+    tool = SearchTool()
     ctx = _create_mock_run_context(agent_context)
 
     assert tool.get_instruction(ctx) is None
@@ -158,7 +158,7 @@ async def test_with_toolset(agent_context: AgentContext):
         call_func=call_func,
     )
 
-    toolset = Toolset(agent_context, tools=[SearchTool])
+    toolset = Toolset(tools=[SearchTool])
     ctx = _create_mock_run_context(agent_context)
 
     tools = await toolset.get_tools(ctx)

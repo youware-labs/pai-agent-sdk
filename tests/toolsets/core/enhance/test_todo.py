@@ -51,7 +51,7 @@ def test_todo_read_tool_attributes(agent_context: AgentContext) -> None:
     assert TodoReadTool.name == "to_do_read"
     assert TodoReadTool.description == snapshot("Read the current session's to-do list.")
     # Test get_instruction with a mock context
-    tool = TodoReadTool(agent_context)
+    tool = TodoReadTool()
     mock_run_ctx = MagicMock(spec=RunContext)
     mock_run_ctx.deps = agent_context
     assert tool.get_instruction(mock_run_ctx) == snapshot(
@@ -80,14 +80,14 @@ Use user's language when writing task content.
 
 
 def test_todo_read_tool_initialization(agent_context: AgentContext) -> None:
-    """Should initialize with context."""
-    tool = TodoReadTool(agent_context)
-    assert tool.ctx is agent_context
+    """Should initialize without context."""
+    tool = TodoReadTool()
+    assert tool.name == "to_do_read"
 
 
 def test_todo_read_tool_is_available(agent_context: AgentContext, mock_run_ctx) -> None:
     """Should be available by default."""
-    tool = TodoReadTool(agent_context)
+    tool = TodoReadTool()
     assert tool.is_available(mock_run_ctx) is True
 
 
@@ -98,7 +98,7 @@ async def test_todo_read_tool_no_file(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = TodoReadTool(ctx)
+        tool = TodoReadTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
@@ -114,7 +114,7 @@ async def test_todo_read_tool_empty_file(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = TodoReadTool(ctx)
+        tool = TodoReadTool()
 
         # Create empty file in tmp_dir
         todo_file = env.tmp_dir / _get_todo_file_name(ctx.run_id)
@@ -134,7 +134,7 @@ async def test_todo_read_tool_valid_file(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = TodoReadTool(ctx)
+        tool = TodoReadTool()
 
         # Create valid file in tmp_dir
         todos = [
@@ -161,7 +161,7 @@ async def test_todo_read_tool_corrupted_file(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = TodoReadTool(ctx)
+        tool = TodoReadTool()
 
         # Create corrupted file in tmp_dir
         todo_file = env.tmp_dir / _get_todo_file_name(ctx.run_id)
@@ -180,22 +180,22 @@ def test_todo_write_tool_attributes(agent_context: AgentContext) -> None:
     assert TodoWriteTool.name == "to_do_write"
     assert TodoWriteTool.description == snapshot("Replace the session's to-do list with an updated list.")
     # Same instruction as TodoReadTool - both load from same file
-    read_tool = TodoReadTool(agent_context)
-    write_tool = TodoWriteTool(agent_context)
+    read_tool = TodoReadTool()
+    write_tool = TodoWriteTool()
     mock_run_ctx = MagicMock(spec=RunContext)
     mock_run_ctx.deps = agent_context
     assert write_tool.get_instruction(mock_run_ctx) == read_tool.get_instruction(mock_run_ctx)
 
 
 def test_todo_write_tool_initialization(agent_context: AgentContext) -> None:
-    """Should initialize with context."""
-    tool = TodoWriteTool(agent_context)
-    assert tool.ctx is agent_context
+    """Should initialize without context."""
+    tool = TodoWriteTool()
+    assert tool.name == "to_do_write"
 
 
 def test_todo_write_tool_is_available(agent_context: AgentContext, mock_run_ctx) -> None:
     """Should be available by default."""
-    tool = TodoWriteTool(agent_context)
+    tool = TodoWriteTool()
     assert tool.is_available(mock_run_ctx) is True
 
 
@@ -206,7 +206,7 @@ async def test_todo_write_tool_write_todos(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = TodoWriteTool(ctx)
+        tool = TodoWriteTool()
 
         todos = [
             TodoItem(id="TASK-1", content="Task 1", status="pending", priority="high"),
@@ -234,7 +234,7 @@ async def test_todo_write_tool_clear_todos(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = TodoWriteTool(ctx)
+        tool = TodoWriteTool()
 
         # First create a file in tmp_dir
         todo_file = env.tmp_dir / _get_todo_file_name(ctx.run_id)
@@ -255,7 +255,7 @@ async def test_todo_write_tool_overwrite_existing(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = TodoWriteTool(ctx)
+        tool = TodoWriteTool()
 
         # Create initial file in tmp_dir
         todo_file = env.tmp_dir / _get_todo_file_name(ctx.run_id)
@@ -285,8 +285,8 @@ async def test_todo_write_and_read_integration(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        write_tool = TodoWriteTool(ctx)
-        read_tool = TodoReadTool(ctx)
+        write_tool = TodoWriteTool()
+        read_tool = TodoReadTool()
 
         todos = [
             TodoItem(id="TASK-1", content="Integration test", status="pending", priority="high"),

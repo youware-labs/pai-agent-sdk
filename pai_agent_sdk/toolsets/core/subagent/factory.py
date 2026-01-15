@@ -83,9 +83,6 @@ def create_subagent_tool(
         name = ""  # Placeholder, will be overwritten
         description = ""  # Placeholder, will be overwritten
 
-        def __init__(self, ctx: AgentContext) -> None:
-            super().__init__(ctx)
-
         def is_available(self, ctx: RunContext[AgentContext]) -> bool:
             if availability_check is None:
                 return True

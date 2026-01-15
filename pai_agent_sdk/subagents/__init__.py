@@ -122,7 +122,7 @@ def load_builtin_subagent_tools(
         from pai_agent_sdk.subagents import load_builtin_subagent_tools
         from pai_agent_sdk.toolsets.core.base import Toolset
 
-        main_toolset = Toolset(ctx, tools=[ViewTool, EditTool, GrepTool])
+        main_toolset = Toolset(tools=[ViewTool, EditTool, GrepTool])
         subagent_tools = load_builtin_subagent_tools(
             parent_toolset=main_toolset,
             model="anthropic:claude-sonnet-4",

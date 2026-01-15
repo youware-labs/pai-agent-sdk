@@ -347,7 +347,6 @@ def create_agent(
     tools = tools or []
     logger.debug("Creating core toolset with %d tools", len(tools))
     core_toolset = Toolset(
-        ctx,
         tools=tools,
         pre_hooks=pre_hooks,
         post_hooks=post_hooks,
@@ -355,6 +354,7 @@ def create_agent(
         max_retries=toolset_max_retries,
         timeout=toolset_timeout,
         skip_unavailable=skip_unavailable_tools,
+        toolset_id="core",
     )
 
     # Add subagent tools if requested
@@ -645,7 +645,6 @@ async def stream_agent(  # noqa: C901
             await pre_node_hook(
                 NodeHookContext(agent_info=main_agent_info, node=node, run=run, output_queue=output_queue)
             )
-
         async with node.stream(run.ctx) as request_stream:
             async for event in request_stream:
                 # PRE EVENT HOOK

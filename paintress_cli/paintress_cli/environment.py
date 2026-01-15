@@ -4,7 +4,8 @@ TUIEnvironment extends LocalEnvironment with capabilities specifically
 designed for TUI operation:
 
 1. ProcessManager - Track and control background processes
-2. Browser Integration - Optional headless browser sandbox (future)
+2. Process Tools - Tool classes for process management via env.toolsets
+3. Browser Integration - Optional headless browser sandbox (future)
 
 Example:
     async with TUIEnvironment(default_path=Path.cwd()) as env:
@@ -15,21 +16,23 @@ Example:
         for info in env.process_manager.list_processes():
             print(f"{info.process_id}: {info.command}")
 
+        # Use env.toolsets with Agent
+        from pai_agent_sdk.toolsets.core.base import Toolset
+        agent = Agent(..., toolsets=[*core_toolsets, *env.toolsets])
+
     # All processes automatically killed on exit
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from agent_environment import ResourceFactory, ResourceRegistryState
 
 from pai_agent_sdk.environment.local import LocalEnvironment
+from pai_agent_sdk.toolsets.core.base import Toolset
 from paintress_cli.processes import PROCESS_MANAGER_KEY, ProcessManager
-
-if TYPE_CHECKING:
-    pass
+from paintress_cli.toolsets.process import process_tools
 
 
 class TUIEnvironment(LocalEnvironment):
@@ -37,6 +40,7 @@ class TUIEnvironment(LocalEnvironment):
 
     Inherits from LocalEnvironment and adds:
     - ProcessManager resource for background process management
+    - Process tool classes available via env.toolsets
     - Automatic cleanup of all processes on exit
 
     The ProcessManager is registered as a resource and can be accessed via:
@@ -78,12 +82,20 @@ class TUIEnvironment(LocalEnvironment):
         self._process_manager: ProcessManager | None = None
 
     async def _setup(self) -> None:
-        """Initialize file operator, shell, and register ProcessManager."""
+        """Initialize file operator, shell, register ProcessManager, and setup toolsets."""
         await super()._setup()
 
         # Create and register ProcessManager as a resource
         self._process_manager = ProcessManager()
         self.resources.set(PROCESS_MANAGER_KEY, self._process_manager)
+
+        # Register tool classes for TUI environment
+        self._toolsets.append(
+            Toolset(
+                tools=process_tools,
+                toolset_id="process",
+            )
+        )
 
     async def _teardown(self) -> None:
         """Clean up resources.
@@ -92,6 +104,7 @@ class TUIEnvironment(LocalEnvironment):
         resources.close_all() in the parent class __aexit__.
         """
         self._process_manager = None
+        self._toolsets = []
         await super()._teardown()
 
     @property

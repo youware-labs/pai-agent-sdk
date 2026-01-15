@@ -14,7 +14,7 @@ from pai_agent_sdk.toolsets.core.shell.shell import OUTPUT_TRUNCATE_LIMIT
 
 async def test_shell_tool_basic_attributes(agent_context: AgentContext) -> None:
     """Should have correct name and description."""
-    tool = ShellTool(agent_context)
+    tool = ShellTool()
     assert tool.name == "shell"
     assert "Execute" in tool.description
 
@@ -24,7 +24,7 @@ async def test_shell_tool_empty_command(tmp_path: Path) -> None:
     async with AsyncExitStack() as stack:
         env = await stack.enter_async_context(LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path))
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = ShellTool(ctx)
+        tool = ShellTool()
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
 
@@ -38,7 +38,7 @@ async def test_shell_tool_execute_success(tmp_path: Path) -> None:
     async with AsyncExitStack() as stack:
         env = await stack.enter_async_context(LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path))
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = ShellTool(ctx)
+        tool = ShellTool()
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
 
@@ -52,7 +52,7 @@ async def test_shell_tool_execute_with_timeout(tmp_path: Path) -> None:
     async with AsyncExitStack() as stack:
         env = await stack.enter_async_context(LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path))
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = ShellTool(ctx)
+        tool = ShellTool()
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
 
@@ -69,7 +69,7 @@ async def test_shell_tool_execute_with_cwd(tmp_path: Path) -> None:
     async with AsyncExitStack() as stack:
         env = await stack.enter_async_context(LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path))
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = ShellTool(ctx)
+        tool = ShellTool()
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
 
@@ -83,7 +83,7 @@ async def test_shell_tool_execute_with_env(tmp_path: Path) -> None:
     async with AsyncExitStack() as stack:
         env = await stack.enter_async_context(LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path))
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = ShellTool(ctx)
+        tool = ShellTool()
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
 
@@ -97,7 +97,7 @@ async def test_shell_tool_execute_failure(tmp_path: Path) -> None:
     async with AsyncExitStack() as stack:
         env = await stack.enter_async_context(LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path))
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = ShellTool(ctx)
+        tool = ShellTool()
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
 
@@ -110,7 +110,7 @@ async def test_shell_tool_captures_stderr(tmp_path: Path) -> None:
     async with AsyncExitStack() as stack:
         env = await stack.enter_async_context(LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path))
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = ShellTool(ctx)
+        tool = ShellTool()
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
 
@@ -126,7 +126,7 @@ async def test_shell_tool_stdout_truncation(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = ShellTool(ctx)
+        tool = ShellTool()
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
 
@@ -143,7 +143,7 @@ async def test_shell_tool_stdout_truncation(tmp_path: Path) -> None:
 
 async def test_shell_tool_get_instruction(agent_context: AgentContext) -> None:
     """Should load instruction from prompts/shell.md."""
-    tool = ShellTool(agent_context)
+    tool = ShellTool()
     mock_run_ctx = MagicMock(spec=RunContext)
     mock_run_ctx.deps = agent_context
     instruction = tool.get_instruction(mock_run_ctx)

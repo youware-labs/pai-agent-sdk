@@ -12,7 +12,7 @@ from paintress_cli.events import (
     SteeringInjectedEvent,
 )
 from paintress_cli.hooks import emit_phase_event
-from paintress_cli.session import TUIContext, render_steering_messages
+from paintress_cli.session import TUIContext, create_steering_filter, render_steering_messages
 from paintress_cli.steering import SteeringMessage
 from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart, UserPromptPart
 
@@ -158,8 +158,8 @@ class TestTUIContext:
 
         # Should have parent processors + steering
         assert len(processors) > 0
-        # Last processor should be steering injection
-        assert processors[-1] == ctx._inject_steering
+        # Last processor should be a callable (the steering filter)
+        assert callable(processors[-1])
 
     @pytest.mark.asyncio
     async def test_inject_steering_into_request(self):
@@ -180,8 +180,9 @@ class TestTUIContext:
 
         mock_ctx = MockRunContext()
 
-        # Inject steering
-        result = await ctx._inject_steering(mock_ctx, history)  # type: ignore[arg-type]
+        # Inject steering using factory-created filter
+        steering_filter = create_steering_filter(ctx)
+        result = await steering_filter(mock_ctx, history)  # type: ignore[arg-type]
 
         # Verify injection
         assert len(result) == 1
@@ -212,7 +213,8 @@ class TestTUIContext:
         class MockRunContext:
             deps = ctx
 
-        result = await ctx._inject_steering(MockRunContext(), history)  # type: ignore[arg-type]
+        steering_filter = create_steering_filter(ctx)
+        result = await steering_filter(MockRunContext(), history)  # type: ignore[arg-type]
 
         # Should be unchanged
         assert isinstance(result[0], ModelRequest)
@@ -234,7 +236,8 @@ class TestTUIContext:
         class MockRunContext:
             deps = ctx
 
-        result = await ctx._inject_steering(MockRunContext(), history)  # type: ignore[arg-type]
+        steering_filter = create_steering_filter(ctx)
+        result = await steering_filter(MockRunContext(), history)  # type: ignore[arg-type]
 
         # Should be unchanged
         assert len(result) == 2

@@ -16,7 +16,7 @@ def test_list_tool_attributes(agent_context: AgentContext) -> None:
     """Should have correct name and description."""
     assert ListTool.name == "ls"
     assert "List directory" in ListTool.description
-    tool = ListTool(agent_context)
+    tool = ListTool()
     mock_run_ctx = MagicMock(spec=RunContext)
     mock_run_ctx.deps = agent_context
     instruction = tool.get_instruction(mock_run_ctx)
@@ -34,7 +34,7 @@ async def test_ls_list_directory(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[test_dir], default_path=test_dir, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = ListTool(ctx)
+        tool = ListTool()
 
         # Create files and directories in the clean test directory
         (test_dir / "file1.txt").write_text("content")
@@ -60,7 +60,7 @@ async def test_ls_file_info(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = ListTool(ctx)
+        tool = ListTool()
 
         (tmp_path / "test.txt").write_text("hello")
 
@@ -82,7 +82,7 @@ async def test_ls_directory_type(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = ListTool(ctx)
+        tool = ListTool()
 
         (tmp_path / "subdir").mkdir()
 
@@ -101,7 +101,7 @@ async def test_ls_directory_not_found(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = ListTool(ctx)
+        tool = ListTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
@@ -118,7 +118,7 @@ async def test_ls_path_is_file(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = ListTool(ctx)
+        tool = ListTool()
 
         (tmp_path / "test.txt").write_text("content")
 
@@ -137,7 +137,7 @@ async def test_ls_with_ignore_pattern(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = ListTool(ctx)
+        tool = ListTool()
 
         (tmp_path / "keep.txt").write_text("content")
         (tmp_path / "ignore.pyc").write_text("content")
@@ -160,7 +160,7 @@ async def test_ls_empty_directory(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = ListTool(ctx)
+        tool = ListTool()
 
         (tmp_path / "empty").mkdir()
 

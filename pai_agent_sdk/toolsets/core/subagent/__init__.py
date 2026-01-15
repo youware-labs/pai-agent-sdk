@@ -28,7 +28,7 @@ Example::
     )
 
     # Use with Toolset
-    toolset = Toolset(ctx, tools=[SearchTool])
+    toolset = Toolset(tools=[SearchTool])
 
 For streaming, use the parent context's stream queue::
 

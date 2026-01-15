@@ -7,7 +7,7 @@ Example:
     from pai_agent_sdk.toolsets.core.base import Toolset
     from paintress_cli.toolsets.process import process_tools
 
-    toolset = Toolset(ctx, tools=process_tools)
+    toolset = Toolset(tools=process_tools)
 """
 
 from __future__ import annotations

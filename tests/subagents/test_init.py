@@ -139,7 +139,6 @@ def test_load_builtin_subagent_tools(agent_context) -> None:
 
     # Create parent toolset with all tools needed by presets
     parent_toolset = Toolset(
-        agent_context,
         tools=[GrepTool, ViewTool, LsTool, SearchTavilyTool, SearchGoogleTool, VisitWebpageTool],
     )
 
@@ -210,7 +209,6 @@ def test_load_builtin_subagent_tools_with_preset_model_settings(agent_context) -
             return url
 
     parent_toolset = Toolset(
-        agent_context,
         tools=[GrepTool, ViewTool, LsTool, SearchTool, VisitTool],
     )
 

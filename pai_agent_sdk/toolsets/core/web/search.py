@@ -76,12 +76,19 @@ class SearchTool(BaseTool):
     ) -> list[dict[str, Any]] | dict[str, Any]:
         """Execute web search."""
         cfg = ctx.deps.tool_config
+        has_tavily = bool(cfg.tavily_api_key) and _is_tavily_available()
 
         # Prefer Google if available
         if cfg.google_search_api_key and cfg.google_search_cx:
-            return await self._search_google(query, num, cfg.google_search_api_key, cfg.google_search_cx)
-        else:
+            result = await self._search_google(query, num, cfg.google_search_api_key, cfg.google_search_cx)
+            # Check if Google search failed and fallback to Tavily if available
+            if isinstance(result, dict) and result.get("success") is False and has_tavily:
+                return await self._search_tavily(query, search_depth, cfg.tavily_api_key)  # type: ignore[arg-type]
+            return result
+        elif has_tavily:
             return await self._search_tavily(query, search_depth, cfg.tavily_api_key)  # type: ignore[arg-type]
+        else:
+            return {"success": False, "error": "No search API available"}
 
     async def _search_google(
         self, query: str, num: int, api_key: str, cx: str

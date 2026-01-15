@@ -477,7 +477,11 @@ class ToolMessage(BaseModel):
                                     "\n".join(lines[:20]) + "\n...(truncated)" if len(lines) > 20 else new_string
                                 )
                                 syntax_content = Syntax(
-                                    content_preview, lexer="text", theme=code_theme, line_numbers=False
+                                    content_preview,
+                                    lexer="text",
+                                    theme=code_theme,
+                                    line_numbers=False,
+                                    background_color="default",
                                 )
                                 content_parts.append(syntax_content)
                             else:
@@ -486,7 +490,13 @@ class ToolMessage(BaseModel):
                             # Content modification - show diff
                             diff_content = self._generate_clean_diff_content(old_string, new_string)
                             if diff_content.strip():
-                                syntax_diff = Syntax(diff_content, lexer="diff", theme=code_theme, line_numbers=False)
+                                syntax_diff = Syntax(
+                                    diff_content,
+                                    lexer="diff",
+                                    theme=code_theme,
+                                    line_numbers=False,
+                                    background_color="default",
+                                )
                                 content_parts.append(syntax_diff)
                             else:
                                 content_parts.append(Text("No changes detected"))
@@ -542,7 +552,9 @@ class ToolMessage(BaseModel):
                 if new_string:
                     lines = new_string.split("\n")
                     content_preview = "\n".join(lines[:15]) + "\n...(truncated)" if len(lines) > 15 else new_string
-                    syntax_content = Syntax(content_preview, lexer="text", theme=code_theme, line_numbers=False)
+                    syntax_content = Syntax(
+                        content_preview, lexer="text", theme=code_theme, line_numbers=False, background_color="default"
+                    )
                     content_parts.append(syntax_content)
                 else:
                     content_parts.append(Text("Empty file", style="dim"))
@@ -550,7 +562,9 @@ class ToolMessage(BaseModel):
                 # Generate diff content for modification
                 diff_content = self._generate_clean_diff_content(old_string, new_string)
                 if diff_content.strip():
-                    syntax_diff = Syntax(diff_content, lexer="diff", theme=code_theme, line_numbers=False)
+                    syntax_diff = Syntax(
+                        diff_content, lexer="diff", theme=code_theme, line_numbers=False, background_color="default"
+                    )
                     content_parts.append(syntax_diff)
                 else:
                     content_parts.append(Text("No changes detected", style="dim"))

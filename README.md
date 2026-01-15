@@ -31,7 +31,18 @@ pip install pai-agent-sdk[web]       # Web tools (tavily, firecrawl, markitdown)
 pip install pai-agent-sdk[document]  # Document processing (pymupdf, markitdown)
 ```
 
+## Project Structure
+
+This repository contains:
+
+- **pai_agent_sdk/** - Core SDK for building AI agents with environment abstraction, toolsets, and session management
+- **paintress_cli/** - Reference CLI implementation with TUI (Terminal User Interface) for interactive agent sessions
+- **examples/** - Production-ready code examples demonstrating SDK features
+- **docs/** - Comprehensive documentation for SDK architecture and APIs
+
 ## Quick Start
+
+### Using the SDK
 
 ```python
 from pai_agent_sdk.agents import create_agent, stream_agent
@@ -44,6 +55,27 @@ async with stream_agent(runtime, "Hello") as streamer:
     async for event in streamer:
         print(event)
 ```
+
+### Using Paintress CLI
+
+For a ready-to-use terminal interface, try [paintress-cli](paintress_cli/) - a TUI reference implementation built on top of pai-agent-sdk:
+
+```bash
+# Run directly with uvx (no installation needed)
+uvx paintress-cli
+
+# Or install globally
+uv tool install paintress-cli
+pip install paintress-cli
+```
+
+Features:
+
+- Rich terminal UI with syntax highlighting and streaming output
+- Built-in tool approval workflows (human-in-the-loop)
+- Session management with conversation history
+- Browser automation support via Docker sandbox
+- MCP (Model Context Protocol) server integration
 
 ## Examples
 

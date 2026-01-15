@@ -143,3 +143,6 @@ cython_debug/
 TO-DO.json
 dev/
 pai_agent_sdk/sandbox/shell/templates/public
+
+# Sync automaticlly
+paintress_cli/paintress_cli/skills/building-agents

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Sync docs and .env.example to skills folder
+# Sync docs and .env.example to paintress_cli/paintress_cli/skills/building-agents
 
 set -e
 
@@ -8,12 +8,14 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 cd "$PROJECT_ROOT"
 
-rm -rf skills
-mkdir -p skills/docs skills/examples
-cp -r docs/* skills/docs/
-cp -r examples/* skills/examples/
-cp examples/.env.example skills/examples/
-cp README.md skills/
-cp SKILL.md skills/
+SKILL_DIR="paintress_cli/paintress_cli/skills/building-agents"
 
-echo "Synced docs, examples, SKILL.md and .env.example to skills folder"
+rm -rf "$SKILL_DIR"
+mkdir -p "$SKILL_DIR/docs" "$SKILL_DIR/examples"
+cp -r docs/* "$SKILL_DIR/docs/"
+cp -r examples/* "$SKILL_DIR/examples/"
+cp examples/.env.example "$SKILL_DIR/examples/"
+cp README.md "$SKILL_DIR/"
+cp SKILL.md "$SKILL_DIR/"
+
+echo "Synced docs, examples, SKILL.md and .env.example to $SKILL_DIR"

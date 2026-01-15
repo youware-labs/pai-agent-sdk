@@ -21,6 +21,9 @@ jobs:
       - name: Set up the environment
         uses: ./.github/actions/setup-python-env
 
+      - name: Sync skills folder
+        run: bash scripts/sync-skills.sh
+
       - name: Build all packages
         run: uv build --all-packages
 
@@ -45,12 +48,9 @@ jobs:
             tag: ${{ github.ref }}
             overwrite: true
 
-      - name: Sync skills folder
-        run: bash scripts/sync-skills.sh
-
       - name: Create SKILL.zip
         run: |
-          mv skills pai-agent-sdk
+          cp -r paintress_cli/paintress_cli/skills/building-agents pai-agent-sdk
           zip -r SKILL.zip pai-agent-sdk
 
       - name: Upload SKILL.zip to release

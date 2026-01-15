@@ -215,14 +215,16 @@ def create_tui_runtime(
             logger.info("Added browser toolset (cdp_url=%s)", browser_manager.cdp_url)
 
     # Environment configuration
+    # Include global config dir in allowed_paths so agent can modify configs directly
+    global_config_dir = ConfigManager.DEFAULT_CONFIG_DIR
     env_kwargs: dict[str, Any] = {}
     if working_dir:
         env_kwargs["default_path"] = working_dir
-        env_kwargs["allowed_paths"] = [working_dir]
+        env_kwargs["allowed_paths"] = [working_dir, global_config_dir]
     else:
         cwd = Path.cwd()
         env_kwargs["default_path"] = cwd
-        env_kwargs["allowed_paths"] = [cwd]
+        env_kwargs["allowed_paths"] = [cwd, global_config_dir]
 
     # Model configuration - resolve from preset name or dict
     model_cfg = _resolve_model_cfg(config.general.model_cfg)

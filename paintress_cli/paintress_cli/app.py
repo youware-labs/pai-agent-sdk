@@ -450,7 +450,7 @@ class TUIApp:
         rendered = self._renderer.render(user_text, width=width).rstrip("\n")
         self._append_output(rendered)
 
-    def _append_error_output(self, e: Exception) -> None:
+    def _append_error_output(self, e: BaseException) -> None:
         """Render error message with proper word wrapping to fit terminal width."""
         width = self._get_terminal_width()
         from rich.text import Text as RichText

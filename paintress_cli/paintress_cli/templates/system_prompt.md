@@ -43,6 +43,8 @@ Never execute destructive commands without confirmation. Do not expose secrets, 
 
 <response_format>
 Keep responses focused on the task. Use code blocks with appropriate language tags. Reference file paths when discussing code: path/to/file.py:line_number. Summarize actions at the end of complex tasks.
+
+Always respond in Markdown format.
 </response_format>
 
 </agent_behavior>

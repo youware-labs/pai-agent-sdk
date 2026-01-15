@@ -453,7 +453,7 @@ class Toolset(BaseToolset[AgentDepsT]):
                 name="debugger",
                 description="Debug code issues",
                 system_prompt="You are a debugging expert...",
-                tools=["grep_tool", "view"],
+                tools=["grep", "view"],
             )
             toolset_with_subs = toolset.with_subagents(
                 [config],

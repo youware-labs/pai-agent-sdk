@@ -9,7 +9,7 @@ from pai_agent_sdk.toolsets.core.base import BaseTool, Toolset
 class GrepTool(BaseTool):
     """Test grep tool."""
 
-    name = "grep_tool"
+    name = "grep"
     description = "Search file contents"
 
     async def call(self, ctx, pattern: str) -> str:
@@ -64,7 +64,7 @@ class TestSubagentToolAvailability:
             name="test_subagent",
             description="Test subagent",
             system_prompt="You are a test agent",
-            tools=["grep_tool", "view"],
+            tools=["grep", "view"],
         )
 
         tool_cls = create_subagent_tool_from_config(config, parent_toolset, model="test")
@@ -80,7 +80,7 @@ class TestSubagentToolAvailability:
             name="test_subagent",
             description="Test subagent",
             system_prompt="You are a test agent",
-            tools=["grep_tool", "view"],  # requires view which is missing
+            tools=["grep", "view"],  # requires view which is missing
         )
 
         tool_cls = create_subagent_tool_from_config(config, parent_toolset, model="test")
@@ -97,7 +97,7 @@ class TestSubagentToolAvailability:
             name="test_subagent",
             description="Test subagent",
             system_prompt="You are a test agent",
-            tools=["grep_tool", "unavailable_tool"],
+            tools=["grep", "unavailable_tool"],
         )
 
         tool_cls = create_subagent_tool_from_config(config, parent_toolset, model="test")
@@ -132,7 +132,7 @@ class TestSubagentToolAvailability:
             name="test_subagent",
             description="Test subagent",
             system_prompt="You are a test agent",
-            tools=["grep_tool", "dynamic_tool"],
+            tools=["grep", "dynamic_tool"],
         )
 
         tool_cls = create_subagent_tool_from_config(config, parent_toolset, model="test")
@@ -159,7 +159,7 @@ class TestToolsetIsToolAvailable:
         """Should return True for existing and available tool."""
         toolset = Toolset(agent_context, tools=[GrepTool, ViewTool])
 
-        assert toolset.is_tool_available("grep_tool") is True
+        assert toolset.is_tool_available("grep") is True
         assert toolset.is_tool_available("view") is True
 
     def test_is_tool_available_for_missing_tool(self, agent_context) -> None:
@@ -174,7 +174,7 @@ class TestToolsetIsToolAvailable:
         # UnavailableTool is registered but is_available returns False
         toolset = Toolset(agent_context, tools=[GrepTool, UnavailableTool])
 
-        assert toolset.is_tool_available("grep_tool", mock_run_ctx) is True
+        assert toolset.is_tool_available("grep", mock_run_ctx) is True
         assert toolset.is_tool_available("unavailable_tool", mock_run_ctx) is False
 
     def test_is_tool_available_dynamic(self, agent_context, mock_run_ctx) -> None:
@@ -203,7 +203,7 @@ class TestOptionalTools:
             name="test_subagent",
             description="Test subagent",
             system_prompt="You are a test agent",
-            tools=["grep_tool"],  # required
+            tools=["grep"],  # required
             optional_tools=["nonexistent_tool"],  # optional, missing
         )
 
@@ -222,7 +222,7 @@ class TestOptionalTools:
             description="Test subagent",
             system_prompt="You are a test agent",
             tools=["nonexistent_tool"],  # required, missing
-            optional_tools=["grep_tool"],  # optional, present
+            optional_tools=["grep"],  # optional, present
         )
 
         tool_cls = create_subagent_tool_from_config(config, parent_toolset, model="test")
@@ -239,7 +239,7 @@ class TestOptionalTools:
             name="test_subagent",
             description="Test subagent",
             system_prompt="You are a test agent",
-            tools=["grep_tool"],  # required
+            tools=["grep"],  # required
             optional_tools=["view"],  # optional
         )
 
@@ -257,7 +257,7 @@ class TestOptionalTools:
             description="Test subagent",
             system_prompt="You are a test agent",
             tools=None,  # no required tools
-            optional_tools=["grep_tool", "nonexistent"],  # optional only
+            optional_tools=["grep", "nonexistent"],  # optional only
         )
 
         tool_cls = create_subagent_tool_from_config(config, parent_toolset, model="test")

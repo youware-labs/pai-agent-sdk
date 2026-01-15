@@ -70,7 +70,7 @@ def parse_subagent_markdown(content: str) -> SubagentConfig:
         name: debugger
         description: Debug code issues
         tools:
-          - grep_tool
+          - grep
           - view
         model_settings: anthropic_high
         ---

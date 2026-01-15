@@ -60,7 +60,7 @@ description: Debugging specialist for errors and test failures
 instruction: |
   Use the debugger subagent when encountering error messages or stack traces.
 tools:
-  - grep_tool
+  - grep
   - view
 optional_tools:
   - shell
@@ -97,12 +97,12 @@ You are an expert debugger specializing in systematic root cause analysis.
 
 Located in `pai_agent_sdk/subagents/presets/`:
 
-| Preset          | Purpose                                         | Required Tools                         |
-| --------------- | ----------------------------------------------- | -------------------------------------- |
-| `debugger`      | Systematic debugging and root cause analysis    | `glob_tool`, `grep_tool`, `view`, `ls` |
-| `explorer`      | Codebase navigation and structure understanding | `glob_tool`, `grep_tool`, `view`, `ls` |
-| `code-reviewer` | Code quality, security, and maintainability     | `glob_tool`, `grep_tool`, `view`, `ls` |
-| `searcher`      | Web research for documentation and solutions    | `search`                               |
+| Preset          | Purpose                                         | Required Tools               |
+| --------------- | ----------------------------------------------- | ---------------------------- |
+| `debugger`      | Systematic debugging and root cause analysis    | `glob`, `grep`, `view`, `ls` |
+| `explorer`      | Codebase navigation and structure understanding | `glob`, `grep`, `view`, `ls` |
+| `code-reviewer` | Code quality, security, and maintainability     | `glob`, `grep`, `view`, `ls` |
+| `searcher`      | Web research for documentation and solutions    | `search`                     |
 
 ```python
 from pai_agent_sdk.subagents import get_builtin_subagent_configs, load_builtin_subagent_tools

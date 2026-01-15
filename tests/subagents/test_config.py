@@ -42,7 +42,7 @@ name: debugger
 description: Debug code issues
 instruction: Use this tool for debugging
 tools:
-  - grep_tool
+  - grep
   - view
   - edit
 model: anthropic:claude-sonnet-4
@@ -58,7 +58,7 @@ Help users debug their code.
     assert config.name == "debugger"
     assert config.description == "Debug code issues"
     assert config.instruction == "Use this tool for debugging"
-    assert config.tools == ["grep_tool", "view", "edit"]
+    assert config.tools == ["grep", "view", "edit"]
     assert config.model == "anthropic:claude-sonnet-4"
     assert config.model_settings == "anthropic_high"
     assert "debugging expert" in config.system_prompt

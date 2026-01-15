@@ -11,7 +11,7 @@ YAML Frontmatter Schema::
     description: Debug code issues
     instruction: Use this tool when debugging
     tools:  # Optional - list of tool names from parent toolset
-      - grep_tool
+      - grep
       - view
       - edit
     model: inherit  # Optional - 'inherit' or model name

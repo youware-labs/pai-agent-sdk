@@ -19,8 +19,8 @@ instruction: |
   - Specific code locations and recommended fixes
   - Security and performance considerations
 tools:
-  - glob_tool
-  - grep_tool
+  - glob
+  - grep
   - view
   - ls
 optional_tools:

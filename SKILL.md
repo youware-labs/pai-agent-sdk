@@ -210,7 +210,7 @@ Import from `pai_agent_sdk.toolsets.core.*`:
 
 | Module       | Tools                                                                 |
 | ------------ | --------------------------------------------------------------------- |
-| `filesystem` | view, edit, multi_edit, replace, ls, glob_tool, grep_tool             |
+| `filesystem` | view, edit, multi_edit, replace, ls, glob, grep                       |
 | `shell`      | shell (command execution)                                             |
 | `web`        | search_with_tavily, search_with_google, visit_webpage, save_web_files |
 | `document`   | pdf_convert, office_to_markdown                                       |
@@ -223,12 +223,12 @@ Import from `pai_agent_sdk.toolsets.core.*`:
 
 Available via `include_builtin_subagents=True`:
 
-| Name          | Purpose               | Required Tools                 |
-| ------------- | --------------------- | ------------------------------ |
-| debugger      | Root cause analysis   | glob_tool, grep_tool, view, ls |
-| explorer      | Codebase navigation   | glob_tool, grep_tool, view, ls |
-| code-reviewer | Code quality analysis | glob_tool, grep_tool, view, ls |
-| searcher      | Web research          | search                         |
+| Name          | Purpose               | Required Tools       |
+| ------------- | --------------------- | -------------------- |
+| debugger      | Root cause analysis   | glob, grep, view, ls |
+| explorer      | Codebase navigation   | glob, grep, view, ls |
+| code-reviewer | Code quality analysis | glob, grep, view, ls |
+| searcher      | Web research          | search               |
 
 ## Troubleshooting
 

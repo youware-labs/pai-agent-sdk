@@ -11,9 +11,9 @@ from pai_agent_sdk.environment.local import LocalEnvironment
 from pai_agent_sdk.toolsets.core.filesystem.glob import GlobTool
 
 
-def test_glob_tool_attributes(agent_context: AgentContext) -> None:
+def test_glob_attributes(agent_context: AgentContext) -> None:
     """Should have correct name and description."""
-    assert GlobTool.name == "glob_tool"
+    assert GlobTool.name == "glob"
     assert "glob pattern" in GlobTool.description
     tool = GlobTool(agent_context)
     mock_run_ctx = MagicMock(spec=RunContext)

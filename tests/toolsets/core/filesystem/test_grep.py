@@ -11,9 +11,9 @@ from pai_agent_sdk.environment.local import LocalEnvironment
 from pai_agent_sdk.toolsets.core.filesystem.grep import GrepTool
 
 
-def test_grep_tool_attributes(agent_context: AgentContext) -> None:
+def test_grep_attributes(agent_context: AgentContext) -> None:
     """Should have correct name and description."""
-    assert GrepTool.name == "grep_tool"
+    assert GrepTool.name == "grep"
     assert "regex" in GrepTool.description
     tool = GrepTool(agent_context)
     mock_run_ctx = MagicMock(spec=RunContext)

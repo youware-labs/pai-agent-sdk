@@ -83,16 +83,13 @@ disabled = []
 [commands.commit]
 description = "Review and commit changes"
 mode = "act"
-prompt = """
-Please review current changes and commit them with:
-`Co-Authored-By: Paintress <paintress@arcoer.com>`
+prompt = """Please check current git changes and commit them with: `Co-Authored-By: Paintress <paintress@arcoer.com>`
 """
 
 [commands.review]
 description = "Comprehensive code review"
 mode = "act"
-prompt = """
-Please review the current changes and pull request.
+prompt = """Please review the current changes and pull request.
 First, use bash commands to determine the review scope:
 
 1. Check current branch: `git branch --show-current`

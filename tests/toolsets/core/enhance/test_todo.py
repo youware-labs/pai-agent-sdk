@@ -128,7 +128,7 @@ async def test_todo_read_tool_empty_file(tmp_path: Path) -> None:
 
 
 async def test_todo_read_tool_valid_file(tmp_path: Path) -> None:
-    """Should return list of TodoItems when file is valid."""
+    """Should return JSON string of TodoItems when file is valid."""
     async with AsyncExitStack() as stack:
         env = await stack.enter_async_context(
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
@@ -148,10 +148,11 @@ async def test_todo_read_tool_valid_file(tmp_path: Path) -> None:
         mock_run_ctx.deps = ctx
 
         result = await tool.call(mock_run_ctx)
-        assert isinstance(result, list)
-        assert len(result) == 2
-        assert result[0].id == "TASK-1"
-        assert result[1].status == "completed"
+        assert isinstance(result, str)
+        parsed = json.loads(result)
+        assert len(parsed) == 2
+        assert parsed[0]["id"] == "TASK-1"
+        assert parsed[1]["status"] == "completed"
 
 
 async def test_todo_read_tool_corrupted_file(tmp_path: Path) -> None:
@@ -200,7 +201,7 @@ def test_todo_write_tool_is_available(agent_context: AgentContext, mock_run_ctx)
 
 
 async def test_todo_write_tool_write_todos(tmp_path: Path) -> None:
-    """Should write todos to file."""
+    """Should write todos to file and return JSON string."""
     async with AsyncExitStack() as stack:
         env = await stack.enter_async_context(
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
@@ -217,8 +218,9 @@ async def test_todo_write_tool_write_todos(tmp_path: Path) -> None:
         mock_run_ctx.deps = ctx
 
         result = await tool.call(mock_run_ctx, to_dos=todos)
-        assert isinstance(result, list)
-        assert len(result) == 2
+        assert isinstance(result, str)
+        parsed = json.loads(result)
+        assert len(parsed) == 2
 
         # Verify file was created in tmp_dir
         todo_file = env.tmp_dir / _get_todo_file_name(ctx.run_id)
@@ -249,7 +251,7 @@ async def test_todo_write_tool_clear_todos(tmp_path: Path) -> None:
 
 
 async def test_todo_write_tool_overwrite_existing(tmp_path: Path) -> None:
-    """Should overwrite existing file."""
+    """Should overwrite existing file and return JSON string."""
     async with AsyncExitStack() as stack:
         env = await stack.enter_async_context(
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
@@ -269,8 +271,9 @@ async def test_todo_write_tool_overwrite_existing(tmp_path: Path) -> None:
         mock_run_ctx.deps = ctx
 
         result = await tool.call(mock_run_ctx, to_dos=new_todos)
-        assert isinstance(result, list)
-        assert result[0].id == "NEW"
+        assert isinstance(result, str)
+        parsed = json.loads(result)
+        assert parsed[0]["id"] == "NEW"
 
         # Verify file was overwritten
         content = json.loads(todo_file.read_text())
@@ -300,10 +303,11 @@ async def test_todo_write_and_read_integration(tmp_path: Path) -> None:
 
         # Read
         result = await read_tool.call(mock_run_ctx)
-        assert isinstance(result, list)
-        assert len(result) == 1
-        assert result[0].id == "TASK-1"
-        assert result[0].content == "Integration test"
+        assert isinstance(result, str)
+        parsed = json.loads(result)
+        assert len(parsed) == 1
+        assert parsed[0]["id"] == "TASK-1"
+        assert parsed[0]["content"] == "Integration test"
 
 
 def test_enhance_module_exports() -> None:

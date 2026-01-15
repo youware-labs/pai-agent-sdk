@@ -532,8 +532,16 @@ class AgentStreamer(Generic[AgentDepsT, OutputT]):
             AgentInterrupted: If interrupt() was called.
             BaseException: Any other exception that occurred during streaming.
         """
+        # Check stored exception first
         if self.exception is not None:
             raise self.exception
+
+        # Also check tasks for exceptions (in case called before context manager exits)
+        for task in self._tasks:
+            if task.done() and not task.cancelled():
+                exc = task.exception()
+                if exc is not None:
+                    raise exc
 
     def __aiter__(self) -> AsyncIterator[StreamEvent]:
         return self._event_generator
@@ -561,6 +569,8 @@ async def stream_agent(  # noqa: C901
     pre_event_hook: EventHook[AgentDepsT, OutputT] | None = None,
     post_event_hook: EventHook[AgentDepsT, OutputT] | None = None,
     metadata: RunContextMetadata | None = None,
+    # Error handling
+    raise_on_error: bool = True,
 ) -> AsyncIterator[AgentStreamer[AgentDepsT, OutputT]]:
     """Stream agent execution with subagent event aggregation.
 
@@ -592,6 +602,9 @@ async def stream_agent(  # noqa: C901
         pre_event_hook: Called before each event is yielded.
         post_event_hook: Called after each event is yielded.
         metadata: Optional RunContextMetadata for context management.
+        raise_on_error: If True (default), exceptions during streaming are re-raised
+            immediately. If False, exceptions are captured in streamer.exception
+            and can be checked after iteration via raise_if_exception().
 
     Yields:
         AgentStreamer that can be iterated for StreamEvent objects.
@@ -738,10 +751,24 @@ async def stream_agent(  # noqa: C901
             poll_done.set()
 
     async def generate_events() -> AsyncIterator[StreamEvent]:
-        """Consume from output_queue and yield events."""
+        """Consume from output_queue and yield events.
+
+        Also monitors main_task for exceptions and propagates them immediately.
+        """
         while True:
+            # Check if main_task failed - propagate exception immediately
+            if main_task.done() and not main_task.cancelled():
+                exc = main_task.exception()
+                if exc is not None:
+                    raise exc
+
             # Check exit condition: poll done and output queue empty
             if poll_done.is_set() and output_queue.empty():
+                # Final check for main_task exception before returning
+                if main_task.done() and not main_task.cancelled():
+                    exc = main_task.exception()
+                    if exc is not None:
+                        raise exc
                 return
 
             try:
@@ -764,6 +791,8 @@ async def stream_agent(  # noqa: C901
     except Exception as e:
         logger.exception("Uncaught exception in stream_agent context")
         streamer.exception = e
+        if raise_on_error:
+            raise  # Re-raise so caller can handle it
     else:
         if (run := streamer.run) and (result := run.result) and isinstance(result.output, DeferredToolRequests):
             result.output = ctx.tool_id_wrapper.wrap_deferred_tool_requests(result.output)

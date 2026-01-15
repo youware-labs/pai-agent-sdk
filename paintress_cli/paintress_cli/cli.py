@@ -398,7 +398,29 @@ def cli(verbose: bool) -> None:
         sys.exit(130)
     except Exception as e:
         logger.exception("Fatal error")
-        click.echo(click.style(f"Error: {e}", fg="red"))
+        click.echo()
+        click.echo(click.style("=" * 60, fg="red"))
+        click.echo(click.style("FATAL ERROR", fg="red", bold=True))
+        click.echo(click.style("=" * 60, fg="red"))
+        click.echo()
+        click.echo(f"Error type: {type(e).__name__}")
+        click.echo(f"Message: {e}")
+        click.echo()
+        # Show traceback in verbose mode or for unexpected errors
+        if verbose:
+            import traceback
+
+            click.echo(click.style("Traceback:", fg="yellow"))
+            click.echo(traceback.format_exc())
+        else:
+            click.echo("Run with --verbose flag for full traceback.")
+        click.echo()
+        click.echo("Common issues:")
+        click.echo("  - API key not set or invalid")
+        click.echo("  - Network connectivity issues")
+        click.echo("  - Invalid model configuration")
+        click.echo()
+        click.echo("Check logs at: ~/.config/youware-labs/paintress-cli/paintress.log")
         sys.exit(1)
 
 

@@ -136,7 +136,7 @@ class TUIApp:
     # UI components
     _app: Application[None] | None = field(default=None, init=False, repr=False)
     _output_lines: list[str] = field(default_factory=list, init=False)
-    _max_output_lines: int = field(default=1000, init=False)
+    _max_output_lines: int = field(default=1000, init=False)  # Overridden from config.display
     _renderer: RichRenderer = field(default_factory=RichRenderer, init=False)
     _event_renderer: EventRenderer = field(default_factory=EventRenderer, init=False)
 
@@ -185,6 +185,10 @@ class TUIApp:
 
     # Session-level usage tracking
     _session_usage: SessionUsage = field(default_factory=SessionUsage, init=False)
+
+    # UI refresh throttling
+    _last_invalidate_time: float = field(default=0.0, init=False)
+    _invalidate_interval: float = field(default=0.016, init=False)  # ~60fps max
 
     @property
     def mode(self) -> TUIMode:
@@ -235,6 +239,9 @@ class TUIApp:
         if self._runtime.ctx.model_cfg.context_window:
             self._context_window_size = self._runtime.ctx.model_cfg.context_window
 
+        # Apply display config
+        self._max_output_lines = self.config.display.max_output_lines
+
         logger.info("TUIApp initialized")
         configure_tui_logging(log_queue, verbose=self.verbose)
         return self
@@ -279,6 +286,15 @@ class TUIApp:
     # Output Management
     # =========================================================================
 
+    def _throttled_invalidate(self) -> None:
+        """Invalidate UI with throttling to prevent excessive redraws."""
+        if not self._app:
+            return
+        now = time.time()
+        if now - self._last_invalidate_time >= self._invalidate_interval:
+            self._last_invalidate_time = now
+            self._app.invalidate()
+
     def _append_output(self, text: str) -> None:
         """Append text to output buffer with auto-scroll when running."""
         self._output_lines.append(text)
@@ -289,9 +305,8 @@ class TUIApp:
         # Auto-scroll to bottom when agent is running
         if self._state == TUIState.RUNNING:
             self._scroll_to_bottom()
-        # Invalidate app to refresh display
-        if self._app:
-            self._app.invalidate()
+        # Invalidate app to refresh display (throttled during streaming)
+        self._throttled_invalidate()
 
     def _scroll_to_bottom(self) -> None:
         """Scroll output pane to bottom.
@@ -369,8 +384,7 @@ class TUIApp:
             self._output_lines[self._streaming_line_index] = rendered
             if self._state == TUIState.RUNNING:
                 self._scroll_to_bottom()
-            if self._app:
-                self._app.invalidate()
+            self._throttled_invalidate()
 
     def _finalize_streaming_text(self) -> None:
         """Finalize the current streaming text block."""
@@ -393,8 +407,7 @@ class TUIApp:
         # Render initial content with thinking style
         rendered = self._event_renderer.render_thinking(initial_content, width=self._get_terminal_width()).rstrip("\n")
         self._output_lines.append(rendered)
-        if self._app:
-            self._app.invalidate()
+        self._throttled_invalidate()
 
     def _update_streaming_thinking(self, delta: str) -> None:
         """Update current streaming thinking with delta."""
@@ -410,8 +423,7 @@ class TUIApp:
             self._output_lines[self._streaming_thinking_line_index] = rendered
             if self._state == TUIState.RUNNING:
                 self._scroll_to_bottom()
-            if self._app:
-                self._app.invalidate()
+            self._throttled_invalidate()
 
     def _finalize_streaming_thinking(self) -> None:
         """Finalize the current streaming thinking block."""
@@ -437,6 +449,42 @@ class TUIApp:
         user_text.append(text)
         rendered = self._renderer.render(user_text, width=width).rstrip("\n")
         self._append_output(rendered)
+
+    def _append_error_output(self, e: Exception) -> None:
+        """Render error message with proper word wrapping to fit terminal width."""
+        width = self._get_terminal_width()
+        from rich.text import Text as RichText
+
+        error_type = type(e).__name__
+        error_msg = str(e)
+
+        self._append_output("")
+
+        # Error header
+        header = RichText()
+        header.append("[ERROR] ", style="bold red")
+        header.append(error_type, style="bold red")
+        self._append_output(self._renderer.render(header, width=width).rstrip("\n"))
+
+        # Error message (with word wrap)
+        msg_text = RichText()
+        msg_text.append("  ", style="dim")
+        msg_text.append(error_msg)
+        self._append_output(self._renderer.render(msg_text, width=width).rstrip("\n"))
+
+        # Cause if available
+        if e.__cause__:
+            cause_text = RichText()
+            cause_text.append("  Caused by: ", style="dim red")
+            cause_text.append(f"{type(e.__cause__).__name__}: {e.__cause__}")
+            self._append_output(self._renderer.render(cause_text, width=width).rstrip("\n"))
+
+        self._append_output("")
+
+        # Hint
+        hint = RichText()
+        hint.append("(History not saved - you can retry the same message)", style="dim")
+        self._append_output(self._renderer.render(hint, width=width).rstrip("\n"))
 
     # =========================================================================
     # Steering Pane
@@ -621,6 +669,19 @@ class TUIApp:
 
         return parts
 
+    def _on_agent_task_done(self, task: asyncio.Task[None]) -> None:
+        """Callback when agent task completes - handles uncaught exceptions."""
+        if task.cancelled():
+            return
+        exc = task.exception()
+        if exc is not None:
+            # Exception was not caught in _run_agent - display it
+            logger.error("Uncaught exception in agent task: %s: %s", type(exc).__name__, str(exc))
+            self._append_error_output(exc)
+            self._state = TUIState.IDLE
+            if self._app:
+                self._app.invalidate()
+
     async def _run_agent(self, user_input: str) -> None:
         """Execute agent with user prompt and optional guidance."""
         self._state = TUIState.RUNNING
@@ -667,10 +728,12 @@ class TUIApp:
             self._finalize_streaming_text()
             self._finalize_streaming_thinking()
             self._append_output("[Cancelled]")
+            # Don't update message history on cancel - allows retry
         except Exception as e:
             self._finalize_streaming_text()
             self._finalize_streaming_thinking()
-            self._append_output(f"\n[Error: {e}]")
+            # Display error in output pane - don't save history so user can retry
+            self._append_error_output(e)
             logger.exception("Agent execution failed")
         finally:
             # Finalize any remaining streaming text/thinking
@@ -957,6 +1020,7 @@ class TUIApp:
                         else:
                             self._append_user_input(text)
                             self._agent_task = asyncio.create_task(self._run_agent(text))
+                            self._agent_task.add_done_callback(self._on_agent_task_done)
                 else:
                     input_area.buffer.reset()
             else:
@@ -1061,6 +1125,7 @@ class TUIApp:
                     # Show expanded prompt instead of command name
                     self._append_user_input(cmd_def.prompt)
                     self._agent_task = asyncio.create_task(self._run_agent(cmd_def.prompt))
+                    self._agent_task.add_done_callback(self._on_agent_task_done)
                 else:
                     self._append_user_input(command)
                     self._append_system_output(f"Unknown command: {cmd}")
@@ -1406,5 +1471,9 @@ class TUIApp:
             mouse_support=True,
         )
 
-        # Run
-        await self._app.run_async()
+        # Run with error handling
+        try:
+            await self._app.run_async()
+        except Exception as e:
+            # Re-raise to be caught by cli.py with proper error display
+            raise RuntimeError(f"TUI crashed: {e}") from e

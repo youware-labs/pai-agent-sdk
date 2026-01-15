@@ -72,6 +72,9 @@ class DisplayConfig(BaseModel):
     max_arg_length: int = 100
     """Maximum length for tool argument display."""
 
+    max_output_lines: int = 1000
+    """Maximum lines to keep in output buffer. Lower values improve performance."""
+
     show_token_usage: bool = True
     """Show token usage in status bar."""
 

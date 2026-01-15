@@ -14,7 +14,7 @@ lint: ## Lint the code
 .PHONY: cli
 cli: ## Run the CLI
 	@echo "🚀 Running paintress-cli CLI"
-	@uv run paintress
+	@rm -f paintress.log && uv run paintress-cli -v
 
 .PHONY: check
 check: ## Run code quality tools.
@@ -25,12 +25,18 @@ check: ## Run code quality tools.
 	@echo "🚀 Static type checking: Running pyright"
 	@uv run pyright
 	@echo "🚀 Checking for obsolete dependencies: Running deptry"
-	@uv run deptry .
+	@uv run deptry pai_agent_sdk
 
 .PHONY: test
 test: ## Test the code with pytest
 	@echo "🚀 Testing code: Running pytest"
-	@uv run python -m pytest -n auto -vv --inline-snapshot=disable --cov --cov-config=pyproject.toml --cov-report term-missing
+	@uv run python -m pytest tests -n auto -vv --inline-snapshot=disable --cov --cov-config=pyproject.toml --cov-report term-missing
+
+.PHONY: test-cli
+test-cli: ## Test cli
+	@echo "🚀 Testing code: Running pytest"
+	@uv run python -m pytest paintress_cli/tests -n auto -vv --inline-snapshot=disable
+
 
 .PHONY: test-fix
 test-fix: ## Test and auto-fix inline snapshots

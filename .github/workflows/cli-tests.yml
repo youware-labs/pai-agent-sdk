@@ -1,0 +1,37 @@
+name: CLI Tests
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "paintress_cli/**"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "paintress_cli/**"
+
+jobs:
+  cli-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+      fail-fast: false
+    env:
+      UV_PYTHON: ${{ matrix.python-version }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up the environment
+        uses: ./.github/actions/setup-python-env
+        with:
+          python-version: ${{ matrix.python-version }}
+          extras: "all"
+
+      - name: Run CLI tests
+        run: uv run python -m pytest paintress_cli/tests -n auto

@@ -559,7 +559,7 @@ class RunContextMetadata(TypedDict, total=False):
                         ),
                     )
                 )
-                toolset = Toolset(ctx, tools=[HandoffTool])
+                toolset = Toolset(tools=[HandoffTool])
                 agent = Agent(
                     'openai:gpt-4',
                     deps_type=AgentContext,

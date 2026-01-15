@@ -1,0 +1,112 @@
+# Paintress CLI Global Configuration
+# Location: ~/.config/youware-labs/paintress-cli/config.toml
+
+[general]
+# Model configuration (required)
+# Format: "provider:model_name"
+# Examples:
+#   - anthropic:claude-sonnet-4-5
+#   - openai:gpt-4o
+#   - google:gemini-2.5-pro
+model = ""
+
+# Model settings: preset name or custom dict
+# Available presets: anthropic_default, openai_default, google_default, etc.
+# model_settings = "anthropic_default"
+
+# Model config for context management (context window, capabilities, etc.)
+# Presets: claude_200k, claude_1m, gpt5_270k, gemini_1m
+# Aliases: claude, anthropic, openai, gemini
+# model_cfg = "claude_200k"
+#
+# Or custom configuration:
+# [general.model_cfg]
+# context_window = 200000
+# max_images = 20
+# max_videos = 0
+# compact_threshold = 0.90
+# proactive_context_management_threshold = 0.5
+# capabilities = ["vision"]  # Options: vision, video_understanding, document_understanding
+
+# Maximum requests per session
+max_requests = 1000
+
+# Custom system prompt file path (optional)
+# If empty, uses built-in default from CLI package
+# system_prompt_file = "~/.config/youware-labs/paintress-cli/system_prompt.md"
+
+[env]
+# Environment variable overrides for API keys
+# ANTHROPIC_API_KEY = "sk-ant-..."
+# OPENAI_API_KEY = "sk-..."
+# GOOGLE_API_KEY = "..."
+
+[display]
+# Code highlighting theme ("dark" or "light")
+code_theme = "dark"
+# Maximum lines to show for tool results
+max_tool_result_lines = 5
+# Maximum length for tool argument display
+max_arg_length = 100
+# Show token usage in status bar
+show_token_usage = true
+# Show elapsed time
+show_elapsed_time = true
+
+[browser]
+# CDP URL for browser automation
+# Options: null (disabled), "auto" (Docker), or explicit URL
+# cdp_url = "auto"
+# Docker image for auto-start browser
+browser_image = "zenika/alpine-chrome:latest"
+# Browser startup timeout in seconds
+browser_timeout = 30
+
+[subagents]
+# Subagents are loaded from ~/.config/youware-labs/paintress-cli/subagents/
+# Run `paintress setup` to initialize default subagents
+
+# Disable specific subagents by name
+disabled = []
+
+# Override settings for specific subagents
+# [subagents.overrides.explorer]
+# model = "openai:gpt-4o"
+# model_settings = "openai_default"
+
+# =============================================================================
+# Custom Slash Commands
+# =============================================================================
+# Define custom commands that can be triggered with /name
+# Each command has: prompt, mode (optional), description (optional)
+
+[commands.commit]
+description = "Review and commit changes"
+mode = "act"
+prompt = """
+Please review current changes and commit them with:
+`Co-Authored-By: Paintress <paintress@arcoer.com>`
+"""
+
+[commands.review]
+description = "Comprehensive code review"
+mode = "act"
+prompt = """
+Please review the current changes and pull request.
+First, use bash commands to determine the review scope:
+
+1. Check current branch: `git branch --show-current`
+2. If on main/master: review uncommitted changes only
+3. If on feature branch: review all changes since branching from main
+4. Conduct comprehensive code review focusing on:
+   - Logic errors and bugs
+   - Security vulnerabilities
+   - Code quality and error handling
+   - Project standards and naming conventions
+"""
+
+# Example: Add your own custom commands
+# [commands.deploy]
+# description = "Deploy to production"
+# mode = "act"
+# prompt = "Please help me deploy to production..."

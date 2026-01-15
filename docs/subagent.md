@@ -60,13 +60,14 @@ description: Debugging specialist for errors and test failures
 instruction: |
   Use the debugger subagent when encountering error messages or stack traces.
 tools:
-  - grep_tool
+  - grep
   - view
 optional_tools:
   - shell
   - edit
 model: inherit
 model_settings: inherit
+model_cfg: inherit
 ---
 
 You are an expert debugger specializing in systematic root cause analysis.
@@ -74,17 +75,17 @@ You are an expert debugger specializing in systematic root cause analysis.
 
 ### Configuration Fields
 
-| Field            | Type          | Required | Description                                                     |
-| ---------------- | ------------- | -------- | --------------------------------------------------------------- |
-| `name`           | `str`         | Yes      | Unique identifier, used as tool name                            |
-| `description`    | `str`         | Yes      | Shown to model when selecting tools                             |
-| `instruction`    | `str`         | No       | Injected into parent's system prompt                            |
-| `system_prompt`  | `str`         | Yes      | Markdown body content (after frontmatter)                       |
-| `tools`          | `list[str]`   | No       | Required tools from parent (ALL must be available)              |
-| `optional_tools` | `list[str]`   | No       | Optional tools (included if available)                          |
-| `model`          | `str`         | No       | `"inherit"` or model name (e.g., `"anthropic:claude-sonnet-4"`) |
-| `model_settings` | `str \| dict` | No       | `"inherit"`, preset name, or dict config                        |
-| `model_cfg`      | `dict`        | No       | ModelConfig for context management                              |
+| Field            | Type          | Required | Description                                                      |
+| ---------------- | ------------- | -------- | ---------------------------------------------------------------- |
+| `name`           | `str`         | Yes      | Unique identifier, used as tool name                             |
+| `description`    | `str`         | Yes      | Shown to model when selecting tools                              |
+| `instruction`    | `str`         | No       | Injected into parent's system prompt                             |
+| `system_prompt`  | `str`         | Yes      | Markdown body content (after frontmatter)                        |
+| `tools`          | `list[str]`   | No       | Required tools from parent (ALL must be available)               |
+| `optional_tools` | `list[str]`   | No       | Optional tools (included if available)                           |
+| `model`          | `str`         | No       | `"inherit"` or model name (e.g., `"anthropic:claude-sonnet-4"`)  |
+| `model_settings` | `str \| dict` | No       | `"inherit"`, preset name, or dict config                         |
+| `model_cfg`      | `str \| dict` | No       | `"inherit"`, preset name (e.g., `"claude_200k"`), or dict config |
 
 ### Tool Availability Rules
 
@@ -96,12 +97,12 @@ You are an expert debugger specializing in systematic root cause analysis.
 
 Located in `pai_agent_sdk/subagents/presets/`:
 
-| Preset          | Purpose                                         | Required Tools                         |
-| --------------- | ----------------------------------------------- | -------------------------------------- |
-| `debugger`      | Systematic debugging and root cause analysis    | `glob_tool`, `grep_tool`, `view`, `ls` |
-| `explorer`      | Codebase navigation and structure understanding | `glob_tool`, `grep_tool`, `view`, `ls` |
-| `code-reviewer` | Code quality, security, and maintainability     | `glob_tool`, `grep_tool`, `view`, `ls` |
-| `searcher`      | Web research for documentation and solutions    | `search`                               |
+| Preset          | Purpose                                         | Required Tools               |
+| --------------- | ----------------------------------------------- | ---------------------------- |
+| `debugger`      | Systematic debugging and root cause analysis    | `glob`, `grep`, `view`, `ls` |
+| `explorer`      | Codebase navigation and structure understanding | `glob`, `grep`, `view`, `ls` |
+| `code-reviewer` | Code quality, security, and maintainability     | `glob`, `grep`, `view`, `ls` |
+| `searcher`      | Web research for documentation and solutions    | `search`                     |
 
 ```python
 from pai_agent_sdk.subagents import get_builtin_subagent_configs, load_builtin_subagent_tools

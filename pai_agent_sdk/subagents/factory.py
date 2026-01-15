@@ -14,9 +14,8 @@ from pydantic_ai._agent_graph import HistoryProcessor
 
 from pai_agent_sdk.agents.models import infer_model
 from pai_agent_sdk.context import AgentContext, ModelConfig
-from pai_agent_sdk.presets import resolve_model_settings
+from pai_agent_sdk.presets import INHERIT, resolve_model_cfg, resolve_model_settings
 from pai_agent_sdk.subagents.config import (
-    INHERIT,
     SubagentConfig,
     load_subagent_from_file,
     load_subagents_from_dir,
@@ -54,9 +53,15 @@ def _resolve_model_settings(
 
 
 def _resolve_model_cfg(config: SubagentConfig, model_cfg: ModelConfig | None) -> ModelConfig | None:
-    """Resolve effective ModelConfig from config and fallback."""
-    if config.model_cfg is not None:
-        return ModelConfig(**config.model_cfg)
+    """Resolve effective ModelConfig from config and fallback.
+
+    Resolution order:
+    1. config.model_cfg is not None and != 'inherit' -> resolve to ModelConfig
+    2. Otherwise use model_cfg fallback (inherit from parent)
+    """
+    resolved = resolve_model_cfg(config.model_cfg)
+    if resolved is not None:
+        return ModelConfig(**resolved)
     return model_cfg
 
 

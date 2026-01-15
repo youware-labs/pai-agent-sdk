@@ -33,8 +33,7 @@ class ScrapeTool(BaseTool):
     name = "scrape"
     description = "Convert websites to Markdown format for content analysis."
 
-    def __init__(self, ctx: AgentContext) -> None:
-        super().__init__(ctx)
+    def __init__(self) -> None:
         self._md = MarkItDown(enable_plugins=True)
 
     def get_instruction(self, ctx: RunContext[AgentContext]) -> str | None:

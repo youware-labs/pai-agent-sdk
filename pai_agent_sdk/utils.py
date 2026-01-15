@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 P = typing.ParamSpec("P")
 T = typing.TypeVar("T")
-AgentDepsT = TypeVar("AgentDepsT", bound="AgentContext", default="AgentContext")
+AgentDepsT = TypeVar("AgentDepsT", bound="AgentContext")
 
 ImageMediaType = Literal["image/png", "image/jpeg", "image/gif", "image/webp"]
 

@@ -72,7 +72,7 @@ def test_get_builtin_subagent_configs_content() -> None:
 
     # Explorer should have system_prompt mentioning exploration tools
     explorer = configs["explorer"]
-    assert "grep_tool" in explorer.system_prompt or "glob_tool" in explorer.system_prompt
+    assert "grep" in explorer.system_prompt or "glob" in explorer.system_prompt
 
     # Searcher should have system_prompt mentioning search tools
     searcher = configs["searcher"]
@@ -96,7 +96,7 @@ def test_load_builtin_subagent_tools(agent_context) -> None:
 
     # Create mock tools that the subagents need
     class GrepTool(BaseTool):
-        name = "grep_tool"
+        name = "grep"
         description = "Search file contents"
 
         async def call(self, ctx, pattern: str) -> str:
@@ -139,7 +139,6 @@ def test_load_builtin_subagent_tools(agent_context) -> None:
 
     # Create parent toolset with all tools needed by presets
     parent_toolset = Toolset(
-        agent_context,
         tools=[GrepTool, ViewTool, LsTool, SearchTavilyTool, SearchGoogleTool, VisitWebpageTool],
     )
 
@@ -175,7 +174,7 @@ def test_load_builtin_subagent_tools_with_preset_model_settings(agent_context) -
 
     # Minimal tools
     class GrepTool(BaseTool):
-        name = "grep_tool"
+        name = "grep"
         description = "Search"
 
         async def call(self, ctx, pattern: str) -> str:
@@ -210,7 +209,6 @@ def test_load_builtin_subagent_tools_with_preset_model_settings(agent_context) -
             return url
 
     parent_toolset = Toolset(
-        agent_context,
         tools=[GrepTool, ViewTool, LsTool, SearchTool, VisitTool],
     )
 
@@ -269,14 +267,14 @@ async def test_create_agent_with_include_builtin_subagents(agent_context) -> Non
 
     # Create tools needed by builtin subagents
     class GlobTool(BaseTool):
-        name = "glob_tool"
+        name = "glob"
         description = "Find files"
 
         async def call(self, ctx, pattern: str) -> str:
             return pattern
 
     class GrepTool(BaseTool):
-        name = "grep_tool"
+        name = "grep"
         description = "Search"
 
         async def call(self, ctx, pattern: str) -> str:
@@ -323,14 +321,14 @@ async def test_create_agent_with_both_custom_and_builtin_subagents() -> None:
     from pai_agent_sdk.toolsets.core.base import BaseTool
 
     class GlobTool(BaseTool):
-        name = "glob_tool"
+        name = "glob"
         description = "Find files"
 
         async def call(self, ctx, pattern: str) -> str:
             return pattern
 
     class GrepTool(BaseTool):
-        name = "grep_tool"
+        name = "grep"
         description = "Search"
 
         async def call(self, ctx, pattern: str) -> str:

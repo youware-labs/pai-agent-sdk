@@ -52,7 +52,7 @@ except ImportError:
 @pytest.mark.skipif(not PDF_AVAILABLE, reason="pymupdf not installed")
 def test_pdf_convert_tool_attributes(agent_context: AgentContext) -> None:
     """Should have correct name and description."""
-    tool = PdfConvertTool(agent_context)
+    tool = PdfConvertTool()
     assert tool.name == "pdf_convert"
     assert "PDF" in tool.description or "pdf" in tool.description.lower()
 
@@ -65,7 +65,7 @@ async def test_pdf_convert_file_not_found(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = PdfConvertTool(ctx)
+        tool = PdfConvertTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
@@ -83,7 +83,7 @@ async def test_pdf_convert_not_pdf_file(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = PdfConvertTool(ctx)
+        tool = PdfConvertTool()
 
         # Create a non-PDF file
         txt_file = tmp_path / "test.txt"
@@ -105,7 +105,7 @@ async def test_pdf_convert_success(tmp_path: Path, pdf_file: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = PdfConvertTool(ctx)
+        tool = PdfConvertTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
@@ -135,7 +135,7 @@ async def test_pdf_convert_page_range(tmp_path: Path, pdf_file: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = PdfConvertTool(ctx)
+        tool = PdfConvertTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
@@ -176,7 +176,7 @@ except ImportError:
 @pytest.mark.skipif(not OFFICE_AVAILABLE, reason="markitdown not installed")
 def test_office_convert_tool_attributes(agent_context: AgentContext) -> None:
     """Should have correct name and description."""
-    tool = OfficeConvertTool(agent_context)
+    tool = OfficeConvertTool()
     assert tool.name == "office_to_markdown"
     assert "Office" in tool.description or "Word" in tool.description
 
@@ -189,7 +189,7 @@ async def test_office_convert_file_not_found(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = OfficeConvertTool(ctx)
+        tool = OfficeConvertTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
@@ -207,7 +207,7 @@ async def test_office_convert_unsupported_format(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = OfficeConvertTool(ctx)
+        tool = OfficeConvertTool()
 
         # Create an unsupported file
         txt_file = tmp_path / "test.txt"
@@ -229,7 +229,7 @@ async def test_office_convert_docx_success(tmp_path: Path, docx_file: Path) -> N
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = OfficeConvertTool(ctx)
+        tool = OfficeConvertTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx

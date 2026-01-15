@@ -74,20 +74,19 @@ def test_handoff_tool_attributes(agent_context: AgentContext) -> None:
 
 def test_handoff_tool_initialization(agent_context: AgentContext) -> None:
     """Should initialize with context."""
-    tool = HandoffTool(agent_context)
-    assert tool.ctx is agent_context
+    tool = HandoffTool()
     assert tool.name == "handoff"
 
 
 def test_handoff_tool_is_available(agent_context: AgentContext, mock_run_ctx) -> None:
     """Should be available by default."""
-    tool = HandoffTool(agent_context)
+    tool = HandoffTool()
     assert tool.is_available(mock_run_ctx) is True
 
 
 def test_handoff_tool_get_instruction(agent_context: AgentContext) -> None:
     """Should load instruction from prompts/handoff.md."""
-    tool = HandoffTool(agent_context)
+    tool = HandoffTool()
     mock_run_ctx = MagicMock(spec=RunContext)
     mock_run_ctx.deps = agent_context
     instruction = tool.get_instruction(mock_run_ctx)
@@ -99,7 +98,7 @@ def test_handoff_tool_get_instruction(agent_context: AgentContext) -> None:
 
 async def test_handoff_tool_call(agent_context: AgentContext) -> None:
     """Should store handoff message and return summary."""
-    tool = HandoffTool(agent_context)
+    tool = HandoffTool()
 
     mock_run_ctx = MagicMock(spec=RunContext)
     mock_run_ctx.deps = agent_context
@@ -125,7 +124,7 @@ async def test_handoff_tool_call(agent_context: AgentContext) -> None:
 
 async def test_handoff_tool_call_overwrites_previous(agent_context: AgentContext) -> None:
     """Should overwrite previous handoff message."""
-    tool = HandoffTool(agent_context)
+    tool = HandoffTool()
 
     mock_run_ctx = MagicMock(spec=RunContext)
     mock_run_ctx.deps = agent_context

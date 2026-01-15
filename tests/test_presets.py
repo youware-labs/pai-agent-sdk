@@ -16,6 +16,7 @@ from pai_agent_sdk.presets import (
     ANTHROPIC_LOW,
     ANTHROPIC_MEDIUM,
     ANTHROPIC_OFF,
+    INHERIT,
     OPENAI_DEFAULT,
     OPENAI_HIGH,
     OPENAI_LOW,
@@ -24,9 +25,13 @@ from pai_agent_sdk.presets import (
     OPENAI_RESPONSES_HIGH,
     OPENAI_RESPONSES_LOW,
     OPENAI_RESPONSES_MEDIUM,
+    ModelConfigPreset,
     ModelSettingsPreset,
+    get_model_cfg,
     get_model_settings,
+    list_model_cfg_presets,
     list_presets,
+    resolve_model_cfg,
     resolve_model_settings,
 )
 
@@ -219,4 +224,130 @@ def test_list_presets() -> None:
         "openai_responses_high",
         "openai_responses_low",
         "openai_responses_medium",
+    ])
+
+
+# =============================================================================
+# ModelConfigPreset Tests
+# =============================================================================
+
+
+def test_model_cfg_presets_structure() -> None:
+    """Test that ModelConfig presets have expected structure."""
+    cfg = get_model_cfg("claude_200k")
+    assert cfg["context_window"] == 200_000
+    assert cfg["max_videos"] == 0  # Claude doesn't support video
+    assert "max_images" in cfg
+    assert "capabilities" in cfg
+
+    cfg_1m = get_model_cfg("claude_1m")
+    assert cfg_1m["context_window"] == 1_000_000
+    assert cfg_1m["max_videos"] == 0  # Claude doesn't support video
+
+
+def test_model_cfg_capabilities() -> None:
+    """Test that ModelConfig presets have correct capabilities."""
+    from pai_agent_sdk.context import ModelCapability
+
+    # Claude: vision + document, no video
+    cfg_claude = get_model_cfg("claude_200k")
+    assert ModelCapability.vision in cfg_claude["capabilities"]
+    assert ModelCapability.document_understanding in cfg_claude["capabilities"]
+    assert ModelCapability.video_understanding not in cfg_claude["capabilities"]
+
+    # GPT-5: vision only
+    cfg_gpt = get_model_cfg("gpt5_270k")
+    assert ModelCapability.vision in cfg_gpt["capabilities"]
+    assert ModelCapability.video_understanding not in cfg_gpt["capabilities"]
+
+    # Gemini: vision + video + document
+    cfg_gemini = get_model_cfg("gemini_1m")
+    assert ModelCapability.vision in cfg_gemini["capabilities"]
+    assert ModelCapability.video_understanding in cfg_gemini["capabilities"]
+    assert ModelCapability.document_understanding in cfg_gemini["capabilities"]
+
+
+def test_get_model_cfg_by_enum() -> None:
+    """Test getting model config by enum."""
+    cfg = get_model_cfg(ModelConfigPreset.CLAUDE_200K)
+    assert cfg["context_window"] == 200_000
+
+    cfg_gemini = get_model_cfg(ModelConfigPreset.GEMINI_1M)
+    assert cfg_gemini["context_window"] == 1_000_000
+    assert cfg_gemini["max_videos"] == 1  # Gemini supports video
+
+
+def test_get_model_cfg_by_string() -> None:
+    """Test getting model config by string name."""
+    cfg = get_model_cfg("claude_200k")
+    assert cfg["context_window"] == 200_000
+
+    cfg_gpt = get_model_cfg("gpt5_270k")
+    assert cfg_gpt["context_window"] == 270_000
+    assert cfg_gpt["max_videos"] == 0  # GPT doesn't support video
+
+
+def test_get_model_cfg_by_alias() -> None:
+    """Test getting model config by alias."""
+    cfg = get_model_cfg("claude")
+    assert cfg["context_window"] == 200_000
+
+    cfg = get_model_cfg("anthropic")
+    assert cfg["context_window"] == 200_000
+
+    cfg = get_model_cfg("openai")
+    assert cfg["context_window"] == 270_000  # GPT-5 series
+
+    cfg = get_model_cfg("gemini")
+    assert cfg["context_window"] == 1_000_000
+
+
+def test_get_model_cfg_invalid() -> None:
+    """Test that invalid preset name raises ValueError."""
+    with pytest.raises(ValueError, match="Unknown ModelConfig preset"):
+        get_model_cfg("invalid_preset_name")
+
+
+def test_resolve_model_cfg_none() -> None:
+    """Test that None returns None (inherit)."""
+    result = resolve_model_cfg(None)
+    assert result is None
+
+
+def test_resolve_model_cfg_inherit() -> None:
+    """Test that 'inherit' returns None."""
+    result = resolve_model_cfg(INHERIT)
+    assert result is None
+    result = resolve_model_cfg("inherit")
+    assert result is None
+
+
+def test_resolve_model_cfg_dict() -> None:
+    """Test that dict is returned as-is."""
+    custom = {"context_window": 100000, "max_images": 10}
+    result = resolve_model_cfg(custom)
+    assert result == custom
+
+
+def test_resolve_model_cfg_string() -> None:
+    """Test that string is resolved to preset."""
+    result = resolve_model_cfg("claude_200k")
+    assert result is not None
+    assert result["context_window"] == 200_000
+
+
+def test_list_model_cfg_presets() -> None:
+    """Test list_model_cfg_presets returns all available presets."""
+    presets = list_model_cfg_presets()
+
+    assert presets == snapshot([
+        "anthropic",
+        "claude",
+        "claude_1m",
+        "claude_200k",
+        "gemini",
+        "gemini_1m",
+        "gpt5",
+        "gpt5_270k",
+        "openai",
     ])

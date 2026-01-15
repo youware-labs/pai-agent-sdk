@@ -12,7 +12,7 @@ from typing import Annotated, Any, cast
 from uuid import uuid4
 
 from pydantic import Field
-from pydantic_ai import Agent, AgentRunResult, RunContext
+from pydantic_ai import Agent, AgentRunResult, RunContext, UsageLimits
 
 from pai_agent_sdk.context import AgentContext, ModelConfig
 from pai_agent_sdk.toolsets.core.base import BaseTool
@@ -82,9 +82,6 @@ def create_subagent_tool(
         # These will be set by the closure
         name = ""  # Placeholder, will be overwritten
         description = ""  # Placeholder, will be overwritten
-
-        def __init__(self, ctx: AgentContext) -> None:
-            super().__init__(ctx)
 
         def is_available(self, ctx: RunContext[AgentContext]) -> bool:
             if availability_check is None:
@@ -213,6 +210,9 @@ def create_subagent_call_func(
             async with agent.iter(
                 prompt,
                 deps=sub_ctx,
+                usage_limits=UsageLimits(
+                    request_limit=1000,
+                ),
                 message_history=deps.subagent_history.get(agent_id),
             ) as run:
                 async for node in run:

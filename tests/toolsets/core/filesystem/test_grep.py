@@ -11,11 +11,11 @@ from pai_agent_sdk.environment.local import LocalEnvironment
 from pai_agent_sdk.toolsets.core.filesystem.grep import GrepTool
 
 
-def test_grep_tool_attributes(agent_context: AgentContext) -> None:
+def test_grep_attributes(agent_context: AgentContext) -> None:
     """Should have correct name and description."""
-    assert GrepTool.name == "grep_tool"
+    assert GrepTool.name == "grep"
     assert "regex" in GrepTool.description
-    tool = GrepTool(agent_context)
+    tool = GrepTool()
     mock_run_ctx = MagicMock(spec=RunContext)
     mock_run_ctx.deps = agent_context
     instruction = tool.get_instruction(mock_run_ctx)
@@ -29,7 +29,7 @@ async def test_grep_find_pattern(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = GrepTool(ctx)
+        tool = GrepTool()
 
         (tmp_path / "test.py").write_text("def hello():\n    print('hello')\n\ndef world():\n    pass")
 
@@ -48,7 +48,7 @@ async def test_grep_invalid_regex(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = GrepTool(ctx)
+        tool = GrepTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
@@ -64,7 +64,7 @@ async def test_grep_with_include_filter(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = GrepTool(ctx)
+        tool = GrepTool()
 
         (tmp_path / "test.py").write_text("hello world")
         (tmp_path / "test.txt").write_text("hello universe")
@@ -84,7 +84,7 @@ async def test_grep_context_lines(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = GrepTool(ctx)
+        tool = GrepTool()
 
         content = "line1\nline2\nMATCH\nline4\nline5"
         (tmp_path / "test.txt").write_text(content)
@@ -106,7 +106,7 @@ async def test_grep_max_results_limit(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = GrepTool(ctx)
+        tool = GrepTool()
 
         # Create file with many matches
         content = "\n".join([f"match{i}" for i in range(20)])
@@ -129,7 +129,7 @@ async def test_grep_max_matches_per_file(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = GrepTool(ctx)
+        tool = GrepTool()
 
         content = "\n".join([f"match{i}" for i in range(10)])
         (tmp_path / "test.txt").write_text(content)
@@ -150,7 +150,7 @@ async def test_grep_no_matches(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = GrepTool(ctx)
+        tool = GrepTool()
 
         (tmp_path / "test.txt").write_text("no matches here")
 
@@ -168,7 +168,7 @@ async def test_grep_match_data_structure(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = GrepTool(ctx)
+        tool = GrepTool()
 
         (tmp_path / "test.txt").write_text("line with pattern")
 
@@ -192,7 +192,7 @@ async def test_grep_max_files_limit(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = GrepTool(ctx)
+        tool = GrepTool()
 
         # Create many files with matches
         for i in range(10):
@@ -216,7 +216,7 @@ async def test_grep_multiple_files(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = GrepTool(ctx)
+        tool = GrepTool()
 
         (tmp_path / "file1.py").write_text("def foo(): pass")
         (tmp_path / "file2.py").write_text("def bar(): pass")
@@ -241,7 +241,7 @@ async def test_grep_skips_directories(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = GrepTool(ctx)
+        tool = GrepTool()
 
         # Create a directory and a file
         (tmp_path / "subdir").mkdir()
@@ -264,7 +264,7 @@ async def test_grep_large_result_truncation(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = GrepTool(ctx)
+        tool = GrepTool()
 
         # Create file with many matches that will produce large output
         # Each match with context will be substantial
@@ -298,7 +298,7 @@ async def test_grep_unreadable_file_handling(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = GrepTool(ctx)
+        tool = GrepTool()
 
         # Create a valid file and a binary file that may cause decode errors
         (tmp_path / "valid.txt").write_text("searchable text")

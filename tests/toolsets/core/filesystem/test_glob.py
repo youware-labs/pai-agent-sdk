@@ -11,11 +11,11 @@ from pai_agent_sdk.environment.local import LocalEnvironment
 from pai_agent_sdk.toolsets.core.filesystem.glob import GlobTool
 
 
-def test_glob_tool_attributes(agent_context: AgentContext) -> None:
+def test_glob_attributes(agent_context: AgentContext) -> None:
     """Should have correct name and description."""
-    assert GlobTool.name == "glob_tool"
+    assert GlobTool.name == "glob"
     assert "glob pattern" in GlobTool.description
-    tool = GlobTool(agent_context)
+    tool = GlobTool()
     mock_run_ctx = MagicMock(spec=RunContext)
     mock_run_ctx.deps = agent_context
     instruction = tool.get_instruction(mock_run_ctx)
@@ -29,7 +29,7 @@ async def test_glob_find_files(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = GlobTool(ctx)
+        tool = GlobTool()
 
         # Create test files
         (tmp_path / "file1.py").write_text("content")
@@ -52,7 +52,7 @@ async def test_glob_recursive_pattern(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = GlobTool(ctx)
+        tool = GlobTool()
 
         # Create nested structure
         (tmp_path / "subdir").mkdir()
@@ -73,7 +73,7 @@ async def test_glob_no_matches(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = GlobTool(ctx)
+        tool = GlobTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
@@ -89,7 +89,7 @@ async def test_glob_specific_extension(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = GlobTool(ctx)
+        tool = GlobTool()
 
         (tmp_path / "test.json").write_text("{}")
         (tmp_path / "test.yaml").write_text("key: value")
@@ -110,7 +110,7 @@ async def test_glob_empty_directory(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = GlobTool(ctx)
+        tool = GlobTool()
 
         # tmp_path is empty, no files created
         mock_run_ctx = MagicMock(spec=RunContext)
@@ -127,7 +127,7 @@ async def test_glob_matches_directories(tmp_path: Path) -> None:
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = GlobTool(ctx)
+        tool = GlobTool()
 
         (tmp_path / "mydir").mkdir()
         (tmp_path / "myfile.txt").write_text("content")

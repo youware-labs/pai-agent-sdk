@@ -27,7 +27,7 @@ def _load_instruction() -> str:
 class GlobTool(BaseTool):
     """Tool for finding files matching glob patterns."""
 
-    name = "glob_tool"
+    name = "glob"
     description = "Find files by glob pattern. Returns paths sorted by modification time (newest first)."
 
     def is_available(self, ctx: RunContext[AgentContext]) -> bool:

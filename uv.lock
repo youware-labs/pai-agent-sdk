@@ -2397,7 +2397,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.12.5" },
     { name = "pydantic-ai", marker = "extra == 'all'" },
     { name = "pydantic-ai", marker = "extra == 'examples'" },
-    { name = "pydantic-ai-slim", specifier = ">=1.41.0" },
+    { name = "pydantic-ai-slim", specifier = ">=1.42.0" },
     { name = "pydantic-settings", specifier = ">=2.0.0" },
     { name = "pymupdf", marker = "extra == 'all'", specifier = ">=1.26.6" },
     { name = "pymupdf", marker = "extra == 'document'", specifier = ">=1.26.6" },
@@ -2442,11 +2442,23 @@ dev = [
 name = "paintress-cli"
 source = { editable = "paintress_cli" }
 dependencies = [
+    { name = "agent-environment" },
+    { name = "click" },
     { name = "pai-agent-sdk", extra = ["all"] },
+    { name = "pydantic" },
+    { name = "pydantic-ai" },
+    { name = "pydantic-settings" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pai-agent-sdk", extras = ["all"], editable = "." }]
+requires-dist = [
+    { name = "agent-environment", specifier = ">=0.1.0" },
+    { name = "click", specifier = ">=8.0" },
+    { name = "pai-agent-sdk", extras = ["all"], editable = "." },
+    { name = "pydantic", specifier = ">=2.0" },
+    { name = "pydantic-ai" },
+    { name = "pydantic-settings", specifier = ">=2.0" },
+]
 
 [[package]]
 name = "pandas"

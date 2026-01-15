@@ -32,6 +32,8 @@ from __future__ import annotations
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal
 
+from pai_agent_sdk.context import ModelCapability
+
 if TYPE_CHECKING:
     from pydantic_ai import ModelSettings
 
@@ -163,7 +165,7 @@ def _anthropic_off_settings(*, use_1m_context: bool = False) -> dict[str, Any]:
 
 ANTHROPIC_DEFAULT: dict[str, Any] = _anthropic_settings(
     thinking_budget=16 * K_TOKENS,
-    max_tokens=16 * K_TOKENS,
+    max_tokens=21 * K_TOKENS,
 )
 """Anthropic default: Same as medium, 16K thinking budget."""
 
@@ -175,7 +177,7 @@ ANTHROPIC_HIGH: dict[str, Any] = _anthropic_settings(
 
 ANTHROPIC_MEDIUM: dict[str, Any] = _anthropic_settings(
     thinking_budget=16 * K_TOKENS,
-    max_tokens=16 * K_TOKENS,
+    max_tokens=21 * K_TOKENS,
 )
 """Anthropic medium thinking: 16K thinking budget, balanced reasoning."""
 
@@ -607,3 +609,162 @@ def list_presets() -> list[str]:
         List of preset names (including aliases).
     """
     return sorted(set(_PRESET_REGISTRY.keys()) | set(_PRESET_ALIASES.keys()))
+
+
+# =============================================================================
+# ModelConfig Presets
+# =============================================================================
+
+# Special value indicating inheritance from parent
+INHERIT = "inherit"
+
+
+class ModelConfigPreset(str, Enum):
+    """Available ModelConfig presets for context management."""
+
+    # Anthropic models
+    CLAUDE_200K = "claude_200k"
+    CLAUDE_1M = "claude_1m"
+
+    # OpenAI models (GPT-5 series with 270k context)
+    GPT5_270K = "gpt5_270k"
+
+    # Gemini models
+    GEMINI_1M = "gemini_1m"
+
+
+# ModelConfig preset registry
+_MODEL_CFG_REGISTRY: dict[str, dict[str, Any]] = {
+    # Anthropic Claude models (vision, no video support)
+    ModelConfigPreset.CLAUDE_200K.value: {
+        "context_window": 200_000,
+        "max_images": 20,
+        "max_videos": 0,  # Claude doesn't support video
+        "support_gif": True,
+        "capabilities": {ModelCapability.vision, ModelCapability.document_understanding},
+    },
+    ModelConfigPreset.CLAUDE_1M.value: {
+        "context_window": 1_000_000,
+        "max_images": 20,
+        "max_videos": 0,  # Claude doesn't support video
+        "support_gif": True,
+        "capabilities": {ModelCapability.vision, ModelCapability.document_understanding},
+    },
+    # OpenAI GPT-5 series (vision, no video support)
+    ModelConfigPreset.GPT5_270K.value: {
+        "context_window": 270_000,
+        "max_images": 20,
+        "max_videos": 0,  # GPT doesn't support video
+        "support_gif": False,
+        "capabilities": {ModelCapability.vision},
+    },
+    # Gemini models (vision + video support)
+    ModelConfigPreset.GEMINI_1M.value: {
+        "context_window": 1_000_000,
+        "max_images": 20,  # Gemini supports more images
+        "max_videos": 1,  # Gemini supports video
+        "support_gif": True,
+        "capabilities": {
+            ModelCapability.vision,
+            ModelCapability.video_understanding,
+            ModelCapability.document_understanding,
+        },
+    },
+}
+
+# ModelConfig aliases
+_MODEL_CFG_ALIASES: dict[str, str] = {
+    "claude": ModelConfigPreset.CLAUDE_200K.value,
+    "anthropic": ModelConfigPreset.CLAUDE_200K.value,
+    "gpt5": ModelConfigPreset.GPT5_270K.value,
+    "openai": ModelConfigPreset.GPT5_270K.value,
+    "gemini": ModelConfigPreset.GEMINI_1M.value,
+}
+
+
+def get_model_cfg(preset: str | ModelConfigPreset) -> dict[str, Any]:
+    """Get ModelConfig by preset name.
+
+    Args:
+        preset: Preset name (string) or ModelConfigPreset enum.
+
+    Returns:
+        Dict suitable for ModelConfig constructor.
+
+    Raises:
+        ValueError: If preset name is not found.
+
+    Example::
+
+        # By string name
+        cfg = get_model_cfg("claude_200k")
+
+        # By enum
+        cfg = get_model_cfg(ModelConfigPreset.GEMINI_1M)
+
+        # By alias
+        cfg = get_model_cfg("claude")  # -> claude_200k
+    """
+    name = preset.value if isinstance(preset, ModelConfigPreset) else preset
+
+    # Check aliases first
+    if name in _MODEL_CFG_ALIASES:
+        name = _MODEL_CFG_ALIASES[name]
+
+    if name not in _MODEL_CFG_REGISTRY:
+        available = list(_MODEL_CFG_REGISTRY.keys()) + list(_MODEL_CFG_ALIASES.keys())
+        msg = f"Unknown ModelConfig preset: {preset!r}. Available: {sorted(available)}"
+        raise ValueError(msg)
+
+    return _MODEL_CFG_REGISTRY[name].copy()
+
+
+def resolve_model_cfg(
+    preset_or_dict: str | dict[str, Any] | ModelConfigPreset | None,
+) -> dict[str, Any] | None:
+    """Resolve a preset name or dict to ModelConfig dict.
+
+    This is the main entry point for resolving ModelConfig from various formats:
+    - None -> None (inherit from parent)
+    - "inherit" -> None (explicit inherit)
+    - str -> lookup preset by name
+    - ModelConfigPreset -> lookup preset by enum
+    - dict -> return as-is (assumed to be valid ModelConfig kwargs)
+
+    Args:
+        preset_or_dict: Preset name, enum, dict, or None.
+
+    Returns:
+        Dict suitable for ModelConfig constructor, or None for inherit.
+
+    Example::
+
+        # Inherit from parent (default)
+        cfg = resolve_model_cfg(None)  # -> None
+        cfg = resolve_model_cfg("inherit")  # -> None
+
+        # From preset name
+        cfg = resolve_model_cfg("claude_200k")
+
+        # From dict
+        cfg = resolve_model_cfg({"context_window": 100000, "max_images": 10})
+    """
+    if preset_or_dict is None:
+        return None
+    if isinstance(preset_or_dict, str):
+        if preset_or_dict == INHERIT:
+            return None
+        return get_model_cfg(preset_or_dict)
+    if isinstance(preset_or_dict, ModelConfigPreset):
+        return get_model_cfg(preset_or_dict)
+    # dict - return as-is
+    return dict(preset_or_dict)
+
+
+def list_model_cfg_presets() -> list[str]:
+    """List all available ModelConfig preset names.
+
+    Returns:
+        List of preset names (including aliases).
+    """
+    return sorted(set(_MODEL_CFG_REGISTRY.keys()) | set(_MODEL_CFG_ALIASES.keys()))

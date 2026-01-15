@@ -11,7 +11,7 @@ YAML Frontmatter Schema::
     description: Debug code issues
     instruction: Use this tool when debugging
     tools:  # Optional - list of tool names from parent toolset
-      - grep_tool
+      - grep
       - view
       - edit
     model: inherit  # Optional - 'inherit' or model name
@@ -57,8 +57,8 @@ from typing import TYPE_CHECKING, Any
 from pydantic_ai._agent_graph import HistoryProcessor
 
 from pai_agent_sdk.context import AgentContext, ModelConfig
+from pai_agent_sdk.presets import INHERIT
 from pai_agent_sdk.subagents.config import (
-    INHERIT,
     SubagentConfig,
     load_subagent_from_file,
     load_subagents_from_dir,
@@ -122,7 +122,7 @@ def load_builtin_subagent_tools(
         from pai_agent_sdk.subagents import load_builtin_subagent_tools
         from pai_agent_sdk.toolsets.core.base import Toolset
 
-        main_toolset = Toolset(ctx, tools=[ViewTool, EditTool, GrepTool])
+        main_toolset = Toolset(tools=[ViewTool, EditTool, GrepTool])
         subagent_tools = load_builtin_subagent_tools(
             parent_toolset=main_toolset,
             model="anthropic:claude-sonnet-4",

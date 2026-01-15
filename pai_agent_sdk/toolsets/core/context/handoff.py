@@ -16,7 +16,7 @@ Example::
     from pai_agent_sdk.filters.handoff import process_handoff_message
 
     async with AgentContext() as ctx:
-        toolset = Toolset(ctx, tools=[HandoffTool])
+        toolset = Toolset(tools=[HandoffTool])
         agent = Agent(
             'openai:gpt-4',
             deps_type=AgentContext,

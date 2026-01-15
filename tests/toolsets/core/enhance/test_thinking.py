@@ -16,7 +16,7 @@ def test_thinking_tool_attributes(agent_context: AgentContext) -> None:
         "Think about something without obtaining new information or making changes."
     )
     # Test get_instruction with a mock context
-    tool = ThinkingTool(agent_context)
+    tool = ThinkingTool()
     mock_run_ctx = MagicMock(spec=RunContext)
     mock_run_ctx.deps = agent_context
     assert tool.get_instruction(mock_run_ctx) == snapshot(
@@ -49,20 +49,19 @@ Use user's language when writing thoughts.
 
 def test_thinking_tool_initialization(agent_context: AgentContext) -> None:
     """Should initialize with context."""
-    tool = ThinkingTool(agent_context)
-    assert tool.ctx is agent_context
+    tool = ThinkingTool()
     assert tool.name == "thinking"
 
 
 def test_thinking_tool_is_available(agent_context: AgentContext, mock_run_ctx) -> None:
     """Should be available by default."""
-    tool = ThinkingTool(agent_context)
+    tool = ThinkingTool()
     assert tool.is_available(mock_run_ctx) is True
 
 
 async def test_thinking_tool_call_returns_thought(agent_context: AgentContext) -> None:
     """Should return the thought in a dictionary."""
-    tool = ThinkingTool(agent_context)
+    tool = ThinkingTool()
 
     mock_run_ctx = MagicMock(spec=RunContext)
     mock_run_ctx.deps = agent_context
@@ -73,7 +72,7 @@ async def test_thinking_tool_call_returns_thought(agent_context: AgentContext) -
 
 async def test_thinking_tool_call_with_markdown(agent_context: AgentContext) -> None:
     """Should handle markdown formatted thoughts."""
-    tool = ThinkingTool(agent_context)
+    tool = ThinkingTool()
 
     mock_run_ctx = MagicMock(spec=RunContext)
     mock_run_ctx.deps = agent_context
@@ -92,7 +91,7 @@ code_example()
 
 async def test_thinking_tool_call_with_empty_thought(agent_context: AgentContext) -> None:
     """Should handle empty thought string."""
-    tool = ThinkingTool(agent_context)
+    tool = ThinkingTool()
 
     mock_run_ctx = MagicMock(spec=RunContext)
     mock_run_ctx.deps = agent_context
@@ -103,7 +102,7 @@ async def test_thinking_tool_call_with_empty_thought(agent_context: AgentContext
 
 async def test_thinking_tool_call_with_unicode(agent_context: AgentContext) -> None:
     """Should handle unicode characters."""
-    tool = ThinkingTool(agent_context)
+    tool = ThinkingTool()
 
     mock_run_ctx = MagicMock(spec=RunContext)
     mock_run_ctx.deps = agent_context

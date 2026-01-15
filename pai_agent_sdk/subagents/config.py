@@ -12,9 +12,6 @@ from typing import Any
 import yaml
 from pydantic import BaseModel
 
-# Special value indicating inheritance from parent
-INHERIT = "inherit"
-
 
 class SubagentConfig(BaseModel):
     """Parsed subagent configuration from markdown file.
@@ -47,8 +44,8 @@ class SubagentConfig(BaseModel):
     model_settings: str | dict[str, Any] | None = None
     """ModelSettings: 'inherit', preset name (e.g., 'anthropic_medium'), or dict config."""
 
-    model_cfg: dict[str, Any] | None = None
-    """ModelConfig for context management: None (inherit from parent) or dict config."""
+    model_cfg: str | dict[str, Any] | None = None
+    """ModelConfig: 'inherit' (default), preset name (e.g., 'claude_200k'), or dict config."""
 
 
 def parse_subagent_markdown(content: str) -> SubagentConfig:
@@ -73,7 +70,7 @@ def parse_subagent_markdown(content: str) -> SubagentConfig:
         name: debugger
         description: Debug code issues
         tools:
-          - grep_tool
+          - grep
           - view
         model_settings: anthropic_high
         ---

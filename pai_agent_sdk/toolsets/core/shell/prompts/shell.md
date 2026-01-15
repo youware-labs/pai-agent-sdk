@@ -12,7 +12,7 @@ Examples: `ls -la`, `npm install && npm run build`
 Large outputs (>20KB) are saved to temporary files with paths in stdout_file_path/stderr_file_path.
 
 Avoid:
-- find/grep for searching - use grep_tool, glob_tool instead
+- find/grep for searching - use grep, glob instead
 - cat/head/tail/ls to read files - use view and ls tools
 - cd command - use cwd parameter instead
 </shell-tool>

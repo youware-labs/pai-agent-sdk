@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, Generic, cast
 
 import jinja2
 from agent_environment import Environment
-from pydantic_ai import Agent, DeferredToolRequests, DeferredToolResults
+from pydantic_ai import Agent, DeferredToolRequests, DeferredToolResults, UsageLimits
 from pydantic_ai._agent_graph import CallToolsNode, HistoryProcessor, ModelRequestNode
 from pydantic_ai.messages import ModelMessage, UserContent
 from pydantic_ai.models import KnownModelName, Model
@@ -40,7 +40,7 @@ from pai_agent_sdk.environment.local import LocalEnvironment
 from pai_agent_sdk.filters.environment_instructions import create_environment_instructions_filter
 from pai_agent_sdk.filters.system_prompt import create_system_prompt_filter
 from pai_agent_sdk.toolsets.core.base import BaseTool, GlobalHooks, Toolset
-from pai_agent_sdk.utils import add_toolset_instructions
+from pai_agent_sdk.utils import AgentDepsT, add_toolset_instructions
 
 if TYPE_CHECKING:
     from pydantic_ai import ModelSettings
@@ -69,8 +69,7 @@ class AgentInterrupted(Exception):
 # Type Variables
 # =============================================================================
 
-AgentDepsT = TypeVar("AgentDepsT", bound=AgentContext, default=AgentContext)
-OutputT = TypeVar("OutputT", default=str)
+OutputT = TypeVar("OutputT")
 
 
 # =============================================================================
@@ -347,7 +346,6 @@ def create_agent(
     tools = tools or []
     logger.debug("Creating core toolset with %d tools", len(tools))
     core_toolset = Toolset(
-        ctx,
         tools=tools,
         pre_hooks=pre_hooks,
         post_hooks=post_hooks,
@@ -355,6 +353,7 @@ def create_agent(
         max_retries=toolset_max_retries,
         timeout=toolset_timeout,
         skip_unavailable=skip_unavailable_tools,
+        toolset_id="core",
     )
 
     # Add subagent tools if requested
@@ -555,6 +554,7 @@ async def stream_agent(  # noqa: C901
     *,
     message_history: Sequence[ModelMessage] | None = None,
     deferred_tool_results: DeferredToolResults | None = None,
+    usage_limits: UsageLimits | None = None,
     # Hooks
     pre_node_hook: NodeHook[AgentDepsT, OutputT] | None = None,
     post_node_hook: NodeHook[AgentDepsT, OutputT] | None = None,
@@ -644,7 +644,6 @@ async def stream_agent(  # noqa: C901
             await pre_node_hook(
                 NodeHookContext(agent_info=main_agent_info, node=node, run=run, output_queue=output_queue)
             )
-
         async with node.stream(run.ctx) as request_stream:
             async for event in request_stream:
                 # PRE EVENT HOOK
@@ -687,6 +686,7 @@ async def stream_agent(  # noqa: C901
                 agent.iter(
                     user_prompt,
                     deps=ctx,
+                    usage_limits=usage_limits,
                     message_history=message_history,
                     deferred_tool_results=deferred_tool_results,
                     metadata=cast(dict[str, Any], metadata) if metadata else None,

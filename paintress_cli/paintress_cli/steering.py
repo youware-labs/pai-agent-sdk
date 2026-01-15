@@ -16,7 +16,12 @@ import uuid
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+
+from pydantic_ai import ModelRetry, RunContext
+
+if TYPE_CHECKING:
+    pass
 
 
 @dataclass
@@ -88,7 +93,7 @@ class LocalSteeringManager:
         max_size: Maximum number of messages to buffer.
     """
 
-    def __init__(self, max_size: int = 10) -> None:
+    def __init__(self, max_size: int = 100) -> None:
         """Initialize the steering manager.
 
         Args:
@@ -156,3 +161,33 @@ class LocalSteeringManager:
     def __repr__(self) -> str:
         """Return string representation."""
         return f"LocalSteeringManager(pending={len(self._buffer)}, max_size={self._max_size})"
+
+
+# =============================================================================
+# Steering Guard
+# =============================================================================
+
+
+async def steering_output_guard(ctx: RunContext[Any], output: str) -> str:
+    """Output guard that checks for pending steering messages.
+
+    This guard is used with TextOutput to trigger a ModelRetry when
+    there are pending steering messages at the time of output.
+    This ensures the agent processes any user guidance before completing.
+
+    Args:
+        ctx: The run context containing TUIContext with steering_manager.
+        output: The text output from the agent.
+
+    Returns:
+        The output unchanged if no pending messages.
+
+    Raises:
+        ModelRetry: If there are pending steering messages.
+    """
+    deps = ctx.deps
+    # Check if deps has steering_manager (TUIContext)
+    steering_manager = getattr(deps, "steering_manager", None)
+    if steering_manager is not None and steering_manager.has_pending():
+        raise ModelRetry("User added steering messages, please continue the task with the new instructions.")
+    return output

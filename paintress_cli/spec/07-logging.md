@@ -2,9 +2,19 @@
 
 ## Overview
 
-TUI logging redirects all log output from both `paintress_cli` and `pai_agent_sdk` to an asyncio Queue. This prevents log messages from interfering with the TUI display (no stdout/stderr output).
+TUI logging has two modes:
 
-Log messages are emitted as `LogEvent` instances that TUI components can consume and display in a dedicated log panel.
+1. **Silent mode** (default): No log output, prevents interference with TUI display
+2. **Verbose mode** (`-v` flag): Logs written to `paintress.log` in current directory
+
+Additionally, log messages are emitted as `LogEvent` instances to an asyncio Queue for potential TUI panel display.
+
+## Logging Modes
+
+| Mode | Startup Behavior | TUI Runtime Behavior |
+|------|------------------|---------------------|
+| Normal | NullHandler (silent) | Queue only |
+| Verbose (`-v`) | FileHandler (`paintress.log`) | Queue + FileHandler |
 
 ## Architecture
 
@@ -15,19 +25,23 @@ flowchart LR
         SDK[pai_agent_sdk logger]
     end
 
-    subgraph QueueHandler
-        Handler[QueueHandler]
+    subgraph Handlers
+        QH[QueueHandler]
+        FH[FileHandler]
     end
 
-    subgraph TUI Display
+    subgraph Output
         Queue[(asyncio.Queue)]
-        Panel[Log Panel]
+        File[(paintress.log)]
     end
 
-    TUI --> Handler
-    SDK --> Handler
-    Handler --> Queue
-    Queue --> Panel
+    TUI --> QH
+    SDK --> QH
+    QH --> Queue
+
+    TUI -.->|verbose mode| FH
+    SDK -.->|verbose mode| FH
+    FH -.-> File
 ```
 
 ## Components
@@ -70,9 +84,23 @@ class QueueHandler(logging.Handler):
 
 ## Usage
 
-### Initialization
+### CLI Startup Logging
 
-Call `configure_tui_logging()` once at TUI startup:
+Called in `cli.py` before TUI starts:
+
+```python
+from paintress_cli.logging import configure_logging
+
+# Silent mode (default)
+configure_logging(verbose=False)
+
+# Verbose mode - logs to paintress.log
+configure_logging(verbose=True)
+```
+
+### TUI Runtime Logging
+
+Called in `app.py` when TUI initializes:
 
 ```python
 import asyncio
@@ -81,8 +109,8 @@ from paintress_cli.logging import configure_tui_logging
 # Create queue for log events
 log_queue = asyncio.Queue()
 
-# Configure both paintress_cli and pai_agent_sdk loggers
-configure_tui_logging(log_queue, level=logging.INFO)
+# Configure with verbose mode for file logging
+configure_tui_logging(log_queue, verbose=True)
 ```
 
 ### Getting a Logger
@@ -96,54 +124,45 @@ logger.warning("Token usage high")
 logger.error("Connection failed")
 ```
 
-### Consuming Log Events
-
-TUI components consume `LogEvent` from the queue:
-
-```python
-async def log_panel_task(log_queue: asyncio.Queue):
-    while True:
-        event = await log_queue.get()
-        if isinstance(event, LogEvent):
-            display_log_line(
-                level=event.level,
-                message=event.message,
-                timestamp=event.timestamp,
-            )
-```
-
 ## Design Decisions
 
-### Why Queue-Based?
+### Why File-Based for Verbose Mode?
 
-1. **Non-blocking**: Logging never blocks agent execution
-2. **TUI-safe**: No stdout/stderr output that corrupts display
-3. **Unified**: Same event system as agent events
-4. **Filterable**: TUI can filter/format logs as needed
+1. **TUI-safe**: No stdout/stderr output that corrupts display
+2. **Persistent**: Logs preserved for debugging after session ends
+3. **Simple**: `tail -f paintress.log` for real-time monitoring
 
-### Why Extend AgentEvent?
+### Why Silent by Default?
 
-- Consistent with SDK event system
-- Can flow through same `agent_stream_queues` if needed
-- Carries `event_id` and `timestamp` automatically
+- TUI provides visual feedback for important events
+- Log noise distracts from user interaction
+- File I/O overhead unnecessary for normal operation
 
 ### Log Levels
 
 | Level    | Usage                                  |
 | -------- | -------------------------------------- |
-| DEBUG    | Detailed tracing (disabled by default) |
+| DEBUG    | Detailed tracing (verbose mode)        |
 | INFO     | Normal operations                      |
 | WARNING  | Potential issues                       |
 | ERROR    | Failures                               |
 | CRITICAL | Fatal errors                           |
 
-Default level is `INFO` to avoid noise from DEBUG messages.
-
 ## API Reference
 
-### `configure_tui_logging(queue, level=logging.INFO)`
+### `configure_logging(verbose=False)`
 
-Configure both `paintress_cli` and `pai_agent_sdk` loggers to emit to the queue.
+Configure logging for CLI startup phase.
+
+- `verbose=False`: NullHandler (silent)
+- `verbose=True`: FileHandler (`paintress.log`)
+
+### `configure_tui_logging(queue, level=logging.INFO, verbose=False)`
+
+Configure logging for TUI runtime.
+
+- Always adds QueueHandler for log events
+- `verbose=True`: Also adds FileHandler
 
 ### `reset_logging()`
 
@@ -153,22 +172,16 @@ Clear all handlers. Useful for tests.
 
 Get a logger under the `paintress_cli` namespace.
 
-## Integration with TUI
+## File Location
 
-The log panel renderer consumes from the log queue and displays formatted entries:
+Log file is always created in the current working directory:
 
 ```
-┌─ Logs ────────────────────────────────────────────────┐
-│ 16:32:01 INFO  session: Injected 1 steering message   │
-│ 16:32:02 WARN  context: Token usage at 75%            │
-│ 16:32:05 ERROR browser: Connection timeout            │
-└───────────────────────────────────────────────────────┘
+./paintress.log
 ```
 
-Color coding by level:
-
-- DEBUG: dim/gray
-- INFO: default
-- WARNING: yellow
-- ERROR: red
-- CRITICAL: red/bold
+Format:
+```
+2026-01-15 14:30:00,123 DEBUG [paintress_cli.session] Starting agent run
+2026-01-15 14:30:01,456 INFO [pai_agent_sdk.agents.main] Streaming response
+```

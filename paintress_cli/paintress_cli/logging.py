@@ -9,15 +9,19 @@ Key components:
 - QueueHandler: Logging handler that emits LogEvents to a queue
 - configure_tui_logging(): Setup function to redirect all loggers to TUI
 
+Logging modes:
+- Non-verbose (-v not set): Silent mode, no log output
+- Verbose (-v set): Log to file (paintress.log in current directory)
+
 Usage:
     from paintress_cli.logging import configure_tui_logging, LogEvent
 
     # At TUI startup
     log_queue = asyncio.Queue()
-    configure_tui_logging(log_queue)
+    configure_tui_logging(log_queue, verbose=True)  # Enable file logging
 
-    # Log messages now appear as LogEvents in the queue
-    # TUI can consume and display them
+    # Log messages appear as LogEvents in the queue for TUI display
+    # With verbose=True, also written to paintress.log
 """
 
 from __future__ import annotations
@@ -25,6 +29,7 @@ from __future__ import annotations
 import logging
 from asyncio import Queue
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pai_agent_sdk.events import AgentEvent
@@ -36,9 +41,13 @@ if TYPE_CHECKING:
 TUI_LOGGER_NAME = "paintress_cli"
 SDK_LOGGER_NAME = "pai_agent_sdk"
 
+# Log file name
+LOG_FILE_NAME = "paintress.log"
+
 # Cache for initialization state
 _initialized = False
 _log_queue: Queue | None = None
+_verbose_mode: bool = False
 
 
 # -----------------------------------------------------------------------------
@@ -122,13 +131,19 @@ class QueueHandler(logging.Handler):
 # -----------------------------------------------------------------------------
 
 
-def _configure_logger(name: str, queue: Queue, level: int = logging.DEBUG) -> None:
+def _configure_logger(
+    name: str,
+    queue: Queue,
+    level: int = logging.DEBUG,
+    add_file_handler: bool = False,
+) -> None:
     """Configure a logger to use the queue handler.
 
     Args:
         name: Logger name.
         queue: Queue to emit events to.
         level: Minimum log level.
+        add_file_handler: If True, also add file handler for verbose mode.
     """
     logger = logging.getLogger(name)
 
@@ -136,10 +151,18 @@ def _configure_logger(name: str, queue: Queue, level: int = logging.DEBUG) -> No
     logger.handlers.clear()
 
     # Add queue handler
-    handler = QueueHandler(queue, level)
+    queue_handler = QueueHandler(queue, level)
     formatter = logging.Formatter("%(message)s")
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
+    queue_handler.setFormatter(formatter)
+    logger.addHandler(queue_handler)
+
+    # Add file handler for verbose mode
+    if add_file_handler:
+        log_file = Path.cwd() / LOG_FILE_NAME
+        file_handler = logging.FileHandler(log_file)
+        file_formatter = logging.Formatter("%(asctime)s %(levelname)s [%(name)s] %(message)s")
+        file_handler.setFormatter(file_formatter)
+        logger.addHandler(file_handler)
 
     # Set level and prevent propagation
     logger.setLevel(level)
@@ -149,6 +172,7 @@ def _configure_logger(name: str, queue: Queue, level: int = logging.DEBUG) -> No
 def configure_tui_logging(
     queue: Queue,
     level: int = logging.INFO,
+    verbose: bool = False,
 ) -> None:
     """Configure logging for TUI mode.
 
@@ -159,10 +183,11 @@ def configure_tui_logging(
     Args:
         queue: Asyncio queue to receive LogEvents.
         level: Minimum log level to capture (default: INFO).
+        verbose: If True, also log to file (paintress.log).
 
     Example:
         log_queue = asyncio.Queue()
-        configure_tui_logging(log_queue)
+        configure_tui_logging(log_queue, verbose=True)
 
         # Later, consume events
         while True:
@@ -176,9 +201,12 @@ def configure_tui_logging(
 
     _log_queue = queue
 
+    # Use DEBUG level for verbose mode to capture all logs
+    effective_level = logging.DEBUG if verbose else level
+
     # Configure both loggers
-    _configure_logger(TUI_LOGGER_NAME, queue, level)
-    _configure_logger(SDK_LOGGER_NAME, queue, level)
+    _configure_logger(TUI_LOGGER_NAME, queue, effective_level, add_file_handler=verbose)
+    _configure_logger(SDK_LOGGER_NAME, queue, effective_level, add_file_handler=verbose)
 
     _initialized = True
 
@@ -188,7 +216,7 @@ def reset_logging() -> None:
 
     Useful for tests or when reconfiguring.
     """
-    global _initialized, _log_queue
+    global _initialized, _log_queue, _verbose_mode
 
     for name in [TUI_LOGGER_NAME, SDK_LOGGER_NAME]:
         logger = logging.getLogger(name)
@@ -196,29 +224,39 @@ def reset_logging() -> None:
 
     _initialized = False
     _log_queue = None
+    _verbose_mode = False
 
 
 def configure_logging(verbose: bool = False) -> None:
-    """Configure basic stderr logging for CLI startup.
+    """Configure logging for CLI startup.
 
     This is used before TUI is initialized, for early startup messages.
     Once TUI starts, call configure_tui_logging() to switch to queue mode.
 
     Args:
-        verbose: If True, set DEBUG level; otherwise INFO.
+        verbose: If True, log to file (DEBUG level); otherwise silent.
     """
-    level = logging.DEBUG if verbose else logging.INFO
+    global _verbose_mode
+    _verbose_mode = verbose
 
-    # Configure both loggers with stderr handler
+    level = logging.DEBUG if verbose else logging.WARNING
+
+    # Configure both loggers
     for name in [TUI_LOGGER_NAME, SDK_LOGGER_NAME]:
         logger = logging.getLogger(name)
         logger.handlers.clear()
 
-        handler = logging.StreamHandler()
-        formatter = logging.Formatter("%(levelname)s: %(message)s")
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
+        if verbose:
+            # File handler for verbose mode
+            log_file = Path.cwd() / LOG_FILE_NAME
+            handler: logging.Handler = logging.FileHandler(log_file)
+            formatter = logging.Formatter("%(asctime)s %(levelname)s [%(name)s] %(message)s")
+            handler.setFormatter(formatter)
+        else:
+            # Silent mode - no output
+            handler = logging.NullHandler()
 
+        logger.addHandler(handler)
         logger.setLevel(level)
         logger.propagate = False
 

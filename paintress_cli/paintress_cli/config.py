@@ -96,19 +96,6 @@ class ToolsConfig(BaseModel):
     """Tools requiring user approval before execution."""
 
 
-class SteeringConfig(BaseModel):
-    """Steering mode configuration."""
-
-    enabled: bool = True
-    """Enable steering mode (inject messages during execution)."""
-
-    prefix: str = ">"
-    """Steering message prefix (empty = any message is steering)."""
-
-    buffer_size: int = 10
-    """Buffer size for pending steering messages."""
-
-
 class SubagentOverride(BaseModel):
     """Override settings for a specific subagent."""
 
@@ -133,17 +120,31 @@ class SubagentsConfig(BaseModel):
     """Override settings for specific subagents."""
 
 
-class SessionConfig(BaseModel):
-    """Session persistence configuration."""
+class CommandDefinition(BaseModel):
+    """Definition for a custom slash command.
 
-    session_dir: str = ".paintress"
-    """Session persistence directory."""
+    Custom commands trigger a predefined prompt when invoked via /name.
+    """
 
-    auto_save_history: bool = False
-    """Auto-save message history."""
+    prompt: str
+    """The prompt text to send to the agent."""
 
-    auto_restore: bool = False
-    """Auto-restore previous session."""
+    mode: Literal["act", "plan"] | None = None
+    """Optional mode to switch to before executing (act or plan)."""
+
+    description: str = ""
+    """Description shown in /help output."""
+
+
+# Default commands provided out of the box (minimal set)
+# Additional commands like /commit, /review can be added in config.toml
+DEFAULT_COMMANDS: dict[str, CommandDefinition] = {
+    "init": CommandDefinition(
+        prompt="Please initialize the project's AGENTS.md file.",
+        mode="act",
+        description="Initialize AGENTS.md",
+    ),
+}
 
 
 class MCPServerConfig(BaseModel):
@@ -182,13 +183,20 @@ class PaintressConfig(BaseModel):
     general: GeneralConfig = Field(default_factory=GeneralConfig)
     display: DisplayConfig = Field(default_factory=DisplayConfig)
     browser: BrowserConfig = Field(default_factory=BrowserConfig)
-    steering: SteeringConfig = Field(default_factory=SteeringConfig)
     subagents: SubagentsConfig = Field(default_factory=SubagentsConfig)
-    session: SessionConfig = Field(default_factory=SessionConfig)
     env: dict[str, str] = Field(default_factory=dict)
     """Environment variable overrides (e.g., API keys)."""
     # From project config
     tools: ToolsConfig = Field(default_factory=ToolsConfig)
+    # Custom slash commands
+    commands: dict[str, CommandDefinition] = Field(default_factory=dict)
+    """Custom slash commands (merged with defaults)."""
+
+    def get_commands(self) -> dict[str, CommandDefinition]:
+        """Get all commands (defaults + user-defined, user overrides defaults)."""
+        result = dict(DEFAULT_COMMANDS)
+        result.update(self.commands)
+        return result
 
     @property
     def is_configured(self) -> bool:

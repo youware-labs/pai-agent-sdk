@@ -48,14 +48,6 @@ browser_image = "zenika/alpine-chrome:latest"
 # Browser startup timeout in seconds
 browser_timeout = 30
 
-[steering]
-# Enable steering mode (inject messages during execution)
-enabled = true
-# Steering message prefix (empty = any message is steering)
-prefix = ">"
-# Buffer size for pending steering messages
-buffer_size = 10
-
 [subagents]
 # Subagents are loaded from ~/.config/youware-labs/paintress-cli/subagents/
 # Run `paintress setup` to initialize default subagents
@@ -68,10 +60,39 @@ disabled = []
 # model = "openai:gpt-4o"
 # model_settings = "openai_default"
 
-[session]
-# Session persistence directory
-session_dir = ".paintress"
-# Auto-save message history
-auto_save_history = false
-# Auto-restore previous session
-auto_restore = false
+# =============================================================================
+# Custom Slash Commands
+# =============================================================================
+# Define custom commands that can be triggered with /name
+# Each command has: prompt, mode (optional), description (optional)
+
+[commands.commit]
+description = "Review and commit changes"
+mode = "act"
+prompt = """
+Please review current changes and commit them with:
+`Co-Authored-By: Paintress <paintress@arcoer.com>`
+"""
+
+[commands.review]
+description = "Comprehensive code review"
+mode = "act"
+prompt = """
+Please review the current changes and pull request.
+First, use bash commands to determine the review scope:
+
+1. Check current branch: `git branch --show-current`
+2. If on main/master: review uncommitted changes only
+3. If on feature branch: review all changes since branching from main
+4. Conduct comprehensive code review focusing on:
+   - Logic errors and bugs
+   - Security vulnerabilities
+   - Code quality and error handling
+   - Project standards and naming conventions
+"""
+
+# Example: Add your own custom commands
+# [commands.deploy]
+# description = "Deploy to production"
+# mode = "act"
+# prompt = "Please help me deploy to production..."

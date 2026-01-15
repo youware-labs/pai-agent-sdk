@@ -336,7 +336,7 @@ def cli(verbose: bool) -> None:
 
     # Run the TUI
     try:
-        asyncio.run(_run_tui(config, config_manager))
+        asyncio.run(_run_tui(config, config_manager, verbose))
     except KeyboardInterrupt:
         click.echo("\nGoodbye!")
         sys.exit(130)
@@ -349,11 +349,12 @@ def cli(verbose: bool) -> None:
 async def _run_tui(
     config: PaintressConfig,
     config_manager: ConfigManager,
+    verbose: bool,
 ) -> None:
     """Run the TUI application."""
     from paintress_cli.app import TUIApp
 
-    async with TUIApp(config=config, config_manager=config_manager) as app:
+    async with TUIApp(config=config, config_manager=config_manager, verbose=verbose) as app:
         await app.run()
 
 

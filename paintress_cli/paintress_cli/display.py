@@ -250,6 +250,100 @@ class ToolMessage(BaseModel):
 
         return Panel(panel_content, title=f"[TOOL] {self.name}", title_align="left")
 
+    def to_inline_text(
+        self,
+        duration: float = 0.0,
+        max_arg_length: int = 80,
+        max_result_lines: int = 8,
+        max_line_length: int = 100,
+    ) -> Text:
+        """Convert the tool message to inline Rich Text format (no panel border).
+
+        Format:
+            Complete: tool_name (0.1s)
+              Args: {...}
+              Output: {...}
+        """
+        # Check if tool execution failed
+        is_error = self.content and self.content.startswith("Tool execution error")
+
+        content = Text()
+        if is_error:
+            content.append("x Error: ", style="dim")
+            content.append(self.name, style="bold red")
+        else:
+            content.append("Complete: ", style="dim")
+            content.append(self.name, style="bold green")
+        content.append(f" ({duration:.1f}s)", style="dim")
+
+        # Add args preview
+        args_preview = self._format_inline_args(max_arg_length)
+        if args_preview:
+            content.append("\n  ", style="dim")
+            content.append("Args: ", style="dim cyan")
+            content.append(args_preview, style="dim")
+
+        # Add output preview
+        output_preview = self._format_inline_output(max_result_lines, max_line_length)
+        if output_preview and output_preview != "[no output]":
+            content.append("\n  ", style="dim")
+            if is_error:
+                content.append("Error: ", style="dim red")
+            else:
+                content.append("Output: ", style="dim yellow")
+            content.append(output_preview, style="dim")
+
+        return content
+
+    def _format_inline_args(self, max_length: int = 80) -> str:
+        """Format tool arguments for inline display."""
+        if not self.args:
+            return ""
+        try:
+            if isinstance(self.args, dict):
+                args_str = json.dumps(self.args, ensure_ascii=False)
+            else:
+                args_str = str(self.args)
+            if len(args_str) > max_length:
+                return args_str[: max_length - 3] + "..."
+            return args_str
+        except Exception:
+            return str(self.args)[:max_length]
+
+    def _format_inline_output(self, max_lines: int = 8, max_line_length: int = 100) -> str:
+        """Format tool output for inline display."""
+        if not self.content:
+            return "[no output]"
+        try:
+            # Try to parse as JSON for prettier formatting
+            try:
+                parsed = json.loads(self.content)
+                if isinstance(parsed, dict):
+                    lines = []
+                    for key, value in list(parsed.items())[: max_lines - 2]:
+                        str_value = str(value)
+                        if len(str_value) > max_line_length:
+                            str_value = str_value[: max_line_length - 3] + "..."
+                        lines.append(f"{key}: {str_value}")
+                    if len(parsed) > max_lines - 2:
+                        lines.append("...")
+                    return "{" + ", ".join(lines) + "}"
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+            # Plain text handling
+            content_lines = self.content.split("\n")
+            result_lines = []
+            for line in content_lines[:max_lines]:
+                if len(line) > max_line_length:
+                    line = line[: max_line_length - 3] + "..."
+                result_lines.append(line)
+            if len(content_lines) > max_lines:
+                result_lines.append("...")
+            return "\n".join(result_lines)
+        except Exception:
+            return str(self.content)[:max_line_length]
+
     def to_special_panel(self, code_theme: str = "monokai") -> Panel:
         """Create special panel for to_do and thinking tools."""
         if self.name in ["to_do_read", "to_do_write"]:
@@ -455,18 +549,32 @@ class EventRenderer:
 
     def render_tool_call_start(self, name: str, tool_call_id: str) -> str:
         """Render tool call start indicator."""
-        return f"[Tool] {name}..."
+        text = Text()
+        text.append("Calling: ", style="dim")
+        text.append(name, style="bold cyan")
+        return self._renderer.render(text)
 
-    def render_tool_call_complete(self, tool_message: ToolMessage) -> str:
-        """Render completed tool call as panel."""
+    def render_tool_call_complete(
+        self,
+        tool_message: ToolMessage,
+        duration: float = 0.0,
+    ) -> str:
+        """Render completed tool call.
+
+        Special tools (edit, thinking, to_do) use Panel format.
+        Normal tools use inline Text format for cleaner display.
+        """
         if tool_message.name in {"edit", "thinking", "to_do_read", "to_do_write", "multi_edit"}:
             panel = tool_message.to_special_panel(code_theme=self._code_theme)
+            return self._renderer.render(panel)
         else:
-            panel = tool_message.to_panel(
-                max_result_lines=self._max_tool_result_lines,
+            # Use inline text format for normal tools
+            text = tool_message.to_inline_text(
+                duration=duration,
                 max_arg_length=self._max_arg_length,
+                max_result_lines=self._max_tool_result_lines,
             )
-        return self._renderer.render(panel)
+            return self._renderer.render(text)
 
     def render_markdown(self, text: str) -> str:
         """Render markdown text."""

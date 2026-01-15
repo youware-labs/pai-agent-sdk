@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any
 
 from paintress_cli.config import (
+    DEFAULT_COMMANDS,
+    CommandDefinition,
     ConfigManager,
     GeneralConfig,
     PaintressConfig,
@@ -419,3 +421,90 @@ def test_get_mcp_config_file(
     project_mcp = project_config_dir / "mcp.json"
     project_mcp.write_text("{}")
     assert config_manager.get_mcp_config_file() == project_mcp
+
+
+# =============================================================================
+# Commands Tests
+# =============================================================================
+
+
+def test_default_commands() -> None:
+    """Test that default commands include init."""
+    assert "init" in DEFAULT_COMMANDS
+    assert DEFAULT_COMMANDS["init"].mode == "act"
+    assert DEFAULT_COMMANDS["init"].description == "Initialize AGENTS.md"
+
+
+def test_get_commands_returns_defaults() -> None:
+    """Test get_commands returns default commands."""
+    config = PaintressConfig()
+    commands = config.get_commands()
+
+    assert "init" in commands
+
+
+def test_get_commands_merges_user_commands() -> None:
+    """Test that user commands are merged with defaults."""
+    config = PaintressConfig(
+        commands={
+            "custom": CommandDefinition(
+                prompt="Custom prompt",
+                description="Custom command",
+            )
+        }
+    )
+    commands = config.get_commands()
+
+    assert "init" in commands  # Default
+    assert "custom" in commands  # User-defined
+    assert commands["custom"].prompt == "Custom prompt"
+
+
+def test_user_command_overrides_default() -> None:
+    """Test that user commands can override defaults."""
+    config = PaintressConfig(
+        commands={
+            "init": CommandDefinition(
+                prompt="Custom init prompt",
+                description="Custom init",
+            )
+        }
+    )
+    commands = config.get_commands()
+
+    assert commands["init"].prompt == "Custom init prompt"
+    assert commands["init"].description == "Custom init"
+
+
+def test_load_commands_from_config_file(
+    temp_config_dir: Path,
+    temp_project_dir: Path,
+    monkeypatch: Any,
+) -> None:
+    """Test loading commands from config.toml."""
+    monkeypatch.chdir(temp_project_dir)
+
+    global_config = temp_config_dir / "config.toml"
+    global_config.write_text("""
+[general]
+model = "anthropic:claude-sonnet-4-5"
+
+[commands.commit]
+description = "Commit changes"
+mode = "act"
+prompt = "Please commit"
+
+[commands.review]
+description = "Review code"
+prompt = "Please review"
+""")
+
+    config_manager = ConfigManager(config_dir=temp_config_dir)
+    config = config_manager.load()
+
+    commands = config.get_commands()
+    assert "init" in commands  # Default
+    assert "commit" in commands  # From config
+    assert "review" in commands  # From config
+    assert commands["commit"].mode == "act"
+    assert commands["review"].prompt == "Please review"

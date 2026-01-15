@@ -194,7 +194,7 @@ def create_steering_filter(
             parts=[*message_history[-1].parts, *rendered],
         )
 
-        logger.info(
+        logger.debug(
             "Injected %d steering message(s): %s",
             len(steering_messages),
             steering_messages[0].prompt[:50] if steering_messages else "",
@@ -203,6 +203,17 @@ def create_steering_filter(
         # Emit event via context (which is TUIContext)
         # Include full content for user audit
         full_content = "\n".join(m.prompt for m in steering_messages)
+
+        # Add to user_prompts for compact/handoff recovery
+        steering_text = f"<steering>\n{full_content}\n</steering>"
+        if context.user_prompts is None:
+            context.user_prompts = steering_text
+        elif isinstance(context.user_prompts, str):
+            context.user_prompts = context.user_prompts + "\n\n" + steering_text
+        else:
+            # Sequence[UserContent] - convert to list and append string
+            context.user_prompts = [*context.user_prompts, steering_text]
+
         event = SteeringInjectedEvent(
             event_id=f"steer-{uuid.uuid4().hex[:8]}",
             message_count=len(steering_messages),

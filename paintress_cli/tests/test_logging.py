@@ -6,10 +6,12 @@ import asyncio
 import logging
 
 from paintress_cli.logging import (
+    LOG_FILE_NAME,
     SDK_LOGGER_NAME,
     TUI_LOGGER_NAME,
     LogEvent,
     QueueHandler,
+    configure_logging,
     configure_tui_logging,
     get_logger,
     reset_logging,
@@ -102,6 +104,24 @@ class TestConfigureTuiLogging:
         assert len(logger.handlers) == 1
         assert isinstance(logger.handlers[0], QueueHandler)
 
+    def test_verbose_adds_file_handler(self, tmp_path, monkeypatch):
+        """Test verbose mode adds file handler."""
+        monkeypatch.chdir(tmp_path)
+        queue: asyncio.Queue = asyncio.Queue()
+        configure_tui_logging(queue, verbose=True)
+
+        logger = logging.getLogger(TUI_LOGGER_NAME)
+        # Should have both QueueHandler and FileHandler
+        assert len(logger.handlers) == 2
+        handler_types = [type(h).__name__ for h in logger.handlers]
+        assert "QueueHandler" in handler_types
+        assert "FileHandler" in handler_types
+
+        # Log file should be created
+        log_file = tmp_path / LOG_FILE_NAME
+        logger.info("Test verbose log")
+        assert log_file.exists()
+
     def test_logs_go_to_queue(self):
         """Test that log messages appear in queue."""
         queue: asyncio.Queue = asyncio.Queue()
@@ -172,3 +192,36 @@ class TestResetLogging:
 
         assert len(tui_logger.handlers) == 0
         assert len(sdk_logger.handlers) == 0
+
+
+class TestConfigureLogging:
+    """Tests for configure_logging (CLI startup logging)."""
+
+    def teardown_method(self):
+        """Reset logging after each test."""
+        reset_logging()
+
+    def test_silent_mode(self):
+        """Test non-verbose mode uses NullHandler."""
+        configure_logging(verbose=False)
+
+        logger = logging.getLogger(TUI_LOGGER_NAME)
+        assert len(logger.handlers) == 1
+        assert isinstance(logger.handlers[0], logging.NullHandler)
+
+    def test_verbose_mode_creates_file(self, tmp_path, monkeypatch):
+        """Test verbose mode creates log file."""
+        monkeypatch.chdir(tmp_path)
+        configure_logging(verbose=True)
+
+        logger = logging.getLogger(TUI_LOGGER_NAME)
+        assert len(logger.handlers) == 1
+        assert isinstance(logger.handlers[0], logging.FileHandler)
+
+        # Log something and verify file is created
+        logger.debug("Test log message")
+        log_file = tmp_path / LOG_FILE_NAME
+        assert log_file.exists()
+
+        content = log_file.read_text()
+        assert "Test log message" in content

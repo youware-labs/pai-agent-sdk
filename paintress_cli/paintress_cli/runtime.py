@@ -30,8 +30,9 @@ from importlib import resources
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from pydantic_ai import ModelSettings
+from pydantic_ai import ModelSettings, TextOutput
 from pydantic_ai.mcp import MCPServer
+from pydantic_ai.output import OutputSpec
 
 from pai_agent_sdk.agents.main import AgentRuntime, create_agent
 from pai_agent_sdk.context import ModelConfig, ToolConfig
@@ -52,6 +53,7 @@ from paintress_cli.environment import TUIEnvironment
 from paintress_cli.logging import get_logger
 from paintress_cli.mcp import build_mcp_servers
 from paintress_cli.session import TUIContext
+from paintress_cli.steering import steering_output_guard
 
 if TYPE_CHECKING:
     from pydantic_ai.toolsets import AbstractToolset
@@ -148,6 +150,7 @@ def create_tui_runtime(
     - TUIContext with SteeringManager
     - MCP servers from configuration
     - Browser toolset if available
+    - Steering guard for output validation
 
     Args:
         config: Paintress CLI configuration.
@@ -212,10 +215,15 @@ def create_tui_runtime(
     # Load system prompt
     effective_system_prompt = system_prompt or _load_system_prompt(config)
 
+    # Configure output type with steering guard
+    # This ensures agent retries when user adds steering messages during output
+    output_type: OutputSpec[str] = TextOutput(steering_output_guard)
+
     # Create runtime using SDK factory
     runtime = create_agent(
         model=config.general.model or None,
         model_settings=cast(ModelSettings, model_settings),
+        output_type=output_type,
         env=TUIEnvironment,
         env_kwargs=env_kwargs,
         context_type=TUIContext,

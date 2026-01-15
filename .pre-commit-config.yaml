@@ -18,7 +18,7 @@ repos:
     hooks:
       - id: mdformat
         args: [--number]
-        exclude: ^(pai_agent_sdk/.*\.md|examples/.*\.md|paintress_cli/.*\.md)$
+        exclude: ^(pai_agent_sdk/.*\.md|examples/.*\.md|paintress_cli/.*\.md|paintress_cli/paintress_cli/skills/)$
         additional_dependencies:
           [mdformat-gfm, mdformat-front-matters, mdformat-footnote]
   - repo: https://github.com/astral-sh/ruff-pre-commit

@@ -619,8 +619,7 @@ class TUIApp:
 
         except asyncio.CancelledError:
             self._finalize_streaming_text()
-            self._append_output("\n[Cancelled]")
-            raise
+            self._append_output("[Cancelled]")
         except Exception as e:
             self._finalize_streaming_text()
             self._append_output(f"\n[Error: {e}]")
@@ -767,11 +766,10 @@ class TUIApp:
             current_time = time.time()
 
             if self._state == TUIState.RUNNING:
-                # Running: cancel the agent task and switch to IDLE
+                # Running: request cancellation (state change handled by _run_agent finally)
                 if self._agent_task and not self._agent_task.done():
                     self._agent_task.cancel()
-                self._append_output("[Cancelled by user]")
-                self._state = TUIState.IDLE
+                    self._append_output("[Cancelling...]")
             else:
                 # Idle: double-press to exit, single-press to clear input
                 if current_time - self._last_ctrl_c_time < self._ctrl_c_exit_timeout:

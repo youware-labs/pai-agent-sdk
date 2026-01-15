@@ -15,10 +15,12 @@ Global config directory: ~/.config/youware-labs/paintress-cli/
 - config.toml: Model settings, display options, browser config
 - mcp.json: MCP server configurations
 - subagents/: Custom subagent definitions (.md files)
+- skills/: Global skills (override built-in skills)
 - RULES.md: Global memory (user preferences and rules that apply across all projects)
 
 Project config directory: .paintress/
 - tools.toml: Tool permission settings
+- skills/: Project-specific skills (highest priority, override global and built-in)
 
 Project root:
 - AGENTS.md: Project memory (project-specific conventions, architecture decisions, and guidelines)

@@ -14,6 +14,7 @@ lint: ## Lint the code
 .PHONY: cli
 cli: ## Run the CLI
 	@echo "🚀 Running paintress-cli CLI"
+	@./scripts/sync-skills.sh
 	@rm -f paintress.log && uv run paintress-cli -v
 
 .PHONY: check

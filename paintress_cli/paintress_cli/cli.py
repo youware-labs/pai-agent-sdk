@@ -51,6 +51,22 @@ PROVIDER_MODEL_SETTINGS = {
     "bedrock": None,
 }
 
+# Provider to model_cfg preset mapping (context window, capabilities)
+# - gemini: vision + video_understanding
+# - anthropic/openai: vision only
+# - unknown: no capabilities
+PROVIDER_MODEL_CFG = {
+    "anthropic": "claude_200k",
+    "openai": "gpt5_270k",
+    "openai-chat": "gpt5_270k",
+    "openai-responses": "gpt5_270k",
+    "google-gla": "gemini_1m",
+    "google-vertex": "gemini_1m",
+    "gemini": "gemini_1m",
+    "groq": None,  # Unknown - no capabilities
+    "bedrock": None,
+}
+
 
 def parse_model_string(model_str: str) -> tuple[str | None, str, str]:
     """Parse model string into (gateway, provider, model_id).
@@ -216,6 +232,11 @@ def run_setup_wizard(config_manager: ConfigManager) -> bool:
     if model_settings_preset:
         click.echo(f"  Auto-detected model_settings: {model_settings_preset}")
 
+    # Auto-detect model_cfg preset based on provider
+    model_cfg_preset = PROVIDER_MODEL_CFG.get(provider)
+    if model_cfg_preset:
+        click.echo(f"  Auto-detected model_cfg: {model_cfg_preset}")
+
     # Read current config and update
     config_content = config_path.read_text()
 
@@ -253,6 +274,41 @@ def run_setup_wizard(config_manager: ConfigManager) -> bool:
                 config_content,
                 flags=re.MULTILINE,
             )
+
+    # Update model_cfg if we have a preset
+    if model_cfg_preset:
+        # Check for existing uncommented model_cfg line
+        if re.search(r"^model_cfg\s*=", config_content, re.MULTILINE):
+            config_content = re.sub(
+                r"^model_cfg\s*=\s*.*$",
+                f'model_cfg = "{model_cfg_preset}"',
+                config_content,
+                flags=re.MULTILINE,
+            )
+        # Check for commented model_cfg line and uncomment it
+        elif re.search(r"^#\s*model_cfg\s*=", config_content, re.MULTILINE):
+            config_content = re.sub(
+                r"^#\s*model_cfg\s*=\s*.*$",
+                f'model_cfg = "{model_cfg_preset}"',
+                config_content,
+                flags=re.MULTILINE,
+            )
+        else:
+            # Add after model_settings line (or model line if no model_settings)
+            if re.search(r"^model_settings\s*=", config_content, re.MULTILINE):
+                config_content = re.sub(
+                    r'^(model_settings\s*=\s*"[^"]*")$',
+                    f'\\1\nmodel_cfg = "{model_cfg_preset}"',
+                    config_content,
+                    flags=re.MULTILINE,
+                )
+            else:
+                config_content = re.sub(
+                    r'^(model\s*=\s*"[^"]*")$',
+                    f'\\1\nmodel_cfg = "{model_cfg_preset}"',
+                    config_content,
+                    flags=re.MULTILINE,
+                )
 
     # Update [env] section with new values
     if env_values:

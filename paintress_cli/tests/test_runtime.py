@@ -127,3 +127,94 @@ def test_create_tui_runtime_uses_cwd_by_default() -> None:
     runtime = create_tui_runtime(config=config)
 
     assert runtime is not None
+
+
+def test_create_tui_runtime_with_model_cfg_preset(tmp_path: Path) -> None:
+    """Test creating runtime with model_cfg preset."""
+    from pai_agent_sdk.context import ModelCapability
+
+    config = PaintressConfig(
+        general=GeneralConfig(
+            model="openai:gpt-4",
+            model_cfg="claude_200k",
+        ),
+    )
+
+    runtime = create_tui_runtime(
+        config=config,
+        working_dir=tmp_path,
+    )
+
+    assert runtime is not None
+    # Check model_cfg was applied
+    assert runtime.ctx.model_cfg.context_window == 200_000
+    assert runtime.ctx.model_cfg.max_images == 20
+    assert ModelCapability.vision in runtime.ctx.model_cfg.capabilities
+
+
+def test_create_tui_runtime_with_model_cfg_gemini(tmp_path: Path) -> None:
+    """Test creating runtime with gemini model_cfg preset (has video support)."""
+    from pai_agent_sdk.context import ModelCapability
+
+    # Use openai model to avoid API key requirement, but test gemini preset
+    config = PaintressConfig(
+        general=GeneralConfig(
+            model="openai:gpt-4",
+            model_cfg="gemini_1m",
+        ),
+    )
+
+    runtime = create_tui_runtime(
+        config=config,
+        working_dir=tmp_path,
+    )
+
+    assert runtime is not None
+    # Check gemini preset has vision + video capabilities
+    assert runtime.ctx.model_cfg.context_window == 1_000_000
+    assert ModelCapability.vision in runtime.ctx.model_cfg.capabilities
+    assert ModelCapability.video_understanding in runtime.ctx.model_cfg.capabilities
+
+
+def test_create_tui_runtime_with_model_cfg_dict(tmp_path: Path) -> None:
+    """Test creating runtime with custom model_cfg dict."""
+    from pai_agent_sdk.context import ModelCapability
+
+    config = PaintressConfig(
+        general=GeneralConfig(
+            model="openai:gpt-4",
+            model_cfg={
+                "context_window": 100_000,
+                "max_images": 10,
+                "capabilities": ["vision"],
+            },
+        ),
+    )
+
+    runtime = create_tui_runtime(
+        config=config,
+        working_dir=tmp_path,
+    )
+
+    assert runtime is not None
+    assert runtime.ctx.model_cfg.context_window == 100_000
+    assert runtime.ctx.model_cfg.max_images == 10
+    assert ModelCapability.vision in runtime.ctx.model_cfg.capabilities
+
+
+def test_create_tui_runtime_with_no_model_cfg(tmp_path: Path) -> None:
+    """Test creating runtime without model_cfg uses defaults."""
+    config = PaintressConfig(
+        general=GeneralConfig(model="openai:gpt-4"),
+    )
+
+    runtime = create_tui_runtime(
+        config=config,
+        working_dir=tmp_path,
+    )
+
+    assert runtime is not None
+    # Default ModelConfig values
+    assert runtime.ctx.model_cfg.context_window is None
+    assert runtime.ctx.model_cfg.max_images == 20
+    assert len(runtime.ctx.model_cfg.capabilities) == 0

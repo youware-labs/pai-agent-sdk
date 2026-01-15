@@ -583,23 +583,28 @@ class EventRenderer:
         self,
         tool_message: ToolMessage,
         duration: float = 0.0,
+        width: int | None = None,
     ) -> str:
         """Render completed tool call.
 
         Special tools (edit, thinking, to_do) use Panel format.
         Normal tools use inline Text format for cleaner display.
         """
+        render_width = width or 120
         if tool_message.name in {"edit", "thinking", "to_do_read", "to_do_write", "multi_edit"}:
             panel = tool_message.to_special_panel(code_theme=self._code_theme)
-            return self._renderer.render(panel)
+            return self._renderer.render(panel, width=render_width)
         else:
             # Use inline text format for normal tools
+            # Calculate available width for args/output (reserve space for labels)
+            max_line_len = max(50, render_width - 20)
             text = tool_message.to_inline_text(
                 duration=duration,
-                max_arg_length=self._max_arg_length,
+                max_arg_length=min(self._max_arg_length, max_line_len),
                 max_result_lines=self._max_tool_result_lines,
+                max_line_length=max_line_len,
             )
-            return self._renderer.render(text)
+            return self._renderer.render(text, width=render_width)
 
     def render_markdown(self, text: str) -> str:
         """Render markdown text."""

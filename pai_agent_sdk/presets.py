@@ -631,7 +631,6 @@ class ModelConfigPreset(str, Enum):
 
     # Gemini models
     GEMINI_1M = "gemini_1m"
-    GEMINI_2M = "gemini_2m"
 
 
 # ModelConfig preset registry
@@ -663,17 +662,6 @@ _MODEL_CFG_REGISTRY: dict[str, dict[str, Any]] = {
     ModelConfigPreset.GEMINI_1M.value: {
         "context_window": 1_000_000,
         "max_images": 20,  # Gemini supports more images
-        "max_videos": 1,  # Gemini supports video
-        "support_gif": True,
-        "capabilities": {
-            ModelCapability.vision,
-            ModelCapability.video_understanding,
-            ModelCapability.document_understanding,
-        },
-    },
-    ModelConfigPreset.GEMINI_2M.value: {
-        "context_window": 2_000_000,
-        "max_images": 20,
         "max_videos": 1,  # Gemini supports video
         "support_gif": True,
         "capabilities": {

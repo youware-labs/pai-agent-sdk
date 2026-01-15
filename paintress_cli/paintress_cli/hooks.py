@@ -13,11 +13,12 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING, Any
 
+from pai_agent_sdk.context import AgentContext, StreamEvent
+from pai_agent_sdk.utils import get_latest_request_usage
 from paintress_cli.events import AgentPhase, AgentPhaseEvent, ContextUpdateEvent
 
 if TYPE_CHECKING:
     from pai_agent_sdk.agents.main import NodeHookContext
-    from pai_agent_sdk.context import AgentContext
 
 
 async def emit_phase_event(
@@ -51,7 +52,7 @@ async def emit_phase_event(
     await ctx.emit_event(event)
 
 
-async def emit_context_update(hook_ctx: NodeHookContext[Any, Any]) -> None:
+async def emit_context_update(hook_ctx: NodeHookContext[AgentContext, Any]) -> None:
     """Emit ContextUpdateEvent after each node completion.
 
     This hook is designed to be used as post_node_hook in stream_agent.
@@ -65,24 +66,22 @@ async def emit_context_update(hook_ctx: NodeHookContext[Any, Any]) -> None:
         return
 
     # Get current usage
-    usage = hook_ctx.run.usage()
+    usage = get_latest_request_usage(hook_ctx.run.all_messages())
+    if not usage:
+        return
     total_tokens = usage.total_tokens
 
     # Get our TUIContext from run.ctx.deps
-    ctx = hook_ctx.run.ctx.deps
-    if ctx is None:
-        return
+    ctx = hook_ctx.run.ctx.deps.user_deps
 
     # Get context window size from model config
-    model_cfg = getattr(ctx, "model_cfg", None)
-    if model_cfg and hasattr(model_cfg, "context_window"):
+    model_cfg = ctx.model_cfg
+    if model_cfg:
         window_size = model_cfg.context_window or 200000
     else:
         window_size = 200000
 
     # Emit event via output_queue
-    from pai_agent_sdk.context import StreamEvent
-
     event = ContextUpdateEvent(
         event_id=f"context-{uuid.uuid4().hex[:8]}",
         total_tokens=total_tokens,

@@ -35,8 +35,8 @@ from pydantic_ai.mcp import MCPServer
 from pydantic_ai.output import OutputSpec
 
 from pai_agent_sdk.agents.main import AgentRuntime, create_agent
-from pai_agent_sdk.context import ModelConfig, ToolConfig
-from pai_agent_sdk.presets import resolve_model_settings
+from pai_agent_sdk.context import ModelCapability, ModelConfig, ToolConfig
+from pai_agent_sdk.presets import resolve_model_cfg, resolve_model_settings
 from pai_agent_sdk.subagents import SubagentConfig, load_subagents_from_dir
 from pai_agent_sdk.toolsets.core.content import tools as content_tools
 from pai_agent_sdk.toolsets.core.context import tools as context_tools
@@ -59,6 +59,34 @@ if TYPE_CHECKING:
     from pydantic_ai.toolsets import AbstractToolset
 
 logger = get_logger(__name__)
+
+
+def _resolve_model_cfg(model_cfg_input: str | dict[str, Any] | None) -> ModelConfig:
+    """Resolve model_cfg from preset name or dict to ModelConfig instance.
+
+    Handles conversion of capabilities from list[str] to set[ModelCapability].
+
+    Args:
+        model_cfg_input: Preset name (e.g., 'claude_200k'), dict, or None.
+
+    Returns:
+        ModelConfig instance.
+    """
+    if model_cfg_input is None:
+        return ModelConfig()
+
+    # Use SDK's resolve_model_cfg to get dict
+    cfg_dict = resolve_model_cfg(model_cfg_input)
+    if cfg_dict is None:
+        return ModelConfig()
+
+    # Convert capabilities from list[str] to set[ModelCapability] if present
+    if "capabilities" in cfg_dict:
+        caps = cfg_dict["capabilities"]
+        if isinstance(caps, (list, set)):
+            cfg_dict["capabilities"] = {ModelCapability(c) if isinstance(c, str) else c for c in caps}
+
+    return ModelConfig(**cfg_dict)
 
 
 def _load_system_prompt(config: PaintressConfig) -> str:
@@ -196,8 +224,10 @@ def create_tui_runtime(
         env_kwargs["default_path"] = cwd
         env_kwargs["allowed_paths"] = [cwd]
 
-    # Model configuration
-    model_cfg = ModelConfig()
+    # Model configuration - resolve from preset name or dict
+    model_cfg = _resolve_model_cfg(config.general.model_cfg)
+    if config.general.model_cfg:
+        logger.debug(f"Using model_cfg: {config.general.model_cfg}")
 
     # Resolve model settings from preset name or dict
     model_settings = resolve_model_settings(config.general.model_settings)

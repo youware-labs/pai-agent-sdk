@@ -207,7 +207,6 @@ class TUIApp:
 
         # Configure TUI logging (queue for internal use, file for verbose mode)
         log_queue: asyncio.Queue[object] = asyncio.Queue()
-        configure_tui_logging(log_queue, verbose=self.verbose)
 
         # Start browser manager (optional)
         self._browser = BrowserManager(self.config.browser)
@@ -230,6 +229,7 @@ class TUIApp:
             self._context_window_size = self._runtime.ctx.model_cfg.context_window
 
         logger.info("TUIApp initialized")
+        configure_tui_logging(log_queue, verbose=self.verbose)
         return self
 
     async def __aexit__(
@@ -669,7 +669,9 @@ class TUIApp:
                     duration = 0.0
                     if tool_call_id in self._event_renderer.tracker.tool_calls:
                         duration = self._event_renderer.tracker.tool_calls[tool_call_id].duration()
-                    rendered = self._event_renderer.render_tool_call_complete(tool_msg, duration=duration)
+                    rendered = self._event_renderer.render_tool_call_complete(
+                        tool_msg, duration=duration, width=self._get_terminal_width()
+                    )
                     self._append_output(rendered.rstrip())
                     self._printed_tool_calls.add(tool_call_id)
 

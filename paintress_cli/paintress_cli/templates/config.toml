@@ -14,6 +14,20 @@ model = ""
 # Available presets: anthropic_default, openai_default, google_default, etc.
 # model_settings = "anthropic_default"
 
+# Model config for context management (context window, capabilities, etc.)
+# Presets: claude_200k, claude_1m, gpt5_270k, gemini_1m
+# Aliases: claude, anthropic, openai, gemini
+# model_cfg = "claude_200k"
+#
+# Or custom configuration:
+# [general.model_cfg]
+# context_window = 200000
+# max_images = 20
+# max_videos = 0
+# compact_threshold = 0.90
+# proactive_context_management_threshold = 0.5
+# capabilities = ["vision"]  # Options: vision, video_understanding, document_understanding
+
 # Maximum requests per session
 max_requests = 1000
 

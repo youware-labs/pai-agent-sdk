@@ -336,13 +336,6 @@ def test_resolve_model_cfg_string() -> None:
     assert result["context_window"] == 200_000
 
 
-def test_resolve_model_cfg_enum() -> None:
-    """Test that enum is resolved to preset."""
-    result = resolve_model_cfg(ModelConfigPreset.GEMINI_2M)
-    assert result is not None
-    assert result["context_window"] == 2_000_000
-
-
 def test_list_model_cfg_presets() -> None:
     """Test list_model_cfg_presets returns all available presets."""
     presets = list_model_cfg_presets()
@@ -354,7 +347,6 @@ def test_list_model_cfg_presets() -> None:
         "claude_200k",
         "gemini",
         "gemini_1m",
-        "gemini_2m",
         "gpt5",
         "gpt5_270k",
         "openai",

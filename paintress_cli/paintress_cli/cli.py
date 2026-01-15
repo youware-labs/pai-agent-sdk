@@ -17,7 +17,7 @@ import click
 
 from paintress_cli import __version__
 from paintress_cli.config import ConfigManager, PaintressConfig
-from paintress_cli.logging import configure_logging, get_logger
+from paintress_cli.logging import LOG_FILE_NAME, configure_logging, get_logger
 
 logger = get_logger(__name__)
 
@@ -420,7 +420,7 @@ def cli(verbose: bool) -> None:
         click.echo("  - Network connectivity issues")
         click.echo("  - Invalid model configuration")
         click.echo()
-        click.echo("Check logs at: ~/.config/youware-labs/paintress-cli/paintress.log")
+        click.echo(f"Check logs at: {LOG_FILE_NAME} (with --verbose flag)")
         sys.exit(1)
 
 

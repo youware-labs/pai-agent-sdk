@@ -165,7 +165,7 @@ def _anthropic_off_settings(*, use_1m_context: bool = False) -> dict[str, Any]:
 
 ANTHROPIC_DEFAULT: dict[str, Any] = _anthropic_settings(
     thinking_budget=16 * K_TOKENS,
-    max_tokens=16 * K_TOKENS,
+    max_tokens=21 * K_TOKENS,
 )
 """Anthropic default: Same as medium, 16K thinking budget."""
 
@@ -177,7 +177,7 @@ ANTHROPIC_HIGH: dict[str, Any] = _anthropic_settings(
 
 ANTHROPIC_MEDIUM: dict[str, Any] = _anthropic_settings(
     thinking_budget=16 * K_TOKENS,
-    max_tokens=16 * K_TOKENS,
+    max_tokens=21 * K_TOKENS,
 )
 """Anthropic medium thinking: 16K thinking budget, balanced reasoning."""
 

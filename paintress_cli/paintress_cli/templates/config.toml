@@ -17,6 +17,10 @@ model = ""
 # Maximum requests per session
 max_requests = 1000
 
+# Custom system prompt file path (optional)
+# If empty, uses built-in default from CLI package
+# system_prompt_file = "~/.config/youware-labs/paintress-cli/system_prompt.md"
+
 [env]
 # Environment variable overrides for API keys
 # ANTHROPIC_API_KEY = "sk-ant-..."
@@ -53,10 +57,16 @@ prefix = ">"
 buffer_size = 10
 
 [subagents]
-# Additional subagent directories to load
-additional_dirs = []
-# Disabled builtin subagents
-disabled_builtins = []
+# Subagents are loaded from ~/.config/youware-labs/paintress-cli/subagents/
+# Run `paintress setup` to initialize default subagents
+
+# Disable specific subagents by name
+disabled = []
+
+# Override settings for specific subagents
+# [subagents.overrides.explorer]
+# model = "openai:gpt-4o"
+# model_settings = "openai_default"
 
 [session]
 # Session persistence directory

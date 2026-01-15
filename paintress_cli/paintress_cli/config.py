@@ -48,6 +48,9 @@ class GeneralConfig(BaseModel):
     max_requests: int = 1000
     """Maximum requests per session."""
 
+    system_prompt_file: str = ""
+    """Path to custom system prompt file. Empty uses built-in default."""
+
     @property
     def is_configured(self) -> bool:
         """Check if model is configured."""
@@ -115,18 +118,16 @@ class SubagentOverride(BaseModel):
     model_settings: str | dict[str, Any] | None = None
     """Override model settings: preset name or dict of actual values."""
 
-    disabled: bool = False
-    """Disable this subagent."""
-
 
 class SubagentsConfig(BaseModel):
-    """Subagent configuration."""
+    """Subagent configuration.
 
-    additional_dirs: list[str] = Field(default_factory=list)
-    """Additional directories to load subagent configurations from."""
+    Subagents are loaded from ~/.config/youware-labs/paintress-cli/subagents/
+    which is initialized by `paintress setup`.
+    """
 
-    disabled_builtins: list[str] = Field(default_factory=list)
-    """Builtin subagents to disable."""
+    disabled: list[str] = Field(default_factory=list)
+    """Subagents to disable (by name)."""
 
     overrides: dict[str, SubagentOverride] = Field(default_factory=dict)
     """Override settings for specific subagents."""
@@ -277,7 +278,7 @@ class ConfigManager:
         """Get list of loaded configuration sources."""
         return self._loaded_sources.copy()
 
-    def load(self) -> PaintressConfig:  # noqa: C901
+    def load(self) -> PaintressConfig:
         """Load configuration from all sources.
 
         Priority (higher wins, no merging between levels):
@@ -338,7 +339,7 @@ class ConfigManager:
         self._config = None
         return self.load()
 
-    def _load_env_overrides(self) -> dict[str, Any]:  # noqa: C901
+    def _load_env_overrides(self) -> dict[str, Any]:
         """Load TUI settings from environment using pydantic-settings."""
         env = EnvSettings()
         overrides: dict[str, Any] = {}

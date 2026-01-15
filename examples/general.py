@@ -58,7 +58,7 @@ from pydantic_ai.messages import (
 
 from pai_agent_sdk.agents.main import create_agent, stream_agent
 from pai_agent_sdk.context import ModelCapability, ModelConfig, ResumableState, RunContextMetadata, StreamEvent
-from pai_agent_sdk.presets import GEMINI_THINKING_LEVEL_HIGH
+from pai_agent_sdk.presets import ANTHROPIC_DEFAULT
 from pai_agent_sdk.toolsets.core.base import UserInteraction
 from pai_agent_sdk.toolsets.core.content import tools as content_tools
 from pai_agent_sdk.toolsets.core.context import tools as context_tools
@@ -306,8 +306,8 @@ async def main():
     system_prompt = load_system_prompt()
 
     runtime = create_agent(
-        model="gemini@google-vertex:gemini-3-pro-preview",
-        model_settings=cast(ModelSettings, GEMINI_THINKING_LEVEL_HIGH),
+        model="anthropic:claude-4-5-sonnet-by-all",
+        model_settings=cast(ModelSettings, ANTHROPIC_DEFAULT),
         system_prompt=system_prompt,
         tools=[
             *content_tools,

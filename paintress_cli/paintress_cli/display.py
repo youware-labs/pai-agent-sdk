@@ -475,3 +475,76 @@ class EventRenderer:
     def render_text(self, text: str, style: str | None = None) -> str:
         """Render styled text."""
         return self._renderer.render_text(text, style=style)
+
+    # =========================================================================
+    # Event Panel Rendering
+    # =========================================================================
+
+    def render_compact_start(self, message_count: int) -> str:
+        """Render compact start notification (single line)."""
+        text = Text()
+        text.append("> ", style="cyan")
+        text.append(f"Context compacting {message_count} messages...", style="dim")
+        return self._renderer.render(text)
+
+    def render_compact_complete(
+        self,
+        original_count: int,
+        compacted_count: int,
+        summary: str = "",
+    ) -> str:
+        """Render compact complete panel."""
+        reduction = int((1 - compacted_count / original_count) * 100) if original_count > 0 else 0
+        content = Text()
+        content.append(f"{original_count} -> {compacted_count} messages ", style="bold")
+        content.append(f"({reduction}% reduction)", style="dim")
+        if summary:
+            preview = summary[:150] + "..." if len(summary) > 150 else summary
+            content.append(f"\n{preview}", style="dim italic")
+        panel = Panel(content, border_style="cyan", title="[cyan]Context Compacted[/cyan]", title_align="left")
+        return self._renderer.render(panel)
+
+    def render_compact_failed(self, error: str) -> str:
+        """Render compact failed notification (single line)."""
+        text = Text()
+        text.append("x ", style="red")
+        text.append("Compact failed: ", style="bold red")
+        text.append(error[:100], style="dim")
+        return self._renderer.render(text)
+
+    def render_handoff_start(self, message_count: int) -> str:
+        """Render handoff start notification (single line)."""
+        text = Text()
+        text.append("> ", style="magenta")
+        text.append(f"Preparing context handoff from {message_count} messages...", style="dim")
+        return self._renderer.render(text)
+
+    def render_handoff_complete(self, content: str) -> str:
+        """Render handoff complete panel."""
+        panel_content = Text()
+        panel_content.append("Context reset with preserved state\n", style="bold green")
+        if content:
+            preview = content[:250] + "..." if len(content) > 250 else content
+            panel_content.append(preview, style="dim")
+        panel = Panel(
+            panel_content, border_style="magenta", title="[magenta]Handoff Complete[/magenta]", title_align="left"
+        )
+        return self._renderer.render(panel)
+
+    def render_handoff_failed(self, error: str) -> str:
+        """Render handoff failed notification (single line)."""
+        text = Text()
+        text.append("x ", style="red")
+        text.append("Handoff failed: ", style="bold red")
+        text.append(error[:100], style="dim")
+        return self._renderer.render(text)
+
+    def render_steering_injected(self, message_count: int, content: str) -> str:
+        """Render steering message injected panel."""
+        panel_content = Text()
+        panel_content.append(f"Guidance injected ({message_count} message(s))\n", style="bold")
+        if content:
+            preview = content[:150] + "..." if len(content) > 150 else content
+            panel_content.append(f'"{preview}"', style="dim italic")
+        panel = Panel(panel_content, border_style="yellow", title="[yellow]Steering[/yellow]", title_align="left")
+        return self._renderer.render(panel)

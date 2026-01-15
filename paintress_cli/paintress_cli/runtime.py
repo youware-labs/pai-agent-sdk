@@ -26,6 +26,7 @@ Example:
 
 from __future__ import annotations
 
+from importlib import resources
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -35,8 +36,18 @@ from pydantic_ai.mcp import MCPServer
 from pai_agent_sdk.agents.main import AgentRuntime, create_agent
 from pai_agent_sdk.context import ModelConfig, ToolConfig
 from pai_agent_sdk.presets import resolve_model_settings
+from pai_agent_sdk.subagents import SubagentConfig, load_subagents_from_dir
+from pai_agent_sdk.toolsets.core.content import tools as content_tools
+from pai_agent_sdk.toolsets.core.context import tools as context_tools
+from pai_agent_sdk.toolsets.core.document import tools as document_tools
+from pai_agent_sdk.toolsets.core.enhance import tools as enhance_tools
+from pai_agent_sdk.toolsets.core.filesystem import tools as filesystem_tools
+from pai_agent_sdk.toolsets.core.multimodal import tools as multimodal_tools
+from pai_agent_sdk.toolsets.core.shell import tools as shell_tools
+from pai_agent_sdk.toolsets.core.subagent import tools as subagent_tools
+from pai_agent_sdk.toolsets.core.web import tools as web_tools
 from paintress_cli.browser import BrowserManager
-from paintress_cli.config import MCPConfig, PaintressConfig
+from paintress_cli.config import ConfigManager, MCPConfig, PaintressConfig, SubagentsConfig
 from paintress_cli.environment import TUIEnvironment
 from paintress_cli.logging import get_logger
 from paintress_cli.mcp import build_mcp_servers
@@ -46,6 +57,79 @@ if TYPE_CHECKING:
     from pydantic_ai.toolsets import AbstractToolset
 
 logger = get_logger(__name__)
+
+
+def _load_system_prompt(config: PaintressConfig) -> str:
+    """Load system prompt from config or built-in default.
+
+    Priority:
+    1. Custom file path from config.general.system_prompt_file
+    2. Built-in default from templates/system_prompt.md
+    """
+    if config.general.system_prompt_file:
+        prompt_path = Path(config.general.system_prompt_file).expanduser()
+        if prompt_path.exists():
+            logger.debug("Loading system prompt from: %s", prompt_path)
+            return prompt_path.read_text(encoding="utf-8")
+        logger.warning("System prompt file not found: %s, using default", prompt_path)
+
+    # Load built-in default
+    template_files = resources.files("paintress_cli").joinpath("templates")
+    default_prompt = template_files.joinpath("system_prompt.md").read_text(encoding="utf-8")
+    logger.debug("Using built-in system prompt")
+    return default_prompt
+
+
+def _load_subagent_configs(
+    subagents_config: SubagentsConfig,
+    config_dir: Path | None = None,
+) -> list[SubagentConfig]:
+    """Load subagent configs from user config directory.
+
+    Subagents are loaded from ~/.config/youware-labs/paintress-cli/subagents/
+    and filtered based on the disabled list in config.
+
+    Args:
+        subagents_config: Subagents configuration with disabled list and overrides.
+        config_dir: Config directory (defaults to ConfigManager.DEFAULT_CONFIG_DIR).
+
+    Returns:
+        List of SubagentConfig objects.
+    """
+    if config_dir is None:
+        config_dir = ConfigManager.DEFAULT_CONFIG_DIR
+
+    subagents_dir = config_dir / "subagents"
+    if not subagents_dir.exists():
+        logger.debug("Subagents directory not found: %s", subagents_dir)
+        return []
+
+    # Load all subagents from directory
+    all_configs = load_subagents_from_dir(subagents_dir)
+    logger.debug("Found %d subagents in %s", len(all_configs), subagents_dir)
+
+    # Filter out disabled subagents
+    disabled_set = set(subagents_config.disabled)
+    enabled_configs: list[SubagentConfig] = []
+
+    for name, cfg in all_configs.items():
+        if name in disabled_set:
+            logger.debug("Subagent disabled: %s", name)
+            continue
+
+        # Apply overrides if any
+        if name in subagents_config.overrides:
+            override = subagents_config.overrides[name]
+            if override.model is not None:
+                cfg = cfg.model_copy(update={"model": override.model})
+            if override.model_settings is not None:
+                cfg = cfg.model_copy(update={"model_settings": override.model_settings})
+            logger.debug("Applied overrides for subagent: %s", name)
+
+        enabled_configs.append(cfg)
+
+    logger.info("Loaded %d subagents (disabled: %d)", len(enabled_configs), len(disabled_set))
+    return enabled_configs
 
 
 def create_tui_runtime(
@@ -122,6 +206,12 @@ def create_tui_runtime(
     if config.tools.need_approval:
         logger.debug("Tools requiring approval: %s", config.tools.need_approval)
 
+    # Load subagent configs from user config directory
+    subagent_configs = _load_subagent_configs(config.subagents)
+
+    # Load system prompt
+    effective_system_prompt = system_prompt or _load_system_prompt(config)
+
     # Create runtime using SDK factory
     runtime = create_agent(
         model=config.general.model or None,
@@ -130,11 +220,23 @@ def create_tui_runtime(
         env_kwargs=env_kwargs,
         context_type=TUIContext,
         model_cfg=model_cfg,
+        tools=[
+            *content_tools,
+            *context_tools,
+            *document_tools,
+            *enhance_tools,
+            *filesystem_tools,
+            *multimodal_tools,
+            *shell_tools,
+            *web_tools,
+            *subagent_tools,
+        ],
         tool_config=tool_config,
         toolsets=toolsets if toolsets else None,
-        system_prompt=system_prompt,
+        system_prompt=effective_system_prompt,
         need_user_approve_tools=config.tools.need_approval or None,
-        include_builtin_subagents=True,
+        subagent_configs=subagent_configs if subagent_configs else None,
+        include_builtin_subagents=False,
     )
 
     logger.info(

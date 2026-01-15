@@ -101,7 +101,7 @@ def get_env_vars_for_model(gateway: str | None, provider: str) -> list[tuple[str
 # =============================================================================
 
 
-def run_setup_wizard(config_manager: ConfigManager) -> bool:  # noqa: C901
+def run_setup_wizard(config_manager: ConfigManager) -> bool:
     """Run interactive setup wizard for first-time configuration.
 
     Flow:

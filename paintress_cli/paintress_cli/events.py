@@ -120,3 +120,23 @@ class ProcessExitedEvent(AgentEvent):
 
     process_id: str = ""
     exit_code: int = 0
+
+
+# -----------------------------------------------------------------------------
+# Context Management Events
+# -----------------------------------------------------------------------------
+
+
+@dataclass
+class ContextUpdateEvent(AgentEvent):
+    """Real-time context usage update for status bar.
+
+    Contains the current total tokens from message history for context window calculation.
+
+    Attributes:
+        total_tokens: Current total tokens used.
+        context_window_size: Maximum context window size.
+    """
+
+    total_tokens: int = 0
+    context_window_size: int = 0

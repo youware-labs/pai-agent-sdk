@@ -9,14 +9,16 @@ from pydantic_ai.messages import ModelResponse, ToolCallPart
 from pydantic_ai.tools import ToolApproved, ToolDenied
 
 from pai_agent_sdk.context import AgentContext
-from pai_agent_sdk.toolsets.core.base import (
+from pai_agent_sdk.toolsets.base import (
     BaseTool,
     BaseToolset,
+    InstructableToolset,
+    UserInputPreprocessResult,
+)
+from pai_agent_sdk.toolsets.core.base import (
     GlobalHooks,
     HookableToolsetTool,
-    InstructableToolset,
     Toolset,
-    UserInputPreprocessResult,
     UserInteraction,
 )
 
@@ -211,11 +213,11 @@ def test_toolset_id(agent_context: AgentContext) -> None:
     assert toolset.id == "my-toolset"
 
 
-def test_toolset_get_instructions(agent_context: AgentContext) -> None:
+async def test_toolset_get_instructions(agent_context: AgentContext) -> None:
     """Should collect instructions from tools."""
     toolset = Toolset(tools=[DummyTool])
     mock_run_ctx = MagicMock(spec=RunContext)
-    instructions = toolset.get_instructions(mock_run_ctx)
+    instructions = await toolset.get_instructions(mock_run_ctx)
     assert instructions is not None
     assert "Use this dummy tool for testing purposes." in instructions
 

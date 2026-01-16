@@ -1,22 +1,40 @@
-"""Base classes for toolsets and tools.
+"""Toolset implementation with hooks and HITL support.
 
-This module provides the foundational abstractions for building toolsets:
-- BaseTool: Abstract base class for individual tools
+This module provides:
 - Toolset: Container for tools with hooks and HITL support
-- InstructableToolset: Protocol for toolsets that provide instructions
+- HookableToolsetTool: Extended ToolsetTool with hook support
+- Hook types and utilities
+
+Base classes (BaseTool, BaseToolset) are in pai_agent_sdk.toolsets.base.
 """
 
 from __future__ import annotations
 
 import functools
-from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 from pydantic_ai import ApprovalRequired, RunContext, Tool, UserError
 from pydantic_ai._agent_graph import HistoryProcessor
+from pydantic_ai.messages import ModelMessage
+from pydantic_ai.tools import (
+    DeferredToolResults,
+    ToolApproved,
+    ToolDenied,
+)
+from pydantic_ai.toolsets.abstract import ToolsetTool
+from typing_extensions import TypeVar
+
+from pai_agent_sdk._logger import get_logger
+from pai_agent_sdk.context import AgentContext
+from pai_agent_sdk.toolsets.base import (
+    BaseTool,
+    BaseToolset,
+    resolve_instructions,
+)
+from pai_agent_sdk.utils import get_tool_name_from_id
 
 if TYPE_CHECKING:
     from pydantic_ai import ModelSettings
@@ -24,38 +42,10 @@ if TYPE_CHECKING:
 
     from pai_agent_sdk.context import ModelConfig
     from pai_agent_sdk.subagents import SubagentConfig
-from pydantic_ai.messages import ModelMessage
-from pydantic_ai.tools import (
-    DeferredToolResults,
-    ToolApproved,
-    ToolDenied,
-)
-from pydantic_ai.toolsets import AbstractToolset
-from pydantic_ai.toolsets.abstract import ToolsetTool
-from typing_extensions import TypeVar
-
-from pai_agent_sdk._logger import get_logger
-from pai_agent_sdk.context import AgentContext
-from pai_agent_sdk.utils import get_tool_name_from_id
 
 logger = get_logger(__name__)
 
 AgentDepsT = TypeVar("AgentDepsT", bound=AgentContext, default=AgentContext, contravariant=True)
-
-
-@runtime_checkable
-class InstructableToolset(Protocol[AgentDepsT]):
-    """Protocol for toolsets that provide instructions.
-
-    This enables duck typing for any toolset that has a get_instructions method,
-    allowing add_toolset_instructions() to work with both Toolset and BrowserUseToolset.
-
-    TODO: Drop it when https://github.com/pydantic/pydantic-ai/pull/3780 merged
-    """
-
-    def get_instructions(self, ctx: RunContext[AgentDepsT]) -> str | None:
-        """Get instructions to inject into the system prompt."""
-        ...
 
 
 class UserInteraction(BaseModel):
@@ -73,16 +63,6 @@ class UserInteraction(BaseModel):
         None,
         description="Additional user input data. Structure depends on tool implementation.",
     )
-
-
-class UserInputPreprocessResult(BaseModel):
-    """Result from processing user input in HITL scenarios."""
-
-    override_args: dict[str, Any] | None = None
-    """Override arguments for the tool call."""
-
-    metadata: dict[str, Any] | None = None
-    """Additional metadata from user input processing."""
 
 
 CallMetadata = dict[str, Any]
@@ -111,119 +91,6 @@ class GlobalHooks(BaseModel):
     """Global post-hook applied after tool-specific post-hooks."""
 
     model_config = {"arbitrary_types_allowed": True}
-
-
-class BaseTool(ABC):
-    """Abstract base class for tools.
-
-    Subclasses define name, description as class attributes, implement
-    the `call` method, and optionally override `get_instruction()` for
-    dynamic instruction generation.
-
-    Example:
-        class ReadFileTool(BaseTool):
-            name = "read_file"
-            description = "Read contents of a file"
-
-            def get_instruction(self, ctx: RunContext[AgentContext]) -> str | None:
-                return "Use this tool to read file contents from the filesystem."
-
-            async def call(self, ctx: RunContext[AgentContext], path: str) -> str:
-                return Path(path).read_text()
-    """
-
-    name: str
-    """The name of the tool, used for invocation."""
-
-    description: str
-    """Description of what the tool does, shown to the model."""
-
-    def is_available(self, ctx: RunContext[AgentContext]) -> bool:
-        """Check if tool is available in current context.
-
-        Override this method to check runtime conditions like model capabilities,
-        optional dependencies, or configuration settings.
-        Tools that return False will be excluded when skip_unavailable=True.
-
-        Args:
-            ctx: The run context containing runtime information.
-
-        Returns:
-            True if tool can be used, False otherwise.
-        """
-        return True
-
-    def get_instruction(self, ctx: RunContext[AgentContext]) -> str | None:
-        """Get instruction for this tool.
-
-        Override this method to provide dynamic instructions based on context.
-        Default implementation returns None (no instruction).
-
-        Args:
-            ctx: The run context containing runtime information.
-
-        Returns:
-            Instruction text to inject into system prompt, or None.
-        """
-        return None
-
-    def get_approval_metadata(self) -> dict[str, Any] | None:
-        return None
-
-    @abstractmethod
-    async def call(self, ctx: RunContext[AgentContext], /, *args: Any, **kwargs: Any) -> Any:
-        """Execute the tool logic.
-
-        Subclasses should override this method with their specific parameter signature.
-        The base signature uses *args/**kwargs to allow any parameter combination.
-
-        Args:
-            ctx: The run context containing runtime information.
-            *args: Tool-specific positional arguments.
-            **kwargs: Tool-specific keyword arguments.
-
-        Returns:
-            The tool's result.
-        """
-        ...
-
-    async def process_user_input(
-        self,
-        ctx: AgentContext,
-        user_input: Any,
-    ) -> UserInputPreprocessResult | None:
-        """Process user input for HITL scenarios.
-
-        Override this method to handle user-provided input when a tool call
-        requires approval. You can use this to:
-        - Validate user input
-        - Transform user input into tool arguments
-        - Store metadata for later use
-
-        Args:
-            ctx: The agent context.
-            user_input: The user-provided input data.
-
-        Returns:
-            A UserInputPreprocessResult with override_args and/or metadata,
-            or None if no processing is needed.
-        """
-        return None
-
-    def get_deferred_metadata(self, ctx: RunContext[AgentContext]) -> Any:
-        """Get HITL metadata for the tool call, if applicable."""
-        return ctx.tool_call_metadata
-
-
-class BaseToolset(AbstractToolset[AgentDepsT], ABC):
-    """Base class for toolsets with instruction support."""
-
-    def get_instructions(self, ctx: RunContext[AgentDepsT]) -> str | None:
-        """Get instructions to inject into the system prompt.
-
-        Override this method to provide tool-specific instructions.
-        """
-        return None
 
 
 @dataclass(kw_only=True)
@@ -623,15 +490,16 @@ class Toolset(BaseToolset[AgentDepsT]):
         logger.debug(f"call_tool: {name!r} completed successfully")
         return result
 
-    def get_instructions(self, ctx: RunContext[AgentDepsT]) -> str | None:
+    async def get_instructions(self, ctx: RunContext[AgentDepsT]) -> str | None:
         """Collect instructions from all tools.
 
         Returns a combined instruction string or None if no tools have instructions.
+        Supports both sync and async get_instruction methods on tools.
         """
         instructions: list[str] = []
         for name in self._tool_classes:
             tool_instance = self._get_tool_instance(name)
-            instruction = tool_instance.get_instruction(ctx)
+            instruction = await resolve_instructions(tool_instance.get_instruction(ctx))
             if instruction:
                 instructions.append(f'<tool-instruction name="{tool_instance.name}">{instruction}</tool-instruction>')
 

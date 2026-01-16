@@ -35,7 +35,7 @@ from prompt_toolkit import Application
 from prompt_toolkit.formatted_text import ANSI
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.layout import HSplit, Layout, ScrollablePane, Window
-from prompt_toolkit.layout.controls import FormattedTextControl
+from prompt_toolkit.layout.controls import BufferControl, FormattedTextControl
 from prompt_toolkit.mouse_events import MouseEvent, MouseEventType
 from prompt_toolkit.styles import Style
 from prompt_toolkit.widgets import TextArea
@@ -1723,7 +1723,30 @@ class TUIApp:
             wrap_lines=True,
         )
 
-        # Input area
+        # Input area with mouse scroll support
+        class ScrollableBufferControl(BufferControl):
+            """BufferControl that handles mouse scroll events for input area."""
+
+            def mouse_handler(self, mouse_event: MouseEvent) -> object:
+                """Handle mouse scroll events to scroll input text."""
+                # Get the window that contains this control
+                if mouse_event.event_type == MouseEventType.SCROLL_UP:
+                    # Move cursor up by 1 line to scroll content
+                    buff = self.buffer
+                    if buff:
+                        doc = buff.document
+                        if doc.cursor_position_row > 0:
+                            buff.cursor_up()
+                        return None
+                elif mouse_event.event_type == MouseEventType.SCROLL_DOWN:
+                    buff = self.buffer
+                    if buff:
+                        doc = buff.document
+                        if doc.cursor_position_row < doc.line_count - 1:
+                            buff.cursor_down()
+                        return None
+                return super().mouse_handler(mouse_event)
+
         input_area = TextArea(
             multiline=True,
             prompt=self._get_prompt,
@@ -1732,6 +1755,18 @@ class TUIApp:
             height=5,
             scrollbar=True,
         )
+
+        # Replace the buffer control with our scrollable version
+        original_control = input_area.control
+        scrollable_control = ScrollableBufferControl(
+            buffer=original_control.buffer,
+            input_processors=original_control.input_processors,
+            include_default_input_processors=False,
+            lexer=original_control.lexer,
+            focus_on_click=original_control.focus_on_click,
+        )
+        input_area.window.content = scrollable_control
+        input_area.control = scrollable_control
 
         # Layout: Output | Steering | Status | Input
         layout = Layout(

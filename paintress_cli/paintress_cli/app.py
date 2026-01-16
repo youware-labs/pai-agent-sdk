@@ -669,19 +669,34 @@ class TUIApp:
         return project_guidance, user_rules
 
     def _build_user_prompt(self, user_input: str) -> str | list[str]:
-        """Build the full user prompt with optional guidance files.
+        """Build the full user prompt with optional guidance files and mode reminder.
 
         Args:
             user_input: The user's input text.
 
         Returns:
             Either the plain user_input string, or a list of
-            [user_input, project_guidance, user_rules] if guidance files exist.
+            [user_input, project_guidance, user_rules, mode_reminder] if guidance files exist
+            or plan mode is active.
         """
         project_guidance, user_rules = self._load_guidance_files()
 
-        # If no guidance files, return plain string
-        if not project_guidance and not user_rules:
+        # Build mode reminder for plan mode
+        mode_reminder: str | None = None
+        if self._mode == TUIMode.PLAN:
+            mode_reminder = (
+                "<mode-reminder>\n"
+                "You are currently in PLAN mode. In this mode:\n"
+                "- Do NOT make any modifications to existing code or files\n"
+                "- Do NOT execute commands that change system state\n"
+                "- Focus on analysis, discussion, and planning\n"
+                "- You MAY create new draft files (e.g., in .drafts/ or .handoff/) to save context, "
+                "discussion results, plans, or design documents\n"
+                "</mode-reminder>"
+            )
+
+        # If no guidance files and not in plan mode, return plain string
+        if not project_guidance and not user_rules and not mode_reminder:
             return user_input
 
         # Build list with non-None items
@@ -690,6 +705,8 @@ class TUIApp:
             parts.append(project_guidance)
         if user_rules:
             parts.append(user_rules)
+        if mode_reminder:
+            parts.append(mode_reminder)
 
         return parts
 

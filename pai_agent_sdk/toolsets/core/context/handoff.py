@@ -75,33 +75,41 @@ class HandoffMessage(BaseModel):
     )
 
     def render(self) -> str:
-        """Render handoff message as structured XML for context injection."""
-        from xml.etree.ElementTree import Element, SubElement, tostring
+        """Render handoff message as Markdown for context injection."""
+        lines: list[str] = []
 
-        root = Element("context-handoff")
-
-        SubElement(root, "primary-request").text = self.primary_request
-        SubElement(root, "current-state").text = self.current_state
+        lines.append("# Context Handoff")
+        lines.append("")
+        lines.append("## Primary Request")
+        lines.append(self.primary_request)
+        lines.append("")
+        lines.append("## Current State")
+        lines.append(self.current_state)
 
         if self.key_decisions:
-            decisions_elem = SubElement(root, "key-decisions")
+            lines.append("")
+            lines.append("## Key Decisions")
             for decision in self.key_decisions:
-                SubElement(decisions_elem, "decision").text = decision
+                lines.append(f"- {decision}")
 
         if self.files_modified:
-            files_elem = SubElement(root, "files-modified")
+            lines.append("")
+            lines.append("## Files Modified")
             for file in self.files_modified:
-                SubElement(files_elem, "file").text = file
+                lines.append(f"- `{file}`")
 
         if self.pending_tasks:
-            tasks_elem = SubElement(root, "pending-tasks")
+            lines.append("")
+            lines.append("## Pending Tasks")
             for task in self.pending_tasks:
-                SubElement(tasks_elem, "task").text = task
+                lines.append(f"- {task}")
 
         if self.next_step:
-            SubElement(root, "next-step").text = self.next_step
+            lines.append("")
+            lines.append("## Next Step")
+            lines.append(self.next_step)
 
-        return tostring(root, encoding="unicode")
+        return "\n".join(lines)
 
 
 class HandoffTool(BaseTool):

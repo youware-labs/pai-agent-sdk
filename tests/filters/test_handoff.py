@@ -56,30 +56,19 @@ async def test_process_handoff_with_handoff_message(tmp_path: Path) -> None:
 
             result = await process_handoff_message(mock_ctx, history)
 
-            # Should return truncated history with 3 messages
-            assert len(result) == 3
+            # Should return truncated history with 1 message
+            assert len(result) == 1
 
             # First message should be the user request with handoff appended
             first_msg = result[0]
             assert isinstance(first_msg, ModelRequest)
-            assert len(first_msg.parts) == 2
-            assert isinstance(first_msg.parts[1], UserPromptPart)
-            assert "<context-handoff>" in first_msg.parts[1].content
-            assert "Previous context summary here" in first_msg.parts[1].content
-
-            # Second message should be a ModelResponse with handoff tool call
-            second_msg = result[1]
-            assert isinstance(second_msg, ModelResponse)
-            assert len(second_msg.parts) == 1
-            assert isinstance(second_msg.parts[0], ToolCallPart)
-            assert second_msg.parts[0].tool_name == "handoff"
-
-            # Third message should be a ModelRequest with tool return
-            third_msg = result[2]
-            assert isinstance(third_msg, ModelRequest)
-            assert len(third_msg.parts) == 1
-            assert isinstance(third_msg.parts[0], ToolReturnPart)
-            assert third_msg.parts[0].tool_name == "handoff"
+            # 4 parts: prefix, original, separator, handoff
+            assert len(first_msg.parts) == 4
+            assert isinstance(first_msg.parts[0], UserPromptPart)
+            assert "Previous User Request" in first_msg.parts[0].content
+            assert isinstance(first_msg.parts[3], UserPromptPart)
+            assert "Previous context summary here" in first_msg.parts[3].content
+            assert "System Reminder" in first_msg.parts[3].content
 
             # Handoff message should be cleared
             assert ctx.handoff_message is None
@@ -131,14 +120,16 @@ async def test_process_handoff_finds_last_user_request(tmp_path: Path) -> None:
             result = await process_handoff_message(mock_ctx, history)
 
             # Should inject into final_user (last true user request)
-            assert len(result) == 3
+            assert len(result) == 1
             assert isinstance(result[0], ModelRequest)
-            # The first part should be the original user prompt
-            assert isinstance(result[0].parts[0], UserPromptPart)
-            assert result[0].parts[0].content == "Next task"
-            # The second part should be the handoff
+            # 4 parts: prefix, original, separator, handoff
+            assert len(result[0].parts) == 4
+            # The second part should be the original user prompt
             assert isinstance(result[0].parts[1], UserPromptPart)
-            assert "<context-handoff>" in result[0].parts[1].content
+            assert result[0].parts[1].content == "Next task"
+            # The last part should be the handoff
+            assert isinstance(result[0].parts[3], UserPromptPart)
+            assert "Context summary" in result[0].parts[3].content
 
 
 async def test_process_handoff_skips_tool_return_only_request(tmp_path: Path) -> None:
@@ -164,13 +155,15 @@ async def test_process_handoff_skips_tool_return_only_request(tmp_path: Path) ->
             result = await process_handoff_message(mock_ctx, history)
 
             # Should inject into user_request (skipping tool_return)
-            assert len(result) == 3
+            assert len(result) == 1
             first_msg = result[0]
             assert isinstance(first_msg, ModelRequest)
-            assert isinstance(first_msg.parts[0], UserPromptPart)
-            assert first_msg.parts[0].content == "Start"
+            # 4 parts: prefix, original, separator, handoff
+            assert len(first_msg.parts) == 4
             assert isinstance(first_msg.parts[1], UserPromptPart)
-            assert "<context-handoff>" in first_msg.parts[1].content
+            assert first_msg.parts[1].content == "Start"
+            assert isinstance(first_msg.parts[3], UserPromptPart)
+            assert "Summary" in first_msg.parts[3].content
 
 
 async def test_process_handoff_emits_events(tmp_path: Path) -> None:
@@ -195,7 +188,7 @@ async def test_process_handoff_emits_events(tmp_path: Path) -> None:
             result = await process_handoff_message(mock_ctx, history)
 
             # Verify result
-            assert len(result) == 3
+            assert len(result) == 1
 
             # Collect events from queue
             events = []
@@ -239,7 +232,7 @@ async def test_process_handoff_no_events_when_streaming_disabled(tmp_path: Path)
             result = await process_handoff_message(mock_ctx, history)
 
             # Should still work correctly
-            assert len(result) == 3
+            assert len(result) == 1
 
             # Queue should be empty since streaming is disabled
             assert ctx.agent_stream_queues[ctx.run_id].empty()

@@ -858,8 +858,7 @@ class EventRenderer:
         panel_content = Text()
         panel_content.append("Context reset with preserved state\n", style="bold green")
         if content:
-            preview = content[:250] + "..." if len(content) > 250 else content
-            panel_content.append(preview, style="dim")
+            panel_content.append(content, style="dim")
         panel = Panel(
             panel_content, border_style="magenta", title="[magenta]Handoff Complete[/magenta]", title_align="left"
         )

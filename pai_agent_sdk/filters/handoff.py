@@ -13,15 +13,17 @@ from uuid import uuid4
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
-    ModelResponse,
-    ToolCallPart,
     ToolReturnPart,
     UserPromptPart,
 )
 from pydantic_ai.tools import RunContext
 
 from pai_agent_sdk.context import AgentContext
-from pai_agent_sdk.events import HandoffCompleteEvent, HandoffFailedEvent, HandoffStartEvent
+from pai_agent_sdk.events import (
+    HandoffCompleteEvent,
+    HandoffFailedEvent,
+    HandoffStartEvent,
+)
 
 
 async def process_handoff_message(
@@ -82,37 +84,24 @@ async def process_handoff_message(
 
         # Append handoff summary after user's current request
         handoff_part = UserPromptPart(
-            content=f"<context-handoff>\n{handoff_content}\n</context-handoff>",
+            content=f"""{handoff_content}
+
+---
+
+**System Reminder**: Handoff done, continue the task and do not repeat the handoff.""",
         )
-        last_user_request.parts = [*last_user_request.parts, handoff_part]
-
-        # Generate a unique tool call id
-        tool_call_id = f"handoff-{ctx.deps.run_id}"
-
+        last_user_request.parts = [
+            UserPromptPart(content="**Previous User Request**:"),
+            *last_user_request.parts,
+            UserPromptPart(content="---"),
+            handoff_part,
+        ]
         # Clear handoff state
         ctx.deps.handoff_message = None
 
         # Return truncated history with handoff marker
-        result = [
+        result: list[ModelMessage] = [
             last_user_request,
-            ModelResponse(
-                parts=[
-                    ToolCallPart(
-                        tool_call_id=tool_call_id,
-                        tool_name="handoff",
-                        args={"_": "context-reset"},
-                    ),
-                ],
-            ),
-            ModelRequest(
-                parts=[
-                    ToolReturnPart(
-                        tool_call_id=tool_call_id,
-                        tool_name="handoff",
-                        content="Handoff complete. Continue with the task using the context summary above.",
-                    ),
-                ],
-            ),
         ]
 
         # Emit complete event with the actual handoff content

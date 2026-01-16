@@ -15,13 +15,15 @@ def test_handoff_message_render_minimal() -> None:
         current_state="Initial setup complete",
     )
     result = msg.render()
-    assert "<context-handoff>" in result
-    assert "<primary-request>Build a REST API</primary-request>" in result
-    assert "<current-state>Initial setup complete</current-state>" in result
-    assert "<key-decisions>" not in result
-    assert "<files-modified>" not in result
-    assert "<pending-tasks>" not in result
-    assert "<next-step>" not in result
+    assert "# Context Handoff" in result
+    assert "## Primary Request" in result
+    assert "Build a REST API" in result
+    assert "## Current State" in result
+    assert "Initial setup complete" in result
+    assert "## Key Decisions" not in result
+    assert "## Files Modified" not in result
+    assert "## Pending Tasks" not in result
+    assert "## Next Step" not in result
 
 
 def test_handoff_message_render_full() -> None:
@@ -35,19 +37,22 @@ def test_handoff_message_render_full() -> None:
         next_step="Implement user endpoint",
     )
     result = msg.render()
-    assert "<context-handoff>" in result
-    assert "<primary-request>Build a REST API</primary-request>" in result
-    assert "<current-state>Database models created</current-state>" in result
-    assert "<key-decisions>" in result
-    assert "<decision>Use PostgreSQL</decision>" in result
-    assert "<decision>Use FastAPI</decision>" in result
-    assert "<files-modified>" in result
-    assert "<file>models.py</file>" in result
-    assert "<file>api.py</file>" in result
-    assert "<pending-tasks>" in result
-    assert "<task>Add authentication</task>" in result
-    assert "<task>Write tests</task>" in result
-    assert "<next-step>Implement user endpoint</next-step>" in result
+    assert "# Context Handoff" in result
+    assert "## Primary Request" in result
+    assert "Build a REST API" in result
+    assert "## Current State" in result
+    assert "Database models created" in result
+    assert "## Key Decisions" in result
+    assert "- Use PostgreSQL" in result
+    assert "- Use FastAPI" in result
+    assert "## Files Modified" in result
+    assert "`models.py`" in result
+    assert "`api.py`" in result
+    assert "## Pending Tasks" in result
+    assert "- Add authentication" in result
+    assert "- Write tests" in result
+    assert "## Next Step" in result
+    assert "Implement user endpoint" in result
 
 
 def test_handoff_message_render_partial() -> None:
@@ -58,11 +63,11 @@ def test_handoff_message_render_partial() -> None:
         key_decisions=["Root cause found"],
     )
     result = msg.render()
-    assert "<key-decisions>" in result
-    assert "<decision>Root cause found</decision>" in result
-    assert "<files-modified>" not in result
-    assert "<pending-tasks>" not in result
-    assert "<next-step>" not in result
+    assert "## Key Decisions" in result
+    assert "- Root cause found" in result
+    assert "## Files Modified" not in result
+    assert "## Pending Tasks" not in result
+    assert "## Next Step" not in result
 
 
 def test_handoff_tool_attributes(agent_context: AgentContext) -> None:
@@ -114,12 +119,12 @@ async def test_handoff_tool_call(agent_context: AgentContext) -> None:
 
     # Verify handoff message is stored in context
     assert agent_context.handoff_message is not None
-    assert "<context-handoff>" in agent_context.handoff_message
-    assert "<primary-request>Build API</primary-request>" in agent_context.handoff_message
+    assert "# Context Handoff" in agent_context.handoff_message
+    assert "Build API" in agent_context.handoff_message
 
     # Verify return value contains summary
     assert "Handoff complete" in result
-    assert "<context-handoff>" in result
+    assert "# Context Handoff" in result
 
 
 async def test_handoff_tool_call_overwrites_previous(agent_context: AgentContext) -> None:

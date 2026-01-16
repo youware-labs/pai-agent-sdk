@@ -6,8 +6,13 @@ from pai_agent_sdk._config import AgentSettings
 from pai_agent_sdk.environment.local import LocalEnvironment
 
 
-def test_agent_context_settings_defaults() -> None:
+def test_agent_context_settings_defaults(monkeypatch) -> None:
     """Should have correct default values."""
+    # Clear environment variables to test true defaults
+    monkeypatch.delenv("PAI_AGENT_IMAGE_UNDERSTANDING_MODEL", raising=False)
+    monkeypatch.delenv("PAI_AGENT_VIDEO_UNDERSTANDING_MODEL", raising=False)
+    monkeypatch.delenv("PAI_AGENT_COMPACT_MODEL", raising=False)
+
     settings = AgentSettings()
     assert settings.image_understanding_model is None
     assert settings.video_understanding_model is None

@@ -30,7 +30,7 @@ from importlib import resources
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from pydantic_ai import ModelSettings, TextOutput
+from pydantic_ai import DeferredToolRequests, ModelSettings, TextOutput
 from pydantic_ai.mcp import MCPServer
 from pydantic_ai.output import OutputSpec
 
@@ -169,7 +169,7 @@ def create_tui_runtime(
     *,
     working_dir: Path | None = None,
     system_prompt: str | None = None,
-) -> AgentRuntime[TUIContext, str]:
+) -> AgentRuntime[TUIContext, str | DeferredToolRequests]:
     """Create AgentRuntime configured for TUI.
 
     This function wraps the SDK's create_agent() with TUI-specific
@@ -249,8 +249,10 @@ def create_tui_runtime(
 
     # Configure output type with steering guard
     # This ensures agent retries when user adds steering messages during output
-    output_type: OutputSpec[str] = TextOutput(steering_output_guard)
-
+    output_type: OutputSpec[str | DeferredToolRequests] = [
+        TextOutput(steering_output_guard),
+        DeferredToolRequests,
+    ]
     # Create runtime using SDK factory
     runtime = create_agent(
         model=config.general.model or None,

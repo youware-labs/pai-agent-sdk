@@ -38,6 +38,7 @@ from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.mouse_events import MouseEvent, MouseEventType
 from prompt_toolkit.styles import Style
 from prompt_toolkit.widgets import TextArea
+from pydantic_ai import DeferredToolRequests, DeferredToolResults, ToolDenied
 from pydantic_ai.messages import (
     FunctionToolCallEvent,
     FunctionToolResultEvent,
@@ -48,6 +49,7 @@ from pydantic_ai.messages import (
     TextPartDelta,
     ThinkingPart,
     ThinkingPartDelta,
+    ToolCallPart,
 )
 from rich.text import Text
 
@@ -131,7 +133,7 @@ class TUIApp:
     # Resources (initialized in __aenter__)
     _exit_stack: AsyncExitStack | None = field(default=None, init=False, repr=False)
     _browser: BrowserManager | None = field(default=None, init=False)
-    _runtime: AgentRuntime[TUIContext, str] | None = field(default=None, init=False)
+    _runtime: AgentRuntime[TUIContext, str | DeferredToolRequests] | None = field(default=None, init=False)
 
     # UI components
     _app: Application[None] | None = field(default=None, init=False, repr=False)
@@ -190,6 +192,14 @@ class TUIApp:
     _last_invalidate_time: float = field(default=0.0, init=False)
     _invalidate_interval: float = field(default=0.016, init=False)  # ~60fps max
 
+    # HITL (Human-in-the-Loop) approval state
+    _hitl_pending: bool = field(default=False, init=False)
+    _approval_event: asyncio.Event | None = field(default=None, init=False)
+    _approval_result: bool | None = field(default=None, init=False)  # True=approve, False=reject
+    _approval_reason: str | None = field(default=None, init=False)
+    _pending_approvals: list[ToolCallPart] = field(default_factory=list, init=False)
+    _current_approval_index: int = field(default=0, init=False)
+
     @property
     def mode(self) -> TUIMode:
         """Current agent mode."""
@@ -201,7 +211,7 @@ class TUIApp:
         return self._state
 
     @property
-    def runtime(self) -> AgentRuntime[TUIContext, str]:
+    def runtime(self) -> AgentRuntime[TUIContext, str | DeferredToolRequests]:
         """Get agent runtime (must be entered first)."""
         if self._runtime is None:
             raise RuntimeError("TUIApp not entered. Use 'async with app:' first.")
@@ -569,15 +579,28 @@ class TUIApp:
 
         # Build status based on state
         if self._state == TUIState.RUNNING:
-            return [
-                (mode_style, f" {self._mode.value.upper()} "),
-                ("class:status-bar", " | "),
-                ("class:status-bar", f"State: {state_text}"),
-                ("class:status-bar", " | "),
-                ("class:status-bar", f"Context: {context_pct}%"),
-                ("class:status-bar", " | "),
-                ("class:status-bar", "Ctrl+C: Interrupt "),
-            ]
+            # Check if waiting for HITL approval
+            if self._hitl_pending:
+                approval_progress = f"{self._current_approval_index + 1}/{len(self._pending_approvals)}"
+                return [
+                    (mode_style, f" {self._mode.value.upper()} "),
+                    ("class:status-bar", " | "),
+                    ("class:status-bar.warning", f"Approval: {approval_progress}"),
+                    ("class:status-bar", " | "),
+                    ("class:status-bar", f"Context: {context_pct}%"),
+                    ("class:status-bar", " | "),
+                    ("class:status-bar", "Enter/Y: Approve | Text: Reject | Ctrl+C: Cancel"),
+                ]
+            else:
+                return [
+                    (mode_style, f" {self._mode.value.upper()} "),
+                    ("class:status-bar", " | "),
+                    ("class:status-bar", f"State: {state_text}"),
+                    ("class:status-bar", " | "),
+                    ("class:status-bar", f"Context: {context_pct}%"),
+                    ("class:status-bar", " | "),
+                    ("class:status-bar", "Ctrl+C: Interrupt "),
+                ]
         else:
             # IDLE: show input mode and scroll hint
             if self._input_mode == "send":
@@ -683,46 +706,30 @@ class TUIApp:
                 self._app.invalidate()
 
     async def _run_agent(self, user_input: str) -> None:
-        """Execute agent with user prompt and optional guidance."""
+        """Execute agent with HITL inner loop for tool approvals."""
         self._state = TUIState.RUNNING
         self._tool_messages.clear()
         self._printed_tool_calls.clear()
         self._event_renderer.clear()
 
-        # Build prompt with optional guidance files
-        user_prompt = self._build_user_prompt(user_input)
-
         try:
-            async with stream_agent(
-                self.runtime,  # type: ignore[arg-type]
-                user_prompt=user_prompt,
-                message_history=self._message_history,
-                post_node_hook=emit_context_update,
-            ) as stream:
-                async for event in stream:
-                    self._handle_stream_event(event)
+            # Initial agent execution
+            result = await self._execute_stream(user_input)
 
-                stream.raise_if_exception()
-                # Save run and update message history for next conversation
-                self._last_run = stream.run
-                if stream.run:
-                    self._message_history = list(stream.run.all_messages())
-                    # Update context usage from run
-                    # Use latest request usage for accurate context tokens (not cumulative)
-                    usage = stream.run.usage()
-                    latest_usage = get_latest_request_usage(self._message_history)
-                    self._current_context_tokens = latest_usage.total_tokens if latest_usage else usage.total_tokens
+            # HITL inner loop: keep processing until we get final str output
+            while result and isinstance(result.output, DeferredToolRequests):
+                deferred = result.output
+                if not deferred.approvals:
+                    # No approvals needed, just continue
+                    break
 
-                    # Accumulate session usage
-                    model_id = self.config.general.model or "unknown"
-                    self._session_usage.add(model_id, usage)
+                # Collect user approval decisions
+                user_response = await self._request_user_action(deferred)
 
-                    # Also accumulate extra_usages (subagents, image_understanding, etc.)
-                    ctx = self.runtime.ctx
-                    for record in ctx.extra_usages:
-                        self._session_usage.add(record.agent, record.usage)
-                    # Clear extra_usages after accumulating to avoid double counting
-                    ctx.extra_usages.clear()
+                # Resume agent with approval results
+                result = await self._execute_stream(user_response)
+
+            # Agent completed successfully
 
         except asyncio.CancelledError:
             self._finalize_streaming_text()
@@ -739,9 +746,251 @@ class TUIApp:
             # Finalize any remaining streaming text/thinking
             self._finalize_streaming_text()
             self._finalize_streaming_thinking()
+            # Reset all HITL state
+            self._reset_hitl_state()
             self._state = TUIState.IDLE
             if self._app:
                 self._app.invalidate()
+
+    def _reset_hitl_state(self) -> None:
+        """Reset all HITL-related state variables.
+
+        Called after agent execution completes (success, error, or cancel)
+        to ensure clean state for next execution.
+        """
+        self._hitl_pending = False
+        self._pending_approvals.clear()
+        self._current_approval_index = 0
+        self._approval_result = None
+        self._approval_reason = None
+        # Don't set _approval_event to None here as it may still be awaited
+        # Instead, set it if it exists to unblock any waiting coroutine
+        if self._approval_event and not self._approval_event.is_set():
+            # Signal cancellation by setting result to False
+            self._approval_result = False
+            self._approval_reason = "Cancelled"
+            self._approval_event.set()
+        self._approval_event = None
+
+    async def _execute_stream(
+        self,
+        prompt: str | DeferredToolResults,
+    ) -> Any:
+        """Execute a single agent stream and return the result.
+
+        Args:
+            prompt: User prompt string or DeferredToolResults from approval.
+
+        Returns:
+            AgentRunResult with output (str or DeferredToolRequests).
+        """
+        # Clear tracking for new stream
+        self._tool_messages.clear()
+        self._printed_tool_calls.clear()
+
+        # Build user prompt if string input
+        if isinstance(prompt, str):
+            user_prompt = self._build_user_prompt(prompt)
+            deferred_results = None
+        else:
+            user_prompt = ""
+            deferred_results = prompt
+
+        async with stream_agent(
+            self.runtime,  # type: ignore[arg-type]
+            user_prompt=user_prompt if user_prompt else None,
+            message_history=self._message_history,
+            deferred_tool_results=deferred_results,
+            post_node_hook=emit_context_update,
+        ) as stream:
+            async for event in stream:
+                self._handle_stream_event(event)
+
+            stream.raise_if_exception()
+            # Save run and update message history for next conversation
+            self._last_run = stream.run
+            if stream.run:
+                self._message_history = list(stream.run.all_messages())
+                # Update context usage from run
+                usage = stream.run.usage()
+                latest_usage = get_latest_request_usage(self._message_history)
+                self._current_context_tokens = latest_usage.total_tokens if latest_usage else usage.total_tokens
+
+                # Accumulate session usage
+                model_id = self.config.general.model or "unknown"
+                self._session_usage.add(model_id, usage)
+
+                # Also accumulate extra_usages (subagents, image_understanding, etc.)
+                ctx = self.runtime.ctx
+                for record in ctx.extra_usages:
+                    self._session_usage.add(record.agent, record.usage)
+                # Clear extra_usages after accumulating to avoid double counting
+                ctx.extra_usages.clear()
+
+            return stream.run.result if stream.run else None
+
+    async def _request_user_action(
+        self,
+        deferred: DeferredToolRequests,
+    ) -> DeferredToolResults:
+        """Collect approval decisions from user for pending tool calls.
+
+        Args:
+            deferred: DeferredToolRequests containing tools needing approval.
+
+        Returns:
+            DeferredToolResults with approval decisions.
+        """
+        results = DeferredToolResults()
+
+        if not deferred.approvals:
+            return results
+
+        self._hitl_pending = True
+        self._pending_approvals = list(deferred.approvals)
+        self._current_approval_index = 0
+
+        self._append_output("")
+        self._append_output(f"[Tool approval required: {len(deferred.approvals)} tool(s)]")
+
+        for idx, tool_call in enumerate(deferred.approvals):
+            self._current_approval_index = idx
+            # Display approval panel
+            self._display_approval_panel(tool_call, idx + 1, len(deferred.approvals))
+
+            # Wait for user decision (blocking with asyncio.Event)
+            approved, reason = await self._wait_for_approval_input()
+
+            if approved:
+                results.approvals[tool_call.tool_call_id] = True
+                self._append_output(f"  [Approved: {tool_call.tool_name}]")
+            else:
+                results.approvals[tool_call.tool_call_id] = ToolDenied(reason or "User rejected")
+                self._append_output(f"  [Rejected: {tool_call.tool_name} - {reason or 'User rejected'}]")
+
+        self._hitl_pending = False
+        self._pending_approvals.clear()
+        self._append_output("")
+
+        return results
+
+    async def _wait_for_approval_input(self) -> tuple[bool, str | None]:
+        """Wait for user's approval decision.
+
+        Returns:
+            Tuple of (approved: bool, reason: str | None).
+        """
+        self._approval_event = asyncio.Event()
+        self._approval_result = None
+        self._approval_reason = None
+
+        if self._app:
+            self._app.invalidate()
+
+        # Wait for key handler to set the event
+        await self._approval_event.wait()
+
+        approved = self._approval_result if self._approval_result is not None else False
+        reason = f"User not approved with response: `{self._approval_reason}`"
+
+        self._approval_event = None
+        return approved, reason
+
+    def _format_args_for_display(self, args: Any, max_str_len: int = 500, max_lines: int = 30) -> str:
+        """Format tool arguments for display with smart truncation.
+
+        Args:
+            args: Tool arguments (can be dict, JSON string, or any object)
+            max_str_len: Maximum length for string values before truncation
+            max_lines: Maximum number of lines in output
+
+        Returns:
+            Formatted JSON string or fallback representation
+        """
+        import json
+
+        def truncate_strings(obj: Any, max_len: int) -> Any:
+            """Recursively truncate long strings in nested structures."""
+            if isinstance(obj, str):
+                if len(obj) > max_len:
+                    return obj[:max_len] + f"... ({len(obj) - max_len} more chars)"
+                return obj
+            elif isinstance(obj, dict):
+                return {k: truncate_strings(v, max_len) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [truncate_strings(item, max_len) for item in obj]
+            return obj
+
+        try:
+            # If args is a string, try to parse it as JSON first
+            if isinstance(args, str):
+                try:
+                    parsed = json.loads(args)
+                    args = parsed
+                except json.JSONDecodeError:
+                    # Not valid JSON, treat as plain string
+                    if len(args) > max_str_len:
+                        return args[:max_str_len] + f"\n... ({len(args) - max_str_len} more chars)"
+                    return args
+
+            # Truncate long strings in the structure
+            truncated = truncate_strings(args, max_str_len)
+
+            # Format as pretty JSON
+            formatted = json.dumps(truncated, indent=2, ensure_ascii=False)
+
+            # Limit total lines
+            lines = formatted.split("\n")
+            if len(lines) > max_lines:
+                formatted = "\n".join(lines[:max_lines]) + f"\n... ({len(lines) - max_lines} more lines)"
+
+            return formatted
+
+        except Exception:
+            # Ultimate fallback: convert to string
+            result = str(args)
+            if len(result) > max_str_len:
+                result = result[:max_str_len] + f"... ({len(result) - max_str_len} more chars)"
+            return result
+
+    def _display_approval_panel(
+        self,
+        tool_call: ToolCallPart,
+        index: int,
+        total: int,
+    ) -> None:
+        """Display approval panel for a tool call."""
+        from rich.console import Group
+        from rich.panel import Panel
+        from rich.syntax import Syntax
+
+        content_parts: list[Any] = [
+            Text(f"Tool {index} of {total}", style="bold cyan"),
+            Text(""),
+            Text(f"Tool: {tool_call.tool_name}", style="bold yellow"),
+        ]
+
+        if tool_call.args:
+            content_parts.append(Text(""))
+            content_parts.append(Text("Arguments:", style="bold cyan"))
+            formatted_args = self._format_args_for_display(tool_call.args)
+            code_theme = self.config.display.code_theme or "monokai"
+            # Determine if it looks like JSON for syntax highlighting
+            is_json_like = formatted_args.strip().startswith(("{", "["))
+            syntax = Syntax(formatted_args, "json" if is_json_like else "text", theme=code_theme)
+            content_parts.append(syntax)
+
+        panel = Panel(
+            Group(*content_parts),
+            title="[yellow]Tool Approval Required[/yellow]",
+            subtitle="[dim]Enter/Y: Approve | Any text: Reject with reason | Ctrl+C: Cancel[/dim]",
+            border_style="yellow",
+            padding=(1, 2),
+        )
+
+        # Render panel to ANSI and append
+        rendered = self._renderer.render(panel, width=self._get_terminal_width())
+        self._append_output(rendered.rstrip())
 
     def _handle_stream_event(self, event: StreamEvent) -> None:
         """Handle a stream event from agent execution."""
@@ -996,6 +1245,20 @@ class TUIApp:
             """Handle Enter based on current input mode."""
             if self._input_mode == "send":
                 text = input_area.buffer.text.strip()
+
+                # Check if waiting for HITL approval input
+                if self._hitl_pending and self._approval_event and not self._approval_event.is_set():
+                    input_area.buffer.reset()
+                    # Approve if empty, y, Y, yes, YES
+                    if text.lower() in ("", "y", "yes"):
+                        self._approval_result = True
+                        self._approval_reason = None
+                    else:
+                        self._approval_result = False
+                        self._approval_reason = text if text else None
+                    self._approval_event.set()
+                    return
+
                 if text:
                     # Reset history navigation
                     self._history_index = -1
@@ -1022,6 +1285,11 @@ class TUIApp:
                             self._agent_task = asyncio.create_task(self._run_agent(text))
                             self._agent_task.add_done_callback(self._on_agent_task_done)
                 else:
+                    # Empty input - also handle HITL approval (approve with Enter)
+                    if self._hitl_pending and self._approval_event and not self._approval_event.is_set():
+                        self._approval_result = True
+                        self._approval_reason = None
+                        self._approval_event.set()
                     input_area.buffer.reset()
             else:
                 input_area.buffer.insert_text("\n")

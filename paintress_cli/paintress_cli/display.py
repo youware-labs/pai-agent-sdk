@@ -833,8 +833,7 @@ class EventRenderer:
         content.append(f"{original_count} -> {compacted_count} messages ", style="bold")
         content.append(f"({reduction}% reduction)", style="dim")
         if summary:
-            preview = summary[:150] + "..." if len(summary) > 150 else summary
-            content.append(f"\n{preview}", style="dim italic")
+            content.append(summary, style="dim italic")
         panel = Panel(content, border_style="cyan", title="[cyan]Context Compacted[/cyan]", title_align="left")
         return self._renderer.render(panel)
 

@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import sys
 import time
 from contextlib import AsyncExitStack
@@ -907,7 +908,6 @@ class TUIApp:
         Returns:
             Formatted JSON string or fallback representation
         """
-        import json
 
         def truncate_strings(obj: Any, max_len: int) -> Any:
             """Recursively truncate long strings in nested structures."""

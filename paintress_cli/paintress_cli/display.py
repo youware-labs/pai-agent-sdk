@@ -21,7 +21,7 @@ from io import StringIO
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
-from rich.console import Console, Group
+from rich.console import Console, Group, RenderableType
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.syntax import Syntax
@@ -387,7 +387,7 @@ class ToolMessage(BaseModel):
 
         Both to_do_read and to_do_write return JSON string in content.
         """
-        panel_content = ""
+        panel_content: RenderableType = ""
         try:
             if self.content and self.content.startswith("["):
                 to_dos = json.loads(self.content)
@@ -637,8 +637,8 @@ class ToolMessage(BaseModel):
                     args_dict = {"raw_args": self.args}
         return args_dict
 
-    def _format_to_do_list(self, to_dos: list) -> str:
-        """Format a list of to_dos for display."""
+    def _format_to_do_list(self, to_dos: list) -> RenderableType:
+        """Format a list of to_dos for display with rich styling."""
         if not to_dos:
             return "No to_dos found"
 
@@ -649,25 +649,51 @@ class ToolMessage(BaseModel):
                 if priority in priority_groups:
                     priority_groups[priority].append(to_do)
 
-        lines = []
+        parts: list[RenderableType] = []
+
+        priority_styles = {
+            "high": ("bold magenta", "High"),
+            "medium": ("bold", "Medium"),
+            "low": ("dim", "Low"),
+        }
+
         for priority in ["high", "medium", "low"]:
             items = priority_groups[priority]
             if items:
-                lines.append(f"{priority.title()} Priority ({len(items)} items)")
+                style, label = priority_styles[priority]
+                header = Text(f"{label} Priority ({len(items)} items)", style=style)
+                parts.append(header)
+
                 for item in items:
                     status = item.get("status", "pending")
                     content = item.get("content", "No content")
                     item_id = item.get("id", "")
-                    status_text = {
-                        "pending": "[ ]",
-                        "in_progress": "[*]",
-                        "completed": "[v]",
-                    }.get(status, f"[{status}]")
-                    if item_id:
-                        lines.append(f"  {status_text} {item_id}: {content}")
-                    else:
-                        lines.append(f"  {status_text} {content}")
-                lines.append("")
+
+                    line = Text()
+                    line.append("  ")
+
+                    # Status indicator with styling
+                    if status == "completed":
+                        line.append("[x]", style="bold green")
+                        line.append(" ")
+                        if item_id:
+                            line.append(f"{item_id}: ", style="strike dim")
+                        line.append(content, style="strike dim")
+                    elif status == "in_progress":
+                        line.append("[~]", style="bold cyan")
+                        line.append(" ")
+                        if item_id:
+                            line.append(f"{item_id}: ", style="cyan")
+                        line.append(content, style="cyan")
+                    else:  # pending
+                        line.append("[ ]", style="dim")
+                        line.append(" ")
+                        if item_id:
+                            line.append(f"{item_id}: ")
+                        line.append(content)
+
+                    parts.append(line)
+                parts.append(Text(""))
 
         # Progress summary
         total = len(to_dos)
@@ -677,10 +703,23 @@ class ToolMessage(BaseModel):
 
         if total > 0:
             completion_rate = int((completed / total) * 100)
-            lines.append(f"Progress: {completed}/{total} completed ({completion_rate}%)")
-            lines.append(f"Status: {in_progress} in progress, {pending} pending")
+            progress_line = Text()
+            progress_line.append("Progress: ")
+            progress_line.append(f"{completed}/{total}", style="bold green" if completed == total else "bold")
+            progress_line.append(f" ({completion_rate}%)")
+            parts.append(progress_line)
 
-        return "\n".join(lines)
+            status_line = Text()
+            status_line.append("Status: ")
+            if in_progress > 0:
+                status_line.append(f"{in_progress} in progress", style="cyan")
+                if pending > 0:
+                    status_line.append(", ")
+            if pending > 0:
+                status_line.append(f"{pending} pending", style="dim")
+            parts.append(status_line)
+
+        return Group(*parts)
 
 
 # =============================================================================

@@ -49,7 +49,6 @@ _initialized = False
 _log_queue: Queue | None = None
 _verbose_mode: bool = False
 
-
 # -----------------------------------------------------------------------------
 # Log Event
 # -----------------------------------------------------------------------------
@@ -218,7 +217,10 @@ def reset_logging() -> None:
     """
     global _initialized, _log_queue, _verbose_mode
 
-    for name in [TUI_LOGGER_NAME, SDK_LOGGER_NAME]:
+    for name in [
+        TUI_LOGGER_NAME,
+        SDK_LOGGER_NAME,
+    ]:
         logger = logging.getLogger(name)
         logger.handlers.clear()
 

@@ -198,6 +198,7 @@ def create_agent(
     extra_context_kwargs: dict[str, Any] | None = None,
     state: ResumableState | None = None,
     need_user_approve_tools: Sequence[str] | None = None,
+    need_user_approve_mcps: Sequence[str] | None = None,
     # --- Toolset ---
     tools: Sequence[type[BaseTool]] | None = None,
     toolsets: Sequence[AbstractToolset[Any]] | None = None,
@@ -247,6 +248,7 @@ def create_agent(
         extra_context_kwargs: Additional kwargs passed to context_type constructor.
         state: ResumableState to restore session from. Defaults to None.
         need_user_approve_tools: Tools requiring user approval before execution.
+        need_user_approve_mcps: MCP servers requiring user approval for all tools.
 
         tools: Sequence of BaseTool classes to include in the toolset.
         toolsets: Additional AbstractToolset instances to include.
@@ -318,6 +320,7 @@ def create_agent(
         model_cfg=effective_model_cfg,
         tool_config=effective_tool_config,
         need_user_approve_tools=list(need_user_approve_tools) if need_user_approve_tools else [],
+        need_user_approve_mcps=list(need_user_approve_mcps) if need_user_approve_mcps else [],
         **(extra_context_kwargs or {}),
     ).with_state(state)
     logger.debug("Context created: %s (run_id=%s)", type(ctx).__name__, ctx.run_id)

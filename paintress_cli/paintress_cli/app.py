@@ -270,10 +270,20 @@ class TUIApp:
             with contextlib.suppress(asyncio.CancelledError):
                 await self._agent_task
 
+        # Give event loop a chance to process pending cleanups
+        await asyncio.sleep(0)
+
         if self._exit_stack:
-            result = await self._exit_stack.__aexit__(exc_type, exc_val, exc_tb)
-            self._exit_stack = None
-            return result
+            try:
+                result = await self._exit_stack.__aexit__(exc_type, exc_val, exc_tb)
+                self._exit_stack = None
+                return result
+            except (RuntimeError, GeneratorExit, BaseExceptionGroup) as e:
+                # Suppress MCP stdio client cleanup errors
+                # These occur due to async generator lifecycle issues in pydantic-ai/mcp
+                logger.debug("Suppressed cleanup error: %s", e)
+                self._exit_stack = None
+                return None
         return None
 
     # =========================================================================
@@ -1798,3 +1808,11 @@ class TUIApp:
         except Exception as e:
             # Re-raise to be caught by cli.py with proper error display
             raise RuntimeError(f"TUI crashed: {e}") from e
+        finally:
+            # Ensure agent task is fully cancelled and awaited before __aexit__
+            # This prevents async generator cleanup issues with MCP servers
+            if self._agent_task and not self._agent_task.done():
+                self._agent_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await self._agent_task
+                self._agent_task = None

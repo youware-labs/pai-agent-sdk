@@ -2,7 +2,14 @@
 
 import importlib.metadata
 
-__all__ = ["__version__"]
+from pai_agent_sdk.mcp import MCPServerSpec, ProcessToolCallback, create_mcp_approval_hook
+
+__all__ = [
+    "MCPServerSpec",
+    "ProcessToolCallback",
+    "__version__",
+    "create_mcp_approval_hook",
+]
 
 try:
     __version__ = importlib.metadata.version(__name__)

@@ -181,6 +181,9 @@ class ResumableState(BaseModel):
     need_user_approve_tools: list[str] = Field(default_factory=list)
     """List of tool names that require user approval before execution."""
 
+    need_user_approve_mcps: list[str] = Field(default_factory=list)
+    """List of MCP server names that require user approval for all tools."""
+
     def to_subagent_history(self) -> dict[str, list[ModelMessage]]:
         """Deserialize subagent_history to ModelMessage objects.
 
@@ -218,6 +221,7 @@ class ResumableState(BaseModel):
         # Restore agent_registry from serialized format
         ctx.agent_registry = {agent_id: AgentInfo(**info) for agent_id, info in self.agent_registry.items()}
         ctx.need_user_approve_tools = list(self.need_user_approve_tools)
+        ctx.need_user_approve_mcps = list(self.need_user_approve_mcps)
 
 
 class ToolIdWrapper:
@@ -663,6 +667,18 @@ class AgentContext(BaseModel):
 
     Tools in this list will trigger HITL (Human-in-the-Loop) flow,
     deferring execution until the user explicitly approves.
+    """
+
+    need_user_approve_mcps: list[str] = Field(default_factory=list)
+    """List of MCP server names that require user approval for all tools.
+
+    When a server name is in this list, all tools from that server will
+    trigger the HITL approval flow before execution. The server name
+    corresponds to the tool_prefix used when creating the MCPServer.
+
+    Example:
+        ctx.need_user_approve_mcps = ["filesystem", "github"]
+        # All tools from these servers will require approval
     """
 
     subagent_history: dict[str, list[ModelMessage]] = Field(default_factory=dict)

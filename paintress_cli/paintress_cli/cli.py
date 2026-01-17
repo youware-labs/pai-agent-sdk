@@ -12,6 +12,7 @@ import re
 import shutil
 import sys
 from importlib import resources
+from pathlib import Path
 
 import click
 
@@ -171,6 +172,14 @@ def run_setup_wizard(config_manager: ConfigManager) -> bool:
         click.echo(f"Created: {subagents_dir}/ (added: {', '.join(copied_subagents)})")
     else:
         click.echo(f"Skipped: {subagents_dir}/ (all subagents already exist)")
+
+    # Copy builtin skills from paintress_cli (only missing directories - never overwrite)
+    copied_skills = _ensure_builtin_skills(config_manager.config_dir)
+    skills_dir = config_manager.config_dir / "skills"
+    if copied_skills:
+        click.echo(f"Created: {skills_dir}/ (added: {', '.join(copied_skills)})")
+    else:
+        click.echo(f"Skipped: {skills_dir}/ (all skills already exist)")
 
     click.echo()
 
@@ -353,6 +362,86 @@ def load_env_from_config(config: PaintressConfig) -> None:
                 os.environ[key] = value
 
 
+def _ensure_builtin_skills(config_dir: Path) -> list[str]:
+    """Ensure builtin skills are copied to config directory.
+
+    Copies builtin skills from paintress_cli.skills to the config directory.
+    Only copies missing skill directories - never overwrites existing ones.
+
+    Args:
+        config_dir: Global config directory path.
+
+    Returns:
+        List of skill names that were copied.
+    """
+    skills_dir = config_dir / "skills"
+    skills_dir.mkdir(parents=True, exist_ok=True)
+
+    builtin_skills = resources.files("paintress_cli.skills")
+    copied_skills: list[str] = []
+
+    for item in builtin_skills.iterdir():
+        # Skip __init__.py and other non-skill files
+        if item.name.startswith(("_", ".")):
+            continue
+
+        # Check if this is a skill directory (has SKILL.md)
+        try:
+            skill_md = item.joinpath("SKILL.md")
+            if not skill_md.is_file():
+                continue
+        except (TypeError, AttributeError):
+            # Not a directory or can't check
+            continue
+
+        target_dir = skills_dir / item.name
+        if target_dir.exists():
+            # Skip existing skills - never overwrite user modifications
+            continue
+
+        # Copy the entire skill directory
+        with resources.as_file(item) as src_dir:
+            shutil.copytree(src_dir, target_dir)
+        copied_skills.append(item.name)
+
+    return copied_skills
+
+
+def ensure_builtin_assets(config_manager: ConfigManager) -> None:
+    """Ensure builtin assets (subagents, skills) exist in config directory.
+
+    This is called on every CLI startup to ensure new builtin assets
+    from package updates are available to users.
+
+    Args:
+        config_manager: Configuration manager instance.
+    """
+    config_dir = config_manager.config_dir
+
+    # Ensure config directory exists
+    config_dir.mkdir(parents=True, exist_ok=True)
+
+    # Ensure subagents directory and copy missing presets
+    subagents_dir = config_dir / "subagents"
+    subagents_dir.mkdir(exist_ok=True)
+    try:
+        sdk_presets = resources.files("pai_agent_sdk.subagents.presets")
+        for item in sdk_presets.iterdir():
+            if item.name.endswith(".md"):
+                target_path = subagents_dir / item.name
+                if not target_path.exists():
+                    with resources.as_file(item) as src:
+                        shutil.copy(src, target_path)
+                    logger.debug(f"Copied builtin subagent: {item.name}")
+    except Exception as e:
+        logger.warning(f"Failed to copy builtin subagents: {e}")
+
+    # Ensure skills directory and copy missing skills
+    copied_skills = _ensure_builtin_skills(config_dir)
+    if copied_skills:
+        logger.info(f"Copied builtin skills: {', '.join(copied_skills)}")
+
+
 # =============================================================================
 # CLI Entry Point
 # =============================================================================
@@ -379,6 +468,10 @@ def cli(verbose: bool) -> None:
     # Load configuration
     config_manager = ConfigManager()
     config = config_manager.load()
+
+    # Ensure builtin assets exist (subagents, skills)
+    # This runs on every startup to pick up new assets from package updates
+    ensure_builtin_assets(config_manager)
 
     # Check if configuration exists
     if not config.is_configured:

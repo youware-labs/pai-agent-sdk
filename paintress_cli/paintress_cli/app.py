@@ -1676,6 +1676,7 @@ class TUIApp:
         self._append_output(self._renderer.render(title).rstrip())
         self._append_output(f"Model: {self.config.general.model}")
         self._append_output(f"Mode: {self._mode.value.upper()}")
+        self._append_output(f"Config: {self.config_manager.config_dir}")
         self._append_output("")  # blank line before help
         self._show_help()
 

@@ -47,6 +47,7 @@ from pai_agent_sdk.toolsets.core.multimodal import tools as multimodal_tools
 from pai_agent_sdk.toolsets.core.shell import tools as shell_tools
 from pai_agent_sdk.toolsets.core.subagent import tools as subagent_tools
 from pai_agent_sdk.toolsets.core.web import tools as web_tools
+from pai_agent_sdk.toolsets.skills.toolset import SkillToolset
 from paintress_cli.browser import BrowserManager
 from paintress_cli.config import ConfigManager, MCPConfig, PaintressConfig, SubagentsConfig
 from paintress_cli.environment import TUIEnvironment
@@ -199,7 +200,7 @@ def create_tui_runtime(
                     print(event)
     """
     # Collect toolsets
-    toolsets: list[AbstractToolset[Any] | MCPServer] = []
+    toolsets: list[AbstractToolset[Any] | MCPServer] = [SkillToolset()]
 
     # Add MCP servers
     if mcp_config:

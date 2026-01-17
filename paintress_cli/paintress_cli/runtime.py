@@ -200,7 +200,7 @@ def create_tui_runtime(
                     print(event)
     """
     # Collect toolsets
-    toolsets: list[AbstractToolset[Any] | MCPServer] = [SkillToolset()]
+    toolsets: list[AbstractToolset[Any] | MCPServer] = [SkillToolset(toolset_id="skills")]
 
     # Add MCP servers
     if mcp_config:

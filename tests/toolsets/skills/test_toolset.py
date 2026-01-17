@@ -77,7 +77,7 @@ def mock_run_ctx_with_skills(env_with_skills: AgentContext) -> MagicMock:
 async def test_skill_toolset_get_instructions(mock_run_ctx_with_skills: MagicMock):
     """Test that SkillToolset loads and formats skill instructions."""
     toolset = SkillToolset()
-    instructions = toolset.get_instructions(mock_run_ctx_with_skills)
+    instructions = await toolset.get_instructions(mock_run_ctx_with_skills)
 
     assert instructions is not None
     assert "<available-skills>" in instructions
@@ -95,7 +95,7 @@ async def test_skill_toolset_no_file_operator():
     mock_ctx.deps.file_operator = None
 
     toolset = SkillToolset()
-    instructions = toolset.get_instructions(mock_ctx)
+    instructions = await toolset.get_instructions(mock_ctx)
 
     assert instructions is None
 
@@ -113,7 +113,7 @@ async def test_skill_toolset_no_skills(tmp_path: Path):
             mock_ctx.deps = ctx
 
             toolset = SkillToolset()
-            instructions = toolset.get_instructions(mock_ctx)
+            instructions = await toolset.get_instructions(mock_ctx)
 
             assert instructions is None
 
@@ -149,7 +149,7 @@ Content v1.
             toolset = SkillToolset()
 
             # First call - loads skill
-            instructions1 = toolset.get_instructions(mock_ctx)
+            instructions1 = await toolset.get_instructions(mock_ctx)
             assert instructions1 is not None
             assert "Version 1 description" in instructions1
 
@@ -163,7 +163,7 @@ Content v2.
 """)
 
             # Second call - should detect change and reload
-            instructions2 = toolset.get_instructions(mock_ctx)
+            instructions2 = await toolset.get_instructions(mock_ctx)
             assert instructions2 is not None
             assert "Version 2 description" in instructions2
             assert "Version 1 description" not in instructions2
@@ -198,12 +198,12 @@ Content.
             toolset = SkillToolset()
 
             # First call
-            _ = toolset.get_instructions(mock_ctx)
+            _ = await toolset.get_instructions(mock_ctx)
             cached_skill = toolset._skills_cache.get("stable-skill")
             assert cached_skill is not None
 
             # Second call - should reuse cache (same object)
-            _ = toolset.get_instructions(mock_ctx)
+            _ = await toolset.get_instructions(mock_ctx)
             cached_skill2 = toolset._skills_cache.get("stable-skill")
 
             assert cached_skill is cached_skill2  # Same object reference
@@ -235,12 +235,12 @@ Content.
 
             # Default dir name - should not find skill
             default_toolset = SkillToolset()
-            instructions_default = default_toolset.get_instructions(mock_ctx)
+            instructions_default = await default_toolset.get_instructions(mock_ctx)
             assert instructions_default is None
 
             # Custom dir name - should find skill
             custom_toolset = SkillToolset(skills_dir_name="custom-skills")
-            instructions_custom = custom_toolset.get_instructions(mock_ctx)
+            instructions_custom = await custom_toolset.get_instructions(mock_ctx)
             assert instructions_custom is not None
             assert "custom-skill" in instructions_custom
 
@@ -265,3 +265,73 @@ async def test_skill_toolset_call_tool_raises():
 
     with pytest.raises(NotImplementedError, match="does not provide tools"):
         await toolset.call_tool("any_tool", {}, mock_ctx, None)
+
+
+async def test_skill_toolset_pre_scan_hook_sync(tmp_path: Path):
+    """Test that SkillToolset calls sync pre_scan_hook with (toolset, ctx)."""
+    hook_called = []
+
+    def sync_hook(toolset: SkillToolset, ctx: RunContext[AgentContext]):
+        hook_called.append((toolset, ctx))
+
+    async with LocalEnvironment(
+        default_path=tmp_path,
+        allowed_paths=[tmp_path],
+        tmp_base_dir=tmp_path,
+    ) as env:
+        async with AgentContext(env=env) as ctx:
+            mock_ctx = MagicMock(spec=RunContext)
+            mock_ctx.deps = ctx
+
+            toolset = SkillToolset(pre_scan_hook=sync_hook)
+            await toolset.get_instructions(mock_ctx)
+
+            assert len(hook_called) == 1
+            assert hook_called[0][0] is toolset
+            assert hook_called[0][1] is mock_ctx
+
+
+async def test_skill_toolset_pre_scan_hook_async(tmp_path: Path):
+    """Test that SkillToolset calls async pre_scan_hook with (toolset, ctx)."""
+    hook_called = []
+
+    async def async_hook(toolset: SkillToolset, ctx: RunContext[AgentContext]):
+        hook_called.append((toolset, ctx))
+
+    async with LocalEnvironment(
+        default_path=tmp_path,
+        allowed_paths=[tmp_path],
+        tmp_base_dir=tmp_path,
+    ) as env:
+        async with AgentContext(env=env) as ctx:
+            mock_ctx = MagicMock(spec=RunContext)
+            mock_ctx.deps = ctx
+
+            toolset = SkillToolset(pre_scan_hook=async_hook)
+            await toolset.get_instructions(mock_ctx)
+
+            assert len(hook_called) == 1
+            assert hook_called[0][0] is toolset
+            assert hook_called[0][1] is mock_ctx
+
+
+async def test_skill_toolset_pre_scan_hook_accesses_config(tmp_path: Path):
+    """Test that pre_scan_hook can access toolset config."""
+    captured_dir_name = []
+
+    def hook(toolset: SkillToolset, ctx: RunContext[AgentContext]):
+        captured_dir_name.append(toolset.skills_dir_name)
+
+    async with LocalEnvironment(
+        default_path=tmp_path,
+        allowed_paths=[tmp_path],
+        tmp_base_dir=tmp_path,
+    ) as env:
+        async with AgentContext(env=env) as ctx:
+            mock_ctx = MagicMock(spec=RunContext)
+            mock_ctx.deps = ctx
+
+            toolset = SkillToolset(skills_dir_name="custom-dir", pre_scan_hook=hook)
+            await toolset.get_instructions(mock_ctx)
+
+            assert captured_dir_name == ["custom-dir"]

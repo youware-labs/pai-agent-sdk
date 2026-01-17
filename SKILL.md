@@ -1,5 +1,5 @@
 ---
-name: building-agents-with-pai-sdk
+name: agent-builder
 description: Build AI agents using pai-agent-sdk with Pydantic AI. Covers agent creation via create_agent(), toolset configuration, session persistence with ResumableState, subagent hierarchies, and browser automation. Use when creating agent applications, configuring custom tools, managing multi-turn sessions, setting up hierarchical agents, or implementing HITL approval flows.
 ---
 

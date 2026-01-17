@@ -35,9 +35,10 @@ from pai_agent_sdk.toolsets.skills.config import (
     load_skills_from_dir,
     parse_skill_markdown,
 )
-from pai_agent_sdk.toolsets.skills.toolset import SkillToolset
+from pai_agent_sdk.toolsets.skills.toolset import PreScanHook, SkillToolset
 
 __all__ = [
+    "PreScanHook",
     "SkillConfig",
     "SkillToolset",
     "load_skill_from_file",

@@ -65,6 +65,8 @@ class ManagedProcess:
     process: asyncio.subprocess.Process
     started_at: datetime = field(default_factory=datetime.now)
     cwd: str | None = None
+    exited_at: datetime | None = field(default=None)
+    """Timestamp when process exited, for TTL-based cleanup."""
     _output_buffer: list[tuple[str, bool]] = field(default_factory=list)
     """Buffer of (line, is_stderr) tuples."""
     _output_tasks: list[asyncio.Task[None]] = field(default_factory=list)
@@ -78,7 +80,12 @@ class ManagedProcess:
     @property
     def is_running(self) -> bool:
         """Check if process is still running."""
-        return self.process.returncode is None
+        was_running = self.process.returncode is None
+        # Record exit time when we first detect the process has exited
+        if not was_running and self.exited_at is None:
+            # Use object.__setattr__ since dataclass might be frozen in some contexts
+            object.__setattr__(self, "exited_at", datetime.now())
+        return was_running
 
     @property
     def exit_code(self) -> int | None:
@@ -172,19 +179,45 @@ class ProcessManager(BaseResource):
     - Process lifecycle management (kill, wait)
     - Process listing for TUI visualization
     - Automatic cleanup on close()
+    - TTL-based cleanup of exited processes
 
     The resource implements InstructableResource to report running
     processes to the agent context.
     """
 
-    def __init__(self) -> None:
-        """Initialize ProcessManager."""
+    def __init__(self, exited_ttl: float = 300.0) -> None:
+        """Initialize ProcessManager.
+
+        Args:
+            exited_ttl: Time-to-live in seconds for exited processes before auto-cleanup.
+                       Default is 300 seconds (5 minutes). Set to 0 to disable auto-cleanup.
+        """
         self._processes: dict[str, ManagedProcess] = {}
         self._lock = asyncio.Lock()
+        self._exited_ttl = exited_ttl
 
     async def close(self) -> None:
         """Close the resource by killing all processes."""
         await self.kill_all()
+
+    async def _cleanup_expired(self) -> None:
+        """Remove exited processes that have exceeded the TTL."""
+        if self._exited_ttl <= 0:
+            return
+
+        now = datetime.now()
+        expired_ids: list[str] = []
+
+        async with self._lock:
+            for proc_id, proc in self._processes.items():
+                # Check is_running to trigger exited_at recording
+                if not proc.is_running and proc.exited_at is not None:
+                    elapsed = (now - proc.exited_at).total_seconds()
+                    if elapsed > self._exited_ttl:
+                        expired_ids.append(proc_id)
+
+            for proc_id in expired_ids:
+                del self._processes[proc_id]
 
     async def get_context_instructions(self) -> str | None:
         """Report all processes to agent in XML format.
@@ -192,6 +225,9 @@ class ProcessManager(BaseResource):
         Returns context instructions listing all processes (running and exited),
         or None if no processes exist.
         """
+        # Cleanup expired processes before reporting
+        await self._cleanup_expired()
+
         if not self._processes:
             return None
 
@@ -250,6 +286,9 @@ class ProcessManager(BaseResource):
         Returns:
             ManagedProcess instance.
         """
+        # Cleanup expired processes before spawning new one
+        await self._cleanup_expired()
+
         proc_id = process_id or f"proc-{uuid.uuid4().hex[:8]}"
         args = args or []
 

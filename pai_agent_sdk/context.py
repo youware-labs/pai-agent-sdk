@@ -181,6 +181,9 @@ class ResumableState(BaseModel):
     need_user_approve_tools: list[str] = Field(default_factory=list)
     """List of tool names that require user approval before execution."""
 
+    need_user_approve_mcps: list[str] = Field(default_factory=list)
+    """List of MCP server names that require user approval for all tools."""
+
     def to_subagent_history(self) -> dict[str, list[ModelMessage]]:
         """Deserialize subagent_history to ModelMessage objects.
 
@@ -218,6 +221,7 @@ class ResumableState(BaseModel):
         # Restore agent_registry from serialized format
         ctx.agent_registry = {agent_id: AgentInfo(**info) for agent_id, info in self.agent_registry.items()}
         ctx.need_user_approve_tools = list(self.need_user_approve_tools)
+        ctx.need_user_approve_mcps = list(self.need_user_approve_mcps)
 
 
 class ToolIdWrapper:
@@ -665,6 +669,18 @@ class AgentContext(BaseModel):
     deferring execution until the user explicitly approves.
     """
 
+    need_user_approve_mcps: list[str] = Field(default_factory=list)
+    """List of MCP server names that require user approval for all tools.
+
+    When a server name is in this list, all tools from that server will
+    trigger the HITL approval flow before execution. The server name
+    corresponds to the tool_prefix used when creating the MCPServer.
+
+    Example:
+        ctx.need_user_approve_mcps = ["filesystem", "github"]
+        # All tools from these servers will require approval
+    """
+
     subagent_history: dict[str, list[ModelMessage]] = Field(default_factory=dict)
     """Subagent history for resuming sessions."""
 
@@ -721,13 +737,18 @@ class AgentContext(BaseModel):
     async def get_context_instructions(
         self,
         run_context: RunContext[AgentContext] | None = None,
+        *,
+        is_user_prompt: bool = True,
     ) -> str:
         """Return runtime context instructions in XML format.
 
         Provides runtime information about the current session.
 
         Args:
-            runtime_info: Additional runtime information to include.
+            run_context: Optional RunContext for accessing message history and metadata.
+            is_user_prompt: Whether this is a user prompt (True) or a tool response/retry (False).
+                Some information (e.g., known subagents) is only included on user prompts
+                to reduce noise. Subclasses can override to customize behavior. Default True.
 
         Returns:
             XML-formatted string with runtime context and optional system reminders.
@@ -757,14 +778,18 @@ class AgentContext(BaseModel):
             SubElement(usage_elem, "total-tokens").text = str(request_usage.total_tokens)
 
         # Known subagents from agent_registry (excluding main agent)
-        known_subagents = {agent_id: info for agent_id, info in self.agent_registry.items() if agent_id != self.run_id}
-        if known_subagents:
-            subagents_elem = SubElement(root, "known-subagents")
-            subagents_elem.set("hint", "Use subagent_info tool for more details")
-            for _agent_id, info in known_subagents.items():
-                agent_elem = SubElement(subagents_elem, "agent")
-                agent_elem.set("id", info.agent_id)
-                agent_elem.set("name", info.agent_name)
+        # Only include on user prompts, not tool responses
+        if is_user_prompt:
+            known_subagents = {
+                agent_id: info for agent_id, info in self.agent_registry.items() if agent_id != self.run_id
+            }
+            if known_subagents:
+                subagents_elem = SubElement(root, "known-subagents")
+                subagents_elem.set("hint", "Use subagent_info tool for more details")
+                for _agent_id, info in known_subagents.items():
+                    agent_elem = SubElement(subagents_elem, "agent")
+                    agent_elem.set("id", info.agent_id)
+                    agent_elem.set("name", info.agent_name)
 
         parts.append(_xml_to_string(root))
 

@@ -41,7 +41,7 @@ Example::
         result = await agent.run('Your prompt here', deps=ctx)
 """
 
-from pydantic_ai.messages import ModelMessage, ModelRequest, UserPromptPart
+from pydantic_ai.messages import ModelMessage, ModelRequest, RetryPromptPart, ToolReturnPart, UserPromptPart
 from pydantic_ai.tools import RunContext
 
 from pai_agent_sdk.context import AgentContext
@@ -89,8 +89,12 @@ async def inject_runtime_instructions(
     if not last_request:
         return message_history
 
+    # Determine if this is a user prompt (not a tool response or retry)
+    # We include subagent info only on user prompts to reduce noise
+    is_user_prompt = not any(isinstance(part, (ToolReturnPart, RetryPromptPart)) for part in last_request.parts)
+
     # Get runtime instructions from AgentContext
-    instructions = await ctx.deps.get_context_instructions(ctx)
+    instructions = await ctx.deps.get_context_instructions(ctx, is_user_prompt=is_user_prompt)
 
     if not instructions:
         return message_history

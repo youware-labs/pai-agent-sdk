@@ -80,6 +80,13 @@ class TUIEnvironment(LocalEnvironment):
             resource_factories=resource_factories,
         )
         self._process_manager: ProcessManager | None = None
+        # Register tool classes for TUI environment
+        self._toolsets.append(
+            Toolset(
+                tools=process_tools,
+                toolset_id="process",
+            )
+        )
 
     async def _setup(self) -> None:
         """Initialize file operator, shell, register ProcessManager, and setup toolsets."""
@@ -89,14 +96,6 @@ class TUIEnvironment(LocalEnvironment):
         self._process_manager = ProcessManager()
         self.resources.set(PROCESS_MANAGER_KEY, self._process_manager)
 
-        # Register tool classes for TUI environment
-        self._toolsets.append(
-            Toolset(
-                tools=process_tools,
-                toolset_id="process",
-            )
-        )
-
     async def _teardown(self) -> None:
         """Clean up resources.
 
@@ -104,7 +103,6 @@ class TUIEnvironment(LocalEnvironment):
         resources.close_all() in the parent class __aexit__.
         """
         self._process_manager = None
-        self._toolsets = []
         await super()._teardown()
 
     @property

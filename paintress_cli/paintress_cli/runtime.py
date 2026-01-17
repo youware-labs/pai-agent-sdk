@@ -204,7 +204,7 @@ def create_tui_runtime(
 
     # Add MCP servers
     if mcp_config:
-        mcp_servers = build_mcp_servers(mcp_config)
+        mcp_servers = build_mcp_servers(mcp_config, need_approval_mcps=config.tools.need_approval_mcps)
         toolsets.extend(mcp_servers)
         logger.info("Added %d MCP servers to runtime", len(mcp_servers))
 
@@ -241,6 +241,8 @@ def create_tui_runtime(
     tool_config = ToolConfig()
     if config.tools.need_approval:
         logger.debug("Tools requiring approval: %s", config.tools.need_approval)
+    if config.tools.need_approval_mcps:
+        logger.debug("MCP servers requiring approval: %s", config.tools.need_approval_mcps)
 
     # Load subagent configs from user config directory
     subagent_configs = _load_subagent_configs(config.subagents)
@@ -278,6 +280,7 @@ def create_tui_runtime(
         toolsets=toolsets if toolsets else None,
         system_prompt=effective_system_prompt,
         need_user_approve_tools=config.tools.need_approval or None,
+        need_user_approve_mcps=config.tools.need_approval_mcps or None,
         subagent_configs=subagent_configs if subagent_configs else None,
         include_builtin_subagents=False,
     )

@@ -31,6 +31,8 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from pai_agent_sdk.mcp import MCPServerSpec
+
 # =============================================================================
 # Configuration Models
 # =============================================================================
@@ -101,6 +103,9 @@ class ToolsConfig(BaseModel):
     need_approval: list[str] = Field(default_factory=list)
     """Tools requiring user approval before execution."""
 
+    need_approval_mcps: list[str] = Field(default_factory=list)
+    """MCP servers requiring user approval for all tools."""
+
 
 class SubagentOverride(BaseModel):
     """Override settings for a specific subagent."""
@@ -153,26 +158,11 @@ DEFAULT_COMMANDS: dict[str, CommandDefinition] = {
 }
 
 
-class MCPServerConfig(BaseModel):
-    """MCP server configuration."""
+class MCPServerConfig(MCPServerSpec):
+    """MCP server configuration.
 
-    transport: Literal["stdio", "streamable_http"] = "stdio"
-    """Transport type: stdio or streamable_http."""
-
-    command: str | None = None
-    """Command for stdio transport."""
-
-    args: list[str] = Field(default_factory=list)
-    """Command arguments for stdio transport."""
-
-    env: dict[str, str] = Field(default_factory=dict)
-    """Environment variables for the server."""
-
-    url: str | None = None
-    """URL for streamable_http transport."""
-
-    headers: dict[str, str] = Field(default_factory=dict)
-    """Headers for streamable_http transport."""
+    Inherits from SDK's MCPServerSpec. CLI-specific fields can be added here.
+    """
 
 
 class MCPConfig(BaseModel):

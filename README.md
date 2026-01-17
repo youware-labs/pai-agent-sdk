@@ -1,4 +1,6 @@
-# pai-agent-sdk
+# PAI Agent SDK
+
+> PAI is for Paintress or Pydantic AI
 
 [![Release](https://img.shields.io/github/v/release/youware-labs/pai-agent-sdk)](https://img.shields.io/github/v/release/youware-labs/pai-agent-sdk)
 [![Build status](https://img.shields.io/github/actions/workflow/status/youware-labs/pai-agent-sdk/main.yml?branch=main)](https://github.com/youware-labs/pai-agent-sdk/actions/workflows/main.yml?query=branch%3Amain)
@@ -6,9 +8,7 @@
 [![Commit activity](https://img.shields.io/github/commit-activity/m/youware-labs/pai-agent-sdk)](https://img.shields.io/github/commit-activity/m/youware-labs/pai-agent-sdk)
 [![License](https://img.shields.io/github/license/youware-labs/pai-agent-sdk)](https://img.shields.io/github/license/youware-labs/pai-agent-sdk)
 
-Production-ready SDK for building AI agents with [Pydantic AI](https://ai.pydantic.dev/).
-
-> **Early Stage Warning**: This project is in active development. APIs may change frequently between versions. We welcome feedback and contributions to help stabilize the SDK.
+Production-ready SDK for building AI agents with [Pydantic AI](https://ai.pydantic.dev/). Used to build the next-generation Agent system and evaluation system of [YouWare](https://www.youware.com).
 
 ## Key Features
 

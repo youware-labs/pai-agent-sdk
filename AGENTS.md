@@ -165,6 +165,15 @@ See [docs/subagent.md](docs/subagent.md) for details:
 - Tool inheritance and availability rules
 - Built-in presets (debugger, explorer, searcher, code-reviewer)
 
+### Skills System
+
+See [docs/skills.md](docs/skills.md) for details:
+
+- Markdown-based instruction files with YAML frontmatter
+- Progressive loading (frontmatter only until activation)
+- Hot reload with frontmatter change detection
+- Pre-scan hook for external skill synchronization
+
 ### Environment Management
 
 See [docs/environment.md](docs/environment.md) for details:

@@ -737,13 +737,18 @@ class AgentContext(BaseModel):
     async def get_context_instructions(
         self,
         run_context: RunContext[AgentContext] | None = None,
+        *,
+        is_user_prompt: bool = True,
     ) -> str:
         """Return runtime context instructions in XML format.
 
         Provides runtime information about the current session.
 
         Args:
-            runtime_info: Additional runtime information to include.
+            run_context: Optional RunContext for accessing message history and metadata.
+            is_user_prompt: Whether this is a user prompt (True) or a tool response/retry (False).
+                Some information (e.g., known subagents) is only included on user prompts
+                to reduce noise. Subclasses can override to customize behavior. Default True.
 
         Returns:
             XML-formatted string with runtime context and optional system reminders.
@@ -773,14 +778,18 @@ class AgentContext(BaseModel):
             SubElement(usage_elem, "total-tokens").text = str(request_usage.total_tokens)
 
         # Known subagents from agent_registry (excluding main agent)
-        known_subagents = {agent_id: info for agent_id, info in self.agent_registry.items() if agent_id != self.run_id}
-        if known_subagents:
-            subagents_elem = SubElement(root, "known-subagents")
-            subagents_elem.set("hint", "Use subagent_info tool for more details")
-            for _agent_id, info in known_subagents.items():
-                agent_elem = SubElement(subagents_elem, "agent")
-                agent_elem.set("id", info.agent_id)
-                agent_elem.set("name", info.agent_name)
+        # Only include on user prompts, not tool responses
+        if is_user_prompt:
+            known_subagents = {
+                agent_id: info for agent_id, info in self.agent_registry.items() if agent_id != self.run_id
+            }
+            if known_subagents:
+                subagents_elem = SubElement(root, "known-subagents")
+                subagents_elem.set("hint", "Use subagent_info tool for more details")
+                for _agent_id, info in known_subagents.items():
+                    agent_elem = SubElement(subagents_elem, "agent")
+                    agent_elem.set("id", info.agent_id)
+                    agent_elem.set("name", info.agent_name)
 
         parts.append(_xml_to_string(root))
 

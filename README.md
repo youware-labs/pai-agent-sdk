@@ -8,14 +8,18 @@
 [![Commit activity](https://img.shields.io/github/commit-activity/m/youware-labs/pai-agent-sdk)](https://img.shields.io/github/commit-activity/m/youware-labs/pai-agent-sdk)
 [![License](https://img.shields.io/github/license/youware-labs/pai-agent-sdk)](https://img.shields.io/github/license/youware-labs/pai-agent-sdk)
 
-Production-ready SDK for building AI agents with [Pydantic AI](https://ai.pydantic.dev/). Used to build the next-generation Agent system and evaluation system of [YouWare](https://www.youware.com).
+Application framework for building AI agents with [Pydantic AI](https://ai.pydantic.dev/). Used to build the next-generation agent system of [YouWare](https://www.youware.com).
 
 ## Key Features
 
-- **Environment-based Architecture**: Inject file operations, shell access, and resumable resources via `Environment` for clean separation of concerns(check [agent-environment](https://github.com/youware-labs/agent-environment))
+- **Environment-based Architecture**: Inject file operations, shell access, and resources via `Environment` for clean separation of concerns (supports LocalEnvironment and DockerEnvironment)
 - **Resumable Sessions**: Export and restore `AgentContext` state for multi-turn conversations across restarts
-- **Hierarchical Agents**: Delegate specialized tasks to subagents with automatic tool inheritance
+- **Hierarchical Agents**: Subagent system with task delegation, tool inheritance, and markdown-based configuration
+- **Skills System**: Markdown-based instruction files with hot reload and progressive loading
 - **Human-in-the-Loop**: Built-in approval workflows for sensitive tool operations
+- **Toolset Architecture**: Extensible tool system with pre/post hooks for logging, validation, and error handling
+- **Resumable Resources**: Export and restore resource states (like browser sessions) across process restarts
+- **Browser Automation**: Docker-based headless Chrome sandbox for safe browser automation
 - **Streaming Support**: Real-time streaming of agent responses and tool executions
 
 ## Installation
@@ -35,10 +39,10 @@ pip install pai-agent-sdk[document]  # Document processing (pymupdf, markitdown)
 
 This repository contains:
 
-- **pai_agent_sdk/** - Core SDK for building AI agents with environment abstraction, toolsets, and session management
-- **paintress_cli/** - Reference CLI implementation with TUI (Terminal User Interface) for interactive agent sessions
-- **examples/** - Production-ready code examples demonstrating SDK features
-- **docs/** - Comprehensive documentation for SDK architecture and APIs
+- **pai_agent_sdk/** - Core SDK with environment abstraction, toolsets, and session management
+- **paintress_cli/** - Reference CLI implementation with TUI for interactive agent sessions
+- **examples/** - Code examples demonstrating SDK features
+- **docs/** - Documentation for SDK architecture and APIs
 
 ## Quick Start
 
@@ -79,13 +83,13 @@ Features:
 
 ## Examples
 
-Check out the [examples/](examples/) directory for production-ready patterns:
+Check out the [examples/](examples/) directory:
 
-| Example                                     | Description                                                                        |
-| ------------------------------------------- | ---------------------------------------------------------------------------------- |
-| [general.py](examples/general.py)           | Complete production pattern with streaming, HITL approval, and session persistence |
-| [deepresearch.py](examples/deepresearch.py) | Autonomous research agent with web search and content extraction                   |
-| [browser_use.py](examples/browser_use.py)   | Browser automation with Docker-based headless Chrome sandbox                       |
+| Example                                     | Description                                                             |
+| ------------------------------------------- | ----------------------------------------------------------------------- |
+| [general.py](examples/general.py)           | Complete pattern with streaming, HITL approval, and session persistence |
+| [deepresearch.py](examples/deepresearch.py) | Autonomous research agent with web search and content extraction        |
+| [browser_use.py](examples/browser_use.py)   | Browser automation with Docker-based headless Chrome sandbox            |
 
 ## For Agent Users
 
@@ -103,6 +107,7 @@ Copy `examples/.env.example` to `examples/.env` and configure your API keys.
 - [AgentContext & Sessions](docs/context.md) - Session state, resumable sessions, extending context
 - [Toolset Architecture](docs/toolset.md) - Create tools, use hooks, handle errors, extend Toolset
 - [Subagent System](docs/subagent.md) - Hierarchical agents, builtin presets, markdown configuration
+- [Skills System](docs/skills.md) - Markdown-based skills, hot reload, pre-scan hooks
 - [Custom Environments](docs/environment.md) - Environment lifecycle, resource management
 - [Resumable Resources](docs/resumable-resources.md) - Export and restore resource states across restarts
 - [Model Configuration](docs/model.md) - Provider setup, gateway mode

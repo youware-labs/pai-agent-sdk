@@ -1,7 +1,7 @@
 [project]
 name = "pai-agent-sdk"
 dynamic = ["version"]
-description = "Production-ready SDK for building AI agents with Pydantic AI"
+description = "Application framework for building AI agents with Pydantic AI - environment abstractions, session management, and hierarchical agent patterns"
 authors = [{ name = "youware", email = "lab@youware.com" }]
 readme = "README.md"
 keywords = ['python']

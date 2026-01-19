@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from functools import cache
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, Literal
+from typing import TYPE_CHECKING, Annotated, Any
 
 from pydantic import Field
 from pydantic_ai import RunContext
@@ -52,7 +52,7 @@ class SearchTool(BaseTool):
     """Web search tool using Google or Tavily."""
 
     name = "search"
-    description = "Search the web for information using Google or Tavily APIs."
+    description = "Search the web for information using search APIs."
 
     def is_available(self, ctx: RunContext[AgentContext]) -> bool:
         """Available if Google or Tavily API keys are configured (and tavily package installed)."""
@@ -62,6 +62,8 @@ class SearchTool(BaseTool):
         return has_google or has_tavily
 
     def get_instruction(self, ctx: RunContext[AgentContext]) -> str | None:
+        if not self.is_available(ctx):
+            return None
         return _load_search_instruction()
 
     async def call(
@@ -69,10 +71,6 @@ class SearchTool(BaseTool):
         ctx: RunContext[AgentContext],
         query: Annotated[str, Field(description="The search query")],
         num: Annotated[int, Field(description="Number of results to return (1-10)", default=10)] = 10,
-        search_depth: Annotated[
-            Literal["basic", "advanced"],
-            Field(description="Search depth (Tavily only)", default="basic"),
-        ] = "basic",
     ) -> list[dict[str, Any]] | dict[str, Any]:
         """Execute web search."""
         cfg = ctx.deps.tool_config
@@ -83,10 +81,10 @@ class SearchTool(BaseTool):
             result = await self._search_google(query, num, cfg.google_search_api_key, cfg.google_search_cx)
             # Check if Google search failed and fallback to Tavily if available
             if isinstance(result, dict) and result.get("success") is False and has_tavily:
-                return await self._search_tavily(query, search_depth, cfg.tavily_api_key)  # type: ignore[arg-type]
+                return await self._search_tavily(query, cfg.tavily_api_key)  # type: ignore[arg-type]
             return result
         elif has_tavily:
-            return await self._search_tavily(query, search_depth, cfg.tavily_api_key)  # type: ignore[arg-type]
+            return await self._search_tavily(query, cfg.tavily_api_key)  # type: ignore[arg-type]
         else:
             return {"success": False, "error": "No search API available"}
 
@@ -116,14 +114,12 @@ class SearchTool(BaseTool):
 
         return response.json()
 
-    async def _search_tavily(
-        self, query: str, search_depth: Literal["basic", "advanced"], api_key: str
-    ) -> list[dict[str, Any]] | dict[str, Any]:
+    async def _search_tavily(self, query: str, api_key: str) -> list[dict[str, Any]] | dict[str, Any]:
         """Search using Tavily API."""
         from tavily import AsyncTavilyClient
 
         client = AsyncTavilyClient(api_key)
-        results = await client.search(query, search_depth=search_depth)  # type: ignore[arg-type]
+        results = await client.search(query, search_depth="advanced")  # type: ignore[arg-type]
 
         if not results.get("results"):
             return {"success": False, "error": "No search results found."}

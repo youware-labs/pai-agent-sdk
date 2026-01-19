@@ -434,8 +434,14 @@ class ToolSettings(BaseSettings):
     """Firecrawl API key for web scraping."""
 
 
-# Default instance for ToolConfig defaults
-_default_tool_settings = ToolSettings()
+def _get_tool_settings() -> ToolSettings:
+    """Get ToolSettings instance.
+
+    This function creates a new ToolSettings instance each time to ensure
+    environment variables are read at the time of ToolConfig creation,
+    not at module import time.
+    """
+    return ToolSettings()
 
 
 class ToolConfig(BaseModel):
@@ -443,6 +449,10 @@ class ToolConfig(BaseModel):
 
     API keys can be passed directly or loaded from environment variables
     via ToolSettings. See .env.example for available environment variables.
+
+    Note: Environment variables are read when ToolConfig is instantiated,
+    not when the module is imported. This allows callers to set environment
+    variables after importing the module.
     """
 
     model_config = {"arbitrary_types_allowed": True}
@@ -466,24 +476,24 @@ class ToolConfig(BaseModel):
     """Model settings for video understanding agent."""
 
     # Web search API keys
-    google_search_api_key: str | None = Field(default_factory=lambda: _default_tool_settings.google_search_api_key)
+    google_search_api_key: str | None = Field(default_factory=lambda: _get_tool_settings().google_search_api_key)
     """Google Custom Search API key."""
 
-    google_search_cx: str | None = Field(default_factory=lambda: _default_tool_settings.google_search_cx)
+    google_search_cx: str | None = Field(default_factory=lambda: _get_tool_settings().google_search_cx)
     """Google Custom Search Engine ID."""
 
-    tavily_api_key: str | None = Field(default_factory=lambda: _default_tool_settings.tavily_api_key)
+    tavily_api_key: str | None = Field(default_factory=lambda: _get_tool_settings().tavily_api_key)
     """Tavily API key for web search."""
 
     # Image search API keys
-    pixabay_api_key: str | None = Field(default_factory=lambda: _default_tool_settings.pixabay_api_key)
+    pixabay_api_key: str | None = Field(default_factory=lambda: _get_tool_settings().pixabay_api_key)
     """Pixabay API key for stock image search."""
 
-    rapidapi_api_key: str | None = Field(default_factory=lambda: _default_tool_settings.rapidapi_api_key)
+    rapidapi_api_key: str | None = Field(default_factory=lambda: _get_tool_settings().rapidapi_api_key)
     """RapidAPI key for real-time image search."""
 
     # Web scraping API key
-    firecrawl_api_key: str | None = Field(default_factory=lambda: _default_tool_settings.firecrawl_api_key)
+    firecrawl_api_key: str | None = Field(default_factory=lambda: _get_tool_settings().firecrawl_api_key)
     """Firecrawl API key for web scraping."""
 
 

@@ -2,8 +2,6 @@
 
 **pai-agent-sdk** is an application framework for building AI agents with [Pydantic AI](https://ai.pydantic.dev/). It provides environment abstractions, session management, and hierarchical agent patterns.
 
-This is not a replacement for Pydantic AI - it's an opinionated application layer that helps structure larger agent projects with architectural patterns and developer conveniences.
-
 - **Language**: Python 3.11+
 - **Package Manager**: uv
 - **Build System**: hatchling

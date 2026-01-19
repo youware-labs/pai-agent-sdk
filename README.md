@@ -12,7 +12,8 @@ Application framework for building AI agents with [Pydantic AI](https://ai.pydan
 
 ## Key Features
 
-- **Environment-based Architecture**: Inject file operations, shell access, and resources via `Environment` for clean separation of concerns (supports LocalEnvironment and DockerEnvironment)
+- **Environment-based Architecture**: Protocol-based design for file operations, shell access, and resources. Built-in `LocalEnvironment` and `DockerEnvironment`, easily extensible for custom backends (SSH, S3, cloud VMs, etc.)
+- **Fully Typed**: Complete type annotations validated with pyright (standard mode). Enjoy full IDE autocompletion and catch errors before runtime
 - **Resumable Sessions**: Export and restore `AgentContext` state for multi-turn conversations across restarts
 - **Hierarchical Agents**: Subagent system with task delegation, tool inheritance, and markdown-based configuration
 - **Skills System**: Markdown-based instruction files with hot reload and progressive loading

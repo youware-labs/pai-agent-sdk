@@ -9,10 +9,11 @@ Available tools:
 """
 
 from collections.abc import Sequence
-from typing import NotRequired, TypedDict
+from typing import NotRequired
 
 from pydantic_ai import RunContext
 from pydantic_ai.messages import ModelMessage, ModelRequest, UserPromptPart
+from typing_extensions import TypedDict
 
 from pai_agent_sdk.context import AgentContext
 from pai_agent_sdk.toolsets.core.base import BaseTool

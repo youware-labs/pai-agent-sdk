@@ -6,11 +6,12 @@ using the shell provided by AgentContext.
 
 from functools import cache
 from pathlib import Path
-from typing import Annotated, TypedDict, cast
+from typing import Annotated, cast
 
 from agent_environment import Shell
 from pydantic import Field
 from pydantic_ai import RunContext
+from typing_extensions import TypedDict
 
 from pai_agent_sdk._logger import get_logger
 from pai_agent_sdk.context import AgentContext

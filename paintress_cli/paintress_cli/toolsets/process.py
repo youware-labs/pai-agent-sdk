@@ -12,10 +12,11 @@ Example:
 
 from __future__ import annotations
 
-from typing import Annotated, TypedDict
+from typing import Annotated
 
 from pydantic import Field
 from pydantic_ai import RunContext, UserError
+from typing_extensions import TypedDict
 
 from pai_agent_sdk.context import AgentContext
 from pai_agent_sdk.toolsets.core.base import BaseTool

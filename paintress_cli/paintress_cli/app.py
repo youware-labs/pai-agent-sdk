@@ -855,6 +855,9 @@ class TUIApp:
                 # Clear extra_usages after accumulating to avoid double counting
                 ctx.extra_usages.clear()
 
+                # Auto-save session after each run
+                self._auto_save_history()
+
             return stream.run.result if stream.run else None
 
     async def _request_user_action(
@@ -1392,7 +1395,13 @@ class TUIApp:
             case "/load":
                 self._append_user_input(command)
                 if not args.strip():
-                    self._append_system_output("Usage: /load <folder>")
+                    # Load from auto-save directory
+                    auto_save_dir = self.config_manager.get_auto_save_dir()
+                    if auto_save_dir.exists():
+                        self._load_history(str(auto_save_dir))
+                    else:
+                        self._append_system_output("No auto-saved session found for this project")
+                        self._append_system_output(f"Expected: {auto_save_dir}")
                 else:
                     self._load_history(args.strip())
             case "/exit":
@@ -1668,6 +1677,31 @@ class TUIApp:
         except Exception as e:
             self._append_system_output(f"Error loading session: {e}")
 
+    def _auto_save_history(self) -> None:
+        """Auto-save session to project-specific directory.
+
+        Saves message history and context state to:
+        ~/.config/youware-labs/paintress-cli/message_history/{project_hash}/
+
+        This is called automatically after each agent run completes.
+        """
+        if not self._message_history:
+            return
+
+        save_dir = self.config_manager.get_auto_save_dir()
+        save_dir.mkdir(parents=True, exist_ok=True)
+
+        # Save message history
+        history_file = save_dir / "message_history.json"
+        history_file.write_bytes(ModelMessagesTypeAdapter.dump_json(self._message_history, indent=2))
+
+        # Save context state
+        state_file = save_dir / "context_state.json"
+        state = self.runtime.ctx.export_state()
+        state_file.write_text(state.model_dump_json(indent=2))
+
+        logger.debug(f"Auto-saved session to {save_dir}")
+
     def _append_system_output(self, text: str) -> None:
         """Append system message to output."""
         sys_text = Text()
@@ -1689,6 +1723,13 @@ class TUIApp:
         self._append_output(f"Config: {self.config_manager.config_dir}")
         self._append_output("")  # blank line before help
         self._show_help()
+
+        # Hint about auto-saved session if available
+        auto_save_dir = self.config_manager.get_auto_save_dir()
+        if (auto_save_dir / "message_history.json").exists():
+            self._append_output("")
+            hint = Text("Previous session found. Use /load to restore.", style="dim")
+            self._append_output(self._renderer.render(hint).rstrip())
 
         # Create scrollable FormattedTextControl with mouse support
         tui_ref = self

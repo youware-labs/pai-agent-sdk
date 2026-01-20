@@ -23,6 +23,7 @@ Configuration files are loaded with project-level priority (no merging):
 
 from __future__ import annotations
 
+import hashlib
 import tomllib
 from importlib import resources
 from pathlib import Path
@@ -467,6 +468,24 @@ class ConfigManager:
     def get_project_config_file(self) -> Path:
         """Get path to project tools config file."""
         return self._project_dir / self.PROJECT_CONFIG_DIR / "tools.toml"
+
+    def get_project_hash(self) -> str:
+        """Generate stable hash from project directory path.
+
+        Returns:
+            A 12-character hex string derived from SHA256 of the absolute project path.
+        """
+        path_str = str(self._project_dir.resolve())
+        return hashlib.sha256(path_str.encode()).hexdigest()[:12]
+
+    def get_auto_save_dir(self) -> Path:
+        """Get auto-save directory for current project.
+
+        Returns:
+            Path to the project-specific auto-save directory under global config.
+            Format: ~/.config/youware-labs/paintress-cli/message_history/{project_hash}/
+        """
+        return self._config_dir / "message_history" / self.get_project_hash()
 
 
 # =============================================================================

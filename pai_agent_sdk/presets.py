@@ -630,6 +630,7 @@ class ModelConfigPreset(str, Enum):
     GPT5_270K = "gpt5_270k"
 
     # Gemini models
+    GEMINI_200K = "gemini_200k"
     GEMINI_1M = "gemini_1m"
 
 
@@ -659,9 +660,20 @@ _MODEL_CFG_REGISTRY: dict[str, dict[str, Any]] = {
         "capabilities": {ModelCapability.vision},
     },
     # Gemini models (vision + video support)
+    ModelConfigPreset.GEMINI_200K.value: {
+        "context_window": 200_000,
+        "max_images": 20,
+        "max_videos": 1,  # Gemini supports video
+        "support_gif": True,
+        "capabilities": {
+            ModelCapability.vision,
+            ModelCapability.video_understanding,
+            ModelCapability.document_understanding,
+        },
+    },
     ModelConfigPreset.GEMINI_1M.value: {
         "context_window": 1_000_000,
-        "max_images": 20,  # Gemini supports more images
+        "max_images": 20,
         "max_videos": 1,  # Gemini supports video
         "support_gif": True,
         "capabilities": {
@@ -678,7 +690,7 @@ _MODEL_CFG_ALIASES: dict[str, str] = {
     "anthropic": ModelConfigPreset.CLAUDE_200K.value,
     "gpt5": ModelConfigPreset.GPT5_270K.value,
     "openai": ModelConfigPreset.GPT5_270K.value,
-    "gemini": ModelConfigPreset.GEMINI_1M.value,
+    "gemini": ModelConfigPreset.GEMINI_200K.value,
 }
 
 

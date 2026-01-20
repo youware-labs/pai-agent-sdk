@@ -11,11 +11,11 @@
 model = ""
 
 # Model settings: preset name or custom dict
-# Available presets: anthropic_default, openai_default, google_default, etc.
+# Available presets: anthropic_default, openai_default, gemini_thinking_level_default, etc.
 # model_settings = "anthropic_default"
 
 # Model config for context management (context window, capabilities, etc.)
-# Presets: claude_200k, claude_1m, gpt5_270k, gemini_1m
+# Presets: claude_200k, claude_1m, gpt5_270k, gemini_200k, gemini_1m
 # Aliases: claude, anthropic, openai, gemini
 # model_cfg = "claude_200k"
 #

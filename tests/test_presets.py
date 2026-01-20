@@ -299,7 +299,7 @@ def test_get_model_cfg_by_alias() -> None:
     assert cfg["context_window"] == 270_000  # GPT-5 series
 
     cfg = get_model_cfg("gemini")
-    assert cfg["context_window"] == 1_000_000
+    assert cfg["context_window"] == 200_000  # Default to 200K (cheaper)
 
 
 def test_get_model_cfg_invalid() -> None:
@@ -347,6 +347,7 @@ def test_list_model_cfg_presets() -> None:
         "claude_200k",
         "gemini",
         "gemini_1m",
+        "gemini_200k",
         "gpt5",
         "gpt5_270k",
         "openai",

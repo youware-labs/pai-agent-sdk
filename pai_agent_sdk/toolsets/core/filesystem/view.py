@@ -4,6 +4,7 @@ Supports text files, images, videos, and audio files.
 All file operations use the FileOperator abstraction for remote filesystem support.
 """
 
+import asyncio
 from functools import cache
 from pathlib import Path
 from typing import Annotated, Any, cast
@@ -21,6 +22,7 @@ from pai_agent_sdk.toolsets.core.filesystem._types import (
     ViewSegment,
     ViewTruncationInfo,
 )
+from pai_agent_sdk.utils import run_in_threadpool
 
 logger = get_logger(__name__)
 
@@ -170,9 +172,17 @@ class ViewTool(BaseTool):
         image_url: str | None = None
         if ctx.deps.tool_config and ctx.deps.tool_config.image_to_url_hook:
             try:
-                image_url = await ctx.deps.tool_config.image_to_url_hook(ctx, image_data, media_type)
-            except Exception as e:
-                logger.warning(f"image_to_url_hook failed, falling back to data: {e}")
+                hook = ctx.deps.tool_config.image_to_url_hook
+                if asyncio.iscoroutinefunction(hook):
+                    result = await hook(ctx, image_data, media_type)
+                else:
+                    # Run sync hook in threadpool to avoid blocking event loop
+                    result = await run_in_threadpool(hook, ctx, image_data, media_type)
+                # Treat empty strings as None
+                result = cast("str | None", result)
+                image_url = result if result and result.strip() else None
+            except Exception:
+                logger.warning("image_to_url_hook failed, falling back to data", exc_info=True)
 
         # Check if current model supports vision
         has_vision = ctx.deps.model_cfg.has_vision
@@ -235,9 +245,17 @@ class ViewTool(BaseTool):
         video_url: str | None = None
         if ctx.deps.tool_config and ctx.deps.tool_config.video_to_url_hook:
             try:
-                video_url = await ctx.deps.tool_config.video_to_url_hook(ctx, video_data, media_type)
-            except Exception as e:
-                logger.warning(f"video_to_url_hook failed, falling back to data: {e}")
+                hook = ctx.deps.tool_config.video_to_url_hook
+                if asyncio.iscoroutinefunction(hook):
+                    result = await hook(ctx, video_data, media_type)
+                else:
+                    # Run sync hook in threadpool to avoid blocking event loop
+                    result = await run_in_threadpool(hook, ctx, video_data, media_type)
+                # Treat empty strings as None
+                result = cast("str | None", result)
+                video_url = result if result and result.strip() else None
+            except Exception:
+                logger.warning("video_to_url_hook failed, falling back to data", exc_info=True)
 
         # Check if current model supports video understanding
         has_video = ctx.deps.model_cfg.has_video_understanding

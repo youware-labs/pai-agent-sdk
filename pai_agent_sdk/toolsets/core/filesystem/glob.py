@@ -11,6 +11,7 @@ from pydantic_ai import RunContext
 from pai_agent_sdk._logger import get_logger
 from pai_agent_sdk.context import AgentContext
 from pai_agent_sdk.toolsets.core.base import BaseTool
+from pai_agent_sdk.toolsets.core.filesystem._gitignore import filter_gitignored
 
 logger = get_logger(__name__)
 
@@ -48,10 +49,20 @@ class GlobTool(BaseTool):
             str,
             Field(description="Glob pattern to match files (e.g. '**/*.py')"),
         ],
+        include_ignored: Annotated[
+            bool,
+            Field(description="Include files ignored by .gitignore (default: false)", default=False),
+        ] = False,
     ) -> list[str]:
         """Find files matching the given glob pattern."""
         file_operator = cast(FileOperator, ctx.deps.file_operator)
-        return await file_operator.glob(pattern)
+        files = await file_operator.glob(pattern)
+
+        # Filter out gitignored files by default
+        if not include_ignored:
+            files = await filter_gitignored(files, file_operator)
+
+        return files
 
 
 __all__ = ["GlobTool"]

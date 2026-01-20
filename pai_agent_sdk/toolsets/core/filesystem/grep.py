@@ -13,6 +13,7 @@ from pydantic_ai import RunContext
 from pai_agent_sdk._logger import get_logger
 from pai_agent_sdk.context import AgentContext
 from pai_agent_sdk.toolsets.core.base import BaseTool
+from pai_agent_sdk.toolsets.core.filesystem._gitignore import filter_gitignored
 from pai_agent_sdk.toolsets.core.filesystem._types import GrepMatch
 
 logger = get_logger(__name__)
@@ -105,6 +106,10 @@ class GrepTool(BaseTool):
             int,
             Field(description="Max files to search (default: 50, -1 for unlimited)", default=50),
         ] = 50,
+        include_ignored: Annotated[
+            bool,
+            Field(description="Include files ignored by .gitignore (default: false)", default=False),
+        ] = False,
     ) -> dict[str, Any] | str:
         """Search file contents using regular expressions."""
         file_operator = cast(FileOperator, ctx.deps.file_operator)
@@ -115,6 +120,11 @@ class GrepTool(BaseTool):
             return f"Error: Invalid regex pattern: {e}"
 
         files = await file_operator.glob(include)
+
+        # Filter out gitignored files by default
+        if not include_ignored:
+            files = await filter_gitignored(files, file_operator)
+
         files_to_search = files[:max_files] if max_files > 0 else files
 
         results: dict[str, Any] = {}

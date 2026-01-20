@@ -702,6 +702,7 @@ class TUIApp:
                 "- Focus on analysis, discussion, and planning\n"
                 "- You MAY create new draft files (e.g., in .drafts/ or .handoff/) to save context, "
                 "discussion results, plans, or design documents\n"
+                "You can ask user to switch back to ACT mode by typing '/act'\n"
                 "</mode-reminder>"
             )
 

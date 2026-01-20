@@ -2,7 +2,7 @@
 
 import re
 from contextlib import AsyncExitStack
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -1300,3 +1300,73 @@ async def test_get_context_instructions_no_subagents(env: LocalEnvironment) -> N
 
         # Should not have known-subagents section
         assert "<known-subagents" not in instructions
+
+
+# =============================================================================
+# get_current_time Tests
+# =============================================================================
+
+
+async def test_get_current_time_returns_datetime_with_timezone(env: LocalEnvironment) -> None:
+    """Should return datetime with timezone information."""
+    ctx = AgentContext(env=env)
+    current_time = ctx.get_current_time()
+
+    # Should be a datetime
+    assert isinstance(current_time, datetime)
+    # Should have timezone info (not naive)
+    assert current_time.tzinfo is not None
+
+
+async def test_get_current_time_is_recent(env: LocalEnvironment) -> None:
+    """Should return a time close to actual current time."""
+    ctx = AgentContext(env=env)
+    before = datetime.now().astimezone()
+    current_time = ctx.get_current_time()
+    after = datetime.now().astimezone()
+
+    # Should be within the time window
+    assert before <= current_time <= after
+
+
+async def test_get_current_time_can_be_overridden(env: LocalEnvironment) -> None:
+    """Should allow subclass to override time source."""
+
+    fixed_time = datetime(2025, 6, 15, 12, 30, 0, tzinfo=UTC)
+
+    class MockContext(AgentContext):
+        def get_current_time(self) -> datetime:
+            return fixed_time
+
+    ctx = MockContext(env=env)
+    assert ctx.get_current_time() == fixed_time
+
+
+async def test_get_context_instructions_includes_current_time(env: LocalEnvironment) -> None:
+    """Should include current-time element in ISO 8601 format."""
+    async with AgentContext(env=env) as ctx:
+        instructions = await ctx.get_context_instructions()
+
+        # Should contain current-time element
+        assert "<current-time>" in instructions
+        assert "</current-time>" in instructions
+        # Should be in ISO 8601 format with timezone (e.g., 2025-01-20T12:30:00+08:00)
+        assert re.search(
+            r"<current-time>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}</current-time>", instructions
+        )
+
+
+async def test_get_context_instructions_uses_custom_time_source(env: LocalEnvironment) -> None:
+    """Should use overridden get_current_time in context instructions."""
+
+    fixed_time = datetime(2025, 6, 15, 12, 30, 0, tzinfo=UTC)
+
+    class MockContext(AgentContext):
+        def get_current_time(self) -> datetime:
+            return fixed_time
+
+    async with MockContext(env=env) as ctx:
+        instructions = await ctx.get_context_instructions()
+
+        # Should contain the fixed time in ISO format
+        assert "<current-time>2025-06-15T12:30:00+00:00</current-time>" in instructions

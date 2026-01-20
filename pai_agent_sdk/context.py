@@ -788,6 +788,30 @@ class AgentContext(BaseModel):
         end = self.end_at if self.end_at else datetime.now()
         return end - self.start_at
 
+    def get_current_time(self) -> datetime:
+        """Return current time with timezone information.
+
+        Override this method to provide custom time sources (e.g., NTP, mock for testing).
+        Default implementation uses system local time with timezone offset.
+
+        Returns:
+            Current datetime with timezone information (ISO 8601 compatible).
+
+        Example:
+            Subclass to customize time source::
+
+                class MyContext(AgentContext):
+                    def get_current_time(self) -> datetime:
+                        return ntp_client.get_time()  # Custom NTP source
+
+            Mock for testing::
+
+                class MockContext(AgentContext):
+                    def get_current_time(self) -> datetime:
+                        return datetime(2025, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+        """
+        return datetime.now().astimezone()
+
     async def get_context_instructions(
         self,
         run_context: RunContext[AgentContext] | None = None,
@@ -811,6 +835,9 @@ class AgentContext(BaseModel):
 
         # Build runtime-context element
         root = Element("runtime-context")
+
+        # Current time (ISO 8601 with timezone offset for cross-environment compatibility)
+        SubElement(root, "current-time").text = self.get_current_time().isoformat(timespec="seconds")
 
         # Elapsed time
         elapsed = self.elapsed_time

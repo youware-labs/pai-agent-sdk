@@ -66,7 +66,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
@@ -495,6 +495,13 @@ class ToolConfig(BaseModel):
     # Web scraping API key
     firecrawl_api_key: str | None = Field(default_factory=lambda: _get_tool_settings().firecrawl_api_key)
     """Firecrawl API key for web scraping."""
+
+    # Media to URL conversion hooks
+    image_to_url_hook: Callable[[RunContext[AgentContext], bytes, str], Awaitable[str | None]] | None = None
+    """Hook to convert image data to URL. Args: (ctx, image_data, media_type). Returns URL or None to use default behavior."""
+
+    video_to_url_hook: Callable[[RunContext[AgentContext], bytes, str], Awaitable[str | None]] | None = None
+    """Hook to convert video data to URL. Args: (ctx, video_data, media_type). Returns URL or None to use default behavior."""
 
 
 class ModelConfig(BaseModel):

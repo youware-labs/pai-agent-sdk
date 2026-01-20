@@ -10,7 +10,7 @@ from typing import Annotated, Any, cast
 
 from agent_environment import FileOperator
 from pydantic import Field
-from pydantic_ai import BinaryContent, RunContext, ToolReturn
+from pydantic_ai import BinaryContent, ImageUrl, RunContext, ToolReturn, VideoUrl
 
 from pai_agent_sdk._logger import get_logger
 from pai_agent_sdk.context import AgentContext
@@ -158,24 +158,41 @@ class ViewTool(BaseTool):
         ctx: RunContext[AgentContext],
     ) -> str | ToolReturn:
         """Read image file, falling back to description if vision not supported."""
+        # Read image data and determine media type
+        image_data = await file_operator.read_bytes(file_path)
+        media_type = self._get_media_type(file_path)
+
+        # Normalize unsupported media types
+        if media_type not in SUPPORTED_IMAGE_MEDIA_TYPES:
+            media_type = "image/png"
+
+        # Try to convert to URL using hook
+        image_url: str | None = None
+        if ctx.deps.tool_config and ctx.deps.tool_config.image_to_url_hook:
+            try:
+                image_url = await ctx.deps.tool_config.image_to_url_hook(ctx, image_data, media_type)
+            except Exception as e:
+                logger.warning(f"image_to_url_hook failed, falling back to data: {e}")
+
         # Check if current model supports vision
         has_vision = ctx.deps.model_cfg.has_vision
 
         if has_vision:
             # Return image content directly
-            image_content = await self._read_image(file_operator, file_path)
-            return ToolReturn(
-                return_value="The image is attached in the user message.",
-                content=[image_content],
-            )
+            if image_url:
+                return ToolReturn(
+                    return_value="The image is attached in the user message.",
+                    content=[ImageUrl(url=image_url)],
+                )
+            else:
+                return ToolReturn(
+                    return_value="The image is attached in the user message.",
+                    content=[BinaryContent(data=image_data, media_type=media_type)],
+                )
         else:
             # Fall back to image understanding agent
             try:
                 from pai_agent_sdk.agents.image_understanding import get_image_description
-
-                # Read image data
-                image_data = await file_operator.read_bytes(file_path)
-                media_type = self._get_media_type(file_path)
 
                 # Get model and settings from tool_config if available
                 model = None
@@ -185,11 +202,11 @@ class ViewTool(BaseTool):
                     model = tool_config.image_understanding_model
                     model_settings = tool_config.image_understanding_model_settings
 
-                # Use image understanding to describe
+                # Use image understanding to describe (prefer URL if available)
                 description, usage = await get_image_description(
-                    image_data=image_data,
+                    image_url=image_url,
+                    image_data=None if image_url else image_data,
                     media_type=media_type,
-                    instruction="Please describe this image in detail.",
                     model=model,
                     model_settings=model_settings,
                 )
@@ -210,26 +227,37 @@ class ViewTool(BaseTool):
         ctx: RunContext[AgentContext],
     ) -> str | ToolReturn:
         """Read video file, falling back to video understanding agent if not supported."""
+        # Read video data and determine media type
+        video_data = await file_operator.read_bytes(file_path)
+        media_type = self._get_video_media_type(file_path)
+
+        # Try to convert to URL using hook
+        video_url: str | None = None
+        if ctx.deps.tool_config and ctx.deps.tool_config.video_to_url_hook:
+            try:
+                video_url = await ctx.deps.tool_config.video_to_url_hook(ctx, video_data, media_type)
+            except Exception as e:
+                logger.warning(f"video_to_url_hook failed, falling back to data: {e}")
+
         # Check if current model supports video understanding
         has_video = ctx.deps.model_cfg.has_video_understanding
 
         if has_video:
             # Return video content directly
-            content = await file_operator.read_bytes(file_path)
-            media_type = self._get_video_media_type(file_path)
-
-            return ToolReturn(
-                return_value="The video is attached in the user message.",
-                content=[BinaryContent(data=content, media_type=media_type)],
-            )
+            if video_url:
+                return ToolReturn(
+                    return_value="The video is attached in the user message.",
+                    content=[VideoUrl(url=video_url)],
+                )
+            else:
+                return ToolReturn(
+                    return_value="The video is attached in the user message.",
+                    content=[BinaryContent(data=video_data, media_type=media_type)],
+                )
         else:
             # Fall back to video understanding agent
             try:
                 from pai_agent_sdk.agents.video_understanding import get_video_description
-
-                # Read video file
-                video_data = await file_operator.read_bytes(file_path)
-                media_type = self._get_video_media_type(file_path)
 
                 # Get model and settings from tool_config if available
                 model = None
@@ -239,11 +267,11 @@ class ViewTool(BaseTool):
                     model = tool_config.video_understanding_model
                     model_settings = tool_config.video_understanding_model_settings
 
-                # Use video understanding to describe video
+                # Use video understanding to describe video (prefer URL if available)
                 description, usage = await get_video_description(
-                    video_data=video_data,
+                    video_url=video_url,
+                    video_data=None if video_url else video_data,
                     media_type=media_type,
-                    instruction="Please describe what you can see in this video content.",
                     model=model,
                     model_settings=model_settings,
                 )

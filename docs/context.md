@@ -46,6 +46,27 @@ async with stream_agent(runtime, "Hello") as streamer:
         print(event)
 ```
 
+### System Prompt Templates
+
+`create_agent` supports Jinja2 templating for system prompts:
+
+```python
+# Template string with variables
+runtime = create_agent(
+    "openai:gpt-4",
+    system_prompt="You are a {{ role }}. {{ instructions | default('') }}",
+    system_prompt_template_vars={"role": "code reviewer"},
+)
+
+# Default template file (prompts/main.md) with variables
+runtime = create_agent(
+    "openai:gpt-4",
+    system_prompt_template_vars={"project_name": "my-project"},
+)
+```
+
+Templates are always rendered with Jinja2, supporting conditionals and default values even when `template_vars` is empty.
+
 ### Manual Context Management
 
 ```python

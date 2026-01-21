@@ -154,27 +154,32 @@ class AgentRuntime(Generic[AgentDepsT, OutputT]):
 # =============================================================================
 
 
-def _load_system_prompt(template_vars: dict[str, Any] | None = None) -> str:
-    """Load and render system prompt from the prompts directory.
+def _load_system_prompt(
+    template: str | None = None,
+    template_vars: dict[str, Any] | None = None,
+) -> str:
+    """Load and render system prompt.
 
     Args:
+        template: Template string. If None, loads from prompts/main.md.
         template_vars: Variables to pass to Jinja2 template.
 
     Returns:
-        Rendered system prompt string, or empty string if file not found.
+        Rendered system prompt string, or empty string if template is empty/not found.
     """
-    prompt_path = Path(__file__).parent / "prompts" / "main.md"
-    if not prompt_path.exists():
+    if template is None:
+        prompt_path = Path(__file__).parent / "prompts" / "main.md"
+        if not prompt_path.exists():
+            return ""
+        template = prompt_path.read_text()
+
+    if not template.strip():
         return ""
 
-    template_content = prompt_path.read_text()
-    if not template_content.strip():
-        return ""
-
-    # Render with Jinja2
+    # Always render with Jinja2 to support default values in templates
     env = jinja2.Environment(autoescape=False)  # noqa: S701
-    template = env.from_string(template_content)
-    return template.render(**(template_vars or {}))
+    jinja_template = env.from_string(template)
+    return jinja_template.render(**(template_vars or {}))
 
 
 # =============================================================================
@@ -268,8 +273,11 @@ def create_agent(
 
         agent_tools: Additional tools to pass directly to Agent (pydantic-ai Tool objects).
         agent_name: Name of the agent for logging.
-        system_prompt: Custom system prompt(s). If None, loads from main.md.
-        system_prompt_template_vars: Variables for Jinja2 template rendering.
+        system_prompt: Custom system prompt or Jinja2 template string. If None, loads from
+            prompts/main.md. When used with system_prompt_template_vars, the string is
+            rendered as a Jinja2 template, supporting conditionals and default values.
+        system_prompt_template_vars: Variables for Jinja2 template rendering. Works with
+            both custom system_prompt strings and the default template file.
         history_processors: Sequence of history processor functions.
         retries: Number of retries for agent run. Defaults to 1.
         output_retries: Number of retries for output parsing. Defaults to 3.
@@ -303,6 +311,14 @@ def create_agent(
 
             async with DockerEnvironment(image="python:3.11") as docker_env:
                 runtime = create_agent("openai:gpt-4", env=docker_env)
+
+        With templated system prompt::
+
+            runtime = create_agent(
+                "openai:gpt-4",
+                system_prompt="You are a {{ role }}. {{ extra_instructions | default('') }}",
+                system_prompt_template_vars={"role": "helpful assistant"},
+            )
                 async with runtime:  # Only enters ctx and agent
                     result = await runtime.agent.run("Run tests", deps=runtime.ctx)
     """
@@ -386,13 +402,7 @@ def create_agent(
     all_toolsets.extend(actual_env.toolsets)
 
     # --- System Prompt ---
-    effective_system_prompt: str | Sequence[str]
-    if system_prompt is not None:
-        effective_system_prompt = system_prompt
-    else:
-        # Load from template
-        loaded_prompt = _load_system_prompt(system_prompt_template_vars)
-        effective_system_prompt = loaded_prompt if loaded_prompt else ""
+    effective_system_prompt = _load_system_prompt(system_prompt, system_prompt_template_vars)
 
     # --- Create Agent ---
     logger.debug("Creating agent with model=%s, output_type=%s", model, output_type)

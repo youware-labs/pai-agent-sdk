@@ -139,3 +139,90 @@ async def test_glob_matches_directories(tmp_path: Path) -> None:
         assert len(result) == 2
         assert any("mydir" in r for r in result)
         assert any("myfile.txt" in r for r in result)
+
+
+async def test_glob_excludes_gitignored_files(tmp_path: Path) -> None:
+    """Should exclude files matching .gitignore patterns by default."""
+    async with AsyncExitStack() as stack:
+        env = await stack.enter_async_context(
+            LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
+        )
+        ctx = await stack.enter_async_context(AgentContext(env=env))
+        tool = GlobTool()
+
+        # Create .gitignore
+        (tmp_path / ".gitignore").write_text("node_modules/\n*.pyc\n")
+
+        # Create files
+        (tmp_path / "main.py").write_text("content")
+        (tmp_path / "cache.pyc").write_text("content")
+        (tmp_path / "node_modules").mkdir()
+        (tmp_path / "node_modules" / "pkg.js").write_text("content")
+
+        mock_run_ctx = MagicMock(spec=RunContext)
+        mock_run_ctx.deps = ctx
+
+        result = await tool.call(mock_run_ctx, pattern="**/*")
+
+        # Result should be a dict with gitignore_excluded info
+        assert isinstance(result, dict)
+        assert "files" in result
+        assert "gitignore_excluded" in result
+        assert "note" in result
+
+        files = result["files"]
+        # Should include main.py but exclude .pyc and node_modules contents
+        assert any("main.py" in f for f in files)
+        assert not any(".pyc" in f for f in files)
+        # node_modules directory entry may appear, but its contents (pkg.js) should be excluded
+        assert not any("pkg.js" in f for f in files)
+
+        # Summary should mention excluded paths
+        summary = result["gitignore_excluded"]
+        assert any("node_modules/" in s for s in summary)
+
+
+async def test_glob_include_ignored_flag(tmp_path: Path) -> None:
+    """Should include gitignored files when include_ignored=True."""
+    async with AsyncExitStack() as stack:
+        env = await stack.enter_async_context(
+            LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
+        )
+        ctx = await stack.enter_async_context(AgentContext(env=env))
+        tool = GlobTool()
+
+        # Create .gitignore
+        (tmp_path / ".gitignore").write_text("*.log\n")
+        (tmp_path / "app.py").write_text("content")
+        (tmp_path / "debug.log").write_text("content")
+
+        mock_run_ctx = MagicMock(spec=RunContext)
+        mock_run_ctx.deps = ctx
+
+        result = await tool.call(mock_run_ctx, pattern="*", include_ignored=True)
+
+        # Result should be a list (no gitignore filtering)
+        assert isinstance(result, list)
+        assert any("app.py" in f for f in result)
+        assert any("debug.log" in f for f in result)
+
+
+async def test_glob_no_gitignore_returns_list(tmp_path: Path) -> None:
+    """Should return list when no .gitignore exists."""
+    async with AsyncExitStack() as stack:
+        env = await stack.enter_async_context(
+            LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
+        )
+        ctx = await stack.enter_async_context(AgentContext(env=env))
+        tool = GlobTool()
+
+        (tmp_path / "file.py").write_text("content")
+
+        mock_run_ctx = MagicMock(spec=RunContext)
+        mock_run_ctx.deps = ctx
+
+        result = await tool.call(mock_run_ctx, pattern="*.py")
+
+        # No .gitignore means no ignored files, so result is a list
+        assert isinstance(result, list)
+        assert any("file.py" in f for f in result)

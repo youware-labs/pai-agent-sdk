@@ -2,7 +2,7 @@
 
 from functools import cache
 from pathlib import Path
-from typing import Annotated, cast
+from typing import Annotated, Any, cast
 
 from agent_environment import FileOperator
 from pydantic import Field
@@ -53,16 +53,28 @@ class GlobTool(BaseTool):
             bool,
             Field(description="Include files ignored by .gitignore (default: false)", default=False),
         ] = False,
-    ) -> list[str]:
+    ) -> list[str] | dict[str, Any]:
         """Find files matching the given glob pattern."""
         file_operator = cast(FileOperator, ctx.deps.file_operator)
         files = await file_operator.glob(pattern)
 
-        # Filter out gitignored files by default
-        if not include_ignored:
-            files = await filter_gitignored(files, file_operator)
+        # If include_ignored is True, return all files directly
+        if include_ignored:
+            return files
 
-        return files
+        # Filter out gitignored files
+        result = await filter_gitignored(files, file_operator)
+
+        # If there are ignored files, return dict with summary
+        if result.ignored:
+            summary = result.get_ignored_summary(max_items=5)
+            return {
+                "files": result.kept,
+                "gitignore_excluded": summary,
+                "note": "Some files excluded by .gitignore. Set include_ignored=true to include them.",
+            }
+
+        return result.kept
 
 
 __all__ = ["GlobTool"]

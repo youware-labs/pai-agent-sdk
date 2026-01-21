@@ -3,6 +3,8 @@
 import pytest
 
 from pai_agent_sdk.toolsets.core.filesystem._gitignore import (
+    GitignoreFilterResult,
+    _get_top_level_dir,
     _parse_gitignore_content,
     filter_gitignored,
 )
@@ -56,6 +58,72 @@ dist/
     assert not spec.match_file("src/build.py")
 
 
+def test_get_top_level_dir():
+    """Test extracting top-level directory from paths."""
+    assert _get_top_level_dir("node_modules/foo/bar.js") == "node_modules/"
+    assert _get_top_level_dir("src/main.py") == "src/"
+    assert _get_top_level_dir(".venv/lib/site.py") == ".venv/"
+    assert _get_top_level_dir("file.txt") == "file.txt"
+    assert _get_top_level_dir("deep/nested/path/file.py") == "deep/"
+
+
+def test_gitignore_filter_result_get_ignored_summary():
+    """Test GitignoreFilterResult.get_ignored_summary."""
+    result = GitignoreFilterResult(
+        kept=["src/main.py"],
+        ignored=[
+            "node_modules/a.js",
+            "node_modules/b.js",
+            "node_modules/sub/c.js",
+            ".venv/lib/x.py",
+            "build/output.js",
+        ],
+    )
+
+    summary = result.get_ignored_summary()
+    assert len(summary) == 3
+    assert "node_modules/ (3 files)" in summary
+    assert ".venv/ (1 file)" in summary
+    assert "build/ (1 file)" in summary
+
+
+def test_gitignore_filter_result_get_ignored_summary_max_items():
+    """Test GitignoreFilterResult.get_ignored_summary with max_items."""
+    result = GitignoreFilterResult(
+        kept=[],
+        ignored=[
+            "dir1/a.py",
+            "dir2/b.py",
+            "dir3/c.py",
+            "dir4/d.py",
+            "dir5/e.py",
+            "dir6/f.py",
+        ],
+    )
+
+    summary = result.get_ignored_summary(max_items=3)
+    assert len(summary) == 4  # 3 items + "... and X more patterns"
+    assert "... and 3 more patterns" in summary
+
+
+def test_gitignore_filter_result_get_ignored_summary_empty():
+    """Test GitignoreFilterResult.get_ignored_summary with no ignored files."""
+    result = GitignoreFilterResult(kept=["src/main.py"], ignored=[])
+    summary = result.get_ignored_summary()
+    assert summary == []
+
+
+def test_gitignore_filter_result_get_ignored_summary_invalid_max_items():
+    """Test GitignoreFilterResult.get_ignored_summary with invalid max_items."""
+    result = GitignoreFilterResult(
+        kept=["src/main.py"],
+        ignored=["node_modules/a.js", ".venv/lib/x.py"],
+    )
+    # max_items <= 0 should return empty list
+    assert result.get_ignored_summary(max_items=0) == []
+    assert result.get_ignored_summary(max_items=-1) == []
+
+
 @pytest.fixture
 def mock_file_operator(tmp_path):
     """Create a mock file operator for testing."""
@@ -71,7 +139,8 @@ async def test_filter_gitignored_no_gitignore(mock_file_operator):
     result = await filter_gitignored(files, mock_file_operator)
 
     # All files should be returned when no .gitignore
-    assert result == files
+    assert result.kept == files
+    assert result.ignored == []
 
 
 async def test_filter_gitignored_with_gitignore(mock_file_operator, tmp_path):
@@ -90,12 +159,17 @@ async def test_filter_gitignored_with_gitignore(mock_file_operator, tmp_path):
 
     result = await filter_gitignored(files, mock_file_operator)
 
-    # Only non-ignored files should be returned
-    assert "src/main.py" in result
-    assert "test.py" in result
-    assert ".venv/lib/site.py" not in result
-    assert "__pycache__/cache.pyc" not in result
-    assert "module.pyc" not in result
+    # Only non-ignored files should be in kept
+    assert "src/main.py" in result.kept
+    assert "test.py" in result.kept
+    assert ".venv/lib/site.py" not in result.kept
+    assert "__pycache__/cache.pyc" not in result.kept
+    assert "module.pyc" not in result.kept
+
+    # Ignored files should be in ignored list
+    assert ".venv/lib/site.py" in result.ignored
+    assert "__pycache__/cache.pyc" in result.ignored
+    assert "module.pyc" in result.ignored
 
 
 async def test_filter_gitignored_gitignore_changes(mock_file_operator, tmp_path):
@@ -107,14 +181,14 @@ async def test_filter_gitignored_gitignore_changes(mock_file_operator, tmp_path)
     # First: ignore .venv
     gitignore_path.write_text(".venv/\n")
     result1 = await filter_gitignored(files, mock_file_operator)
-    assert ".venv/lib/site.py" not in result1
-    assert "node_modules/pkg/index.js" in result1
+    assert ".venv/lib/site.py" not in result1.kept
+    assert "node_modules/pkg/index.js" in result1.kept
 
     # Second: change to ignore node_modules instead
     gitignore_path.write_text("node_modules/\n")
     result2 = await filter_gitignored(files, mock_file_operator)
-    assert ".venv/lib/site.py" in result2
-    assert "node_modules/pkg/index.js" not in result2
+    assert ".venv/lib/site.py" in result2.kept
+    assert "node_modules/pkg/index.js" not in result2.kept
 
 
 async def test_filter_gitignored_empty_gitignore(mock_file_operator, tmp_path):
@@ -127,7 +201,8 @@ async def test_filter_gitignored_empty_gitignore(mock_file_operator, tmp_path):
     result = await filter_gitignored(files, mock_file_operator)
 
     # All files should be returned with empty .gitignore
-    assert result == files
+    assert result.kept == files
+    assert result.ignored == []
 
 
 async def test_filter_gitignored_preserves_order(mock_file_operator, tmp_path):
@@ -140,4 +215,23 @@ async def test_filter_gitignored_preserves_order(mock_file_operator, tmp_path):
     result = await filter_gitignored(files, mock_file_operator)
 
     # Order should be preserved
-    assert result == ["z.py", "a.py", "m.py"]
+    assert result.kept == ["z.py", "a.py", "m.py"]
+
+
+async def test_filter_gitignored_returns_ignored_summary(mock_file_operator, tmp_path):
+    """Test that filter_gitignored result can generate summary."""
+    gitignore_path = tmp_path / ".gitignore"
+    gitignore_path.write_text("node_modules/\n.venv/\n")
+
+    files = [
+        "src/main.py",
+        "node_modules/a.js",
+        "node_modules/b.js",
+        ".venv/lib/site.py",
+    ]
+
+    result = await filter_gitignored(files, mock_file_operator)
+
+    summary = result.get_ignored_summary()
+    assert "node_modules/ (2 files)" in summary
+    assert ".venv/ (1 file)" in summary

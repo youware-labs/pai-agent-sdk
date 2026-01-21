@@ -312,3 +312,92 @@ async def test_grep_unreadable_file_handling(tmp_path: Path) -> None:
         assert isinstance(result, dict)
         # Should find match in valid.txt
         assert any("valid.txt" in k for k in result)
+
+
+async def test_grep_excludes_gitignored_files(tmp_path: Path) -> None:
+    """Should exclude files matching .gitignore patterns by default."""
+    async with AsyncExitStack() as stack:
+        env = await stack.enter_async_context(
+            LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
+        )
+        ctx = await stack.enter_async_context(AgentContext(env=env))
+        tool = GrepTool()
+
+        # Create .gitignore
+        (tmp_path / ".gitignore").write_text("node_modules/\n")
+
+        # Create files
+        (tmp_path / "main.py").write_text("hello world")
+        (tmp_path / "node_modules").mkdir()
+        (tmp_path / "node_modules" / "pkg.js").write_text("hello from node")
+
+        mock_run_ctx = MagicMock(spec=RunContext)
+        mock_run_ctx.deps = ctx
+
+        result = await tool.call(mock_run_ctx, pattern="hello")
+        assert isinstance(result, dict)
+
+        # Should have gitignore info
+        assert "<gitignore_excluded>" in result
+        assert "<note>" in result
+
+        # Should find match only in main.py
+        match_keys = [k for k in result if not k.startswith("<")]
+        assert len(match_keys) == 1
+        assert "main.py" in match_keys[0]
+
+        # Summary should mention excluded paths
+        summary = result["<gitignore_excluded>"]
+        assert any("node_modules/" in s for s in summary)
+
+
+async def test_grep_include_ignored_flag(tmp_path: Path) -> None:
+    """Should include gitignored files when include_ignored=True."""
+    async with AsyncExitStack() as stack:
+        env = await stack.enter_async_context(
+            LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
+        )
+        ctx = await stack.enter_async_context(AgentContext(env=env))
+        tool = GrepTool()
+
+        # Create .gitignore
+        (tmp_path / ".gitignore").write_text("*.log\n")
+        (tmp_path / "app.py").write_text("hello app")
+        (tmp_path / "debug.log").write_text("hello debug")
+
+        mock_run_ctx = MagicMock(spec=RunContext)
+        mock_run_ctx.deps = ctx
+
+        result = await tool.call(mock_run_ctx, pattern="hello", include_ignored=True)
+        assert isinstance(result, dict)
+
+        # Should not have gitignore info
+        assert "<gitignore_excluded>" not in result
+
+        # Should find matches in both files
+        match_keys = [k for k in result if not k.startswith("<")]
+        assert len(match_keys) == 2
+        assert any("app.py" in k for k in match_keys)
+        assert any("debug.log" in k for k in match_keys)
+
+
+async def test_grep_no_gitignore_no_excluded_info(tmp_path: Path) -> None:
+    """Should not include gitignore info when no .gitignore exists."""
+    async with AsyncExitStack() as stack:
+        env = await stack.enter_async_context(
+            LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
+        )
+        ctx = await stack.enter_async_context(AgentContext(env=env))
+        tool = GrepTool()
+
+        (tmp_path / "file.py").write_text("hello world")
+
+        mock_run_ctx = MagicMock(spec=RunContext)
+        mock_run_ctx.deps = ctx
+
+        result = await tool.call(mock_run_ctx, pattern="hello")
+        assert isinstance(result, dict)
+
+        # No .gitignore means no excluded info
+        assert "<gitignore_excluded>" not in result
+        assert "<note>" not in result

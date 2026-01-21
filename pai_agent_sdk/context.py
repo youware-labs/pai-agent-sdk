@@ -462,9 +462,25 @@ class ToolConfig(BaseModel):
     Note: Environment variables are read when ToolConfig is instantiated,
     not when the module is imported. This allows callers to set environment
     variables after importing the module.
+
+    Extensibility:
+        This class supports two extension patterns:
+
+        1. Inheritance (recommended for type safety)::
+
+            class MyToolConfig(ToolConfig):
+                my_api_key: str | None = None
+
+            class MyContext(AgentContext):
+                tool_config: MyToolConfig = Field(default_factory=MyToolConfig)
+
+        2. Extra attributes (for quick prototyping)::
+
+            config = ToolConfig(my_custom_key="value")
+            config.my_custom_key  # Accessible but not type-checked
     """
 
-    model_config = {"arbitrary_types_allowed": True}
+    model_config = {"arbitrary_types_allowed": True, "extra": "allow"}
 
     skip_url_verification: bool = True
     """Skip SSRF URL verification. Default enabled (skip). Set to False to enable verification for public-facing environments."""
@@ -542,9 +558,26 @@ class ToolConfig(BaseModel):
 
 
 class ModelConfig(BaseModel):
-    """Model configuration for context management."""
+    """Model configuration for context management.
 
-    model_config = {"arbitrary_types_allowed": True}
+    Extensibility:
+        This class supports two extension patterns:
+
+        1. Inheritance (recommended for type safety)::
+
+            class MyModelConfig(ModelConfig):
+                custom_threshold: float = 0.8
+
+            class MyContext(AgentContext):
+                model_cfg: MyModelConfig = Field(default_factory=MyModelConfig)
+
+        2. Extra attributes (for quick prototyping)::
+
+            config = ModelConfig(custom_field="value")
+            config.custom_field  # Accessible but not type-checked
+    """
+
+    model_config = {"arbitrary_types_allowed": True, "extra": "allow"}
 
     context_window: int | None = None
     """Total context window size in tokens."""

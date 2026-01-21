@@ -105,6 +105,58 @@ ToolConfig(
 )
 ```
 
+## Extending ModelConfig and ToolConfig
+
+Both `ModelConfig` and `ToolConfig` support extension for custom settings.
+
+### Option 1: Inheritance (Recommended)
+
+For full type safety, inherit from the config class and override the field in `AgentContext`:
+
+```python
+from pydantic import Field
+from pai_agent_sdk.context import AgentContext, ToolConfig, ModelConfig
+
+class MyToolConfig(ToolConfig):
+    """Custom tool configuration with additional API keys."""
+    my_service_api_key: str | None = None
+    my_custom_setting: int = 100
+
+class MyModelConfig(ModelConfig):
+    """Custom model configuration."""
+    custom_threshold: float = 0.8
+
+class MyContext(AgentContext):
+    tool_config: MyToolConfig = Field(default_factory=MyToolConfig)
+    model_cfg: MyModelConfig = Field(default_factory=MyModelConfig)
+
+# Usage with create_agent
+runtime = create_agent(
+    "openai:gpt-4o",
+    context_type=MyContext,
+    tool_config=MyToolConfig(my_service_api_key="xxx"),
+    model_cfg=MyModelConfig(custom_threshold=0.9),
+)
+```
+
+### Option 2: Extra Attributes (Quick Prototyping)
+
+Both classes have `extra="allow"`, enabling arbitrary attributes without subclassing:
+
+```python
+# Extra attributes are accepted but not type-checked
+config = ToolConfig(
+    tavily_api_key="tvly-xxx",
+    my_custom_key="value",  # Extra attribute
+)
+
+# Access via attribute or model_extra
+config.my_custom_key  # Works at runtime
+config.model_extra["my_custom_key"]  # Also works
+```
+
+> **Note**: Option 1 is recommended for production code as it provides IDE autocomplete and type checking. Option 2 is useful for quick experiments or dynamic configuration.
+
 ## ResumableState Fields
 
 | Field                     | Type                     | Description                                  |

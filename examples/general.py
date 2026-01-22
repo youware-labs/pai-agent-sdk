@@ -330,7 +330,9 @@ async def main():
 
     # Process pending HITL interactions if any
     if message_history and user_interactions and runtime.core_toolset:
-        _deferred_tool_results = await runtime.core_toolset.process_hitl_call(user_interactions, message_history)
+        _deferred_tool_results = await runtime.core_toolset.process_hitl_call(
+            runtime.ctx, user_interactions, message_history
+        )
     else:
         _deferred_tool_results = None
 

@@ -8,16 +8,17 @@ and design style analysis.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, BinaryContent, ImageUrl, ModelSettings
 from pydantic_ai.models import Model
-from pydantic_ai.usage import RunUsage
 
 from pai_agent_sdk._config import AgentSettings
 from pai_agent_sdk._logger import logger
 from pai_agent_sdk.agents.models import infer_model
+from pai_agent_sdk.usage import InternalUsage
 
 # =============================================================================
 # Exceptions
@@ -232,7 +233,7 @@ async def get_image_description(
     model: str | Model | None = None,
     model_settings: ModelSettings | None = None,
     max_image_size: int = DEFAULT_MAX_IMAGE_SIZE,
-) -> tuple[str, RunUsage]:
+) -> tuple[str, InternalUsage]:
     """Analyze an image and get a structured description.
 
     Args:
@@ -245,13 +246,14 @@ async def get_image_description(
         max_image_size: Maximum allowed size for image_data in bytes.
 
     Returns:
-        Tuple of (XML description string, RunUsage).
+        Tuple of (description string, InternalUsage with model_id and usage).
 
     Raises:
         ImageInputError: If image input is invalid.
         ImageSizeError: If image exceeds size limit.
         ImageAnalysisError: If analysis fails.
     """
+
     image_content = build_image_content(
         image_url=image_url,
         image_data=image_data,
@@ -272,4 +274,7 @@ async def get_image_description(
         logger.error(f"Error analyzing image: {e}")
         raise ImageAnalysisError(f"Failed to analyze image: {e}", cause=e) from e
 
-    return result.output.description, result.usage()
+    # Get model_id from agent's model
+    model_id = cast(Model, agent.model).model_name
+
+    return result.output.description, InternalUsage(model_id=model_id, usage=result.usage())

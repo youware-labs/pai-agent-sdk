@@ -22,6 +22,7 @@ from pai_agent_sdk.toolsets.core.subagent.factory import generate_unique_id
 def test_creates_tool_class_with_agent():
     """Test that create_subagent_tool creates a BaseTool subclass from agent call func."""
     mock_agent = MagicMock(spec=Agent)
+    mock_agent.model.model_name = "test-model"
     mock_agent.name = "search"
 
     call_func = create_subagent_call_func(mock_agent)
@@ -39,6 +40,7 @@ def test_creates_tool_class_with_agent():
 def test_pascal_case_naming():
     """Test that tool class names are converted to PascalCase."""
     mock_agent = MagicMock(spec=Agent)
+    mock_agent.model.model_name = "test-model"
     mock_agent.name = "web_search"
 
     call_func = create_subagent_call_func(mock_agent)
@@ -61,6 +63,7 @@ def test_pascal_case_naming():
 def test_call_signature_has_correct_parameters():
     """Test that the call method has the correct signature for pydantic-ai."""
     mock_agent = MagicMock(spec=Agent)
+    mock_agent.model.model_name = "test-model"
     mock_agent.name = "search"
 
     call_func = create_subagent_call_func(mock_agent)
@@ -89,6 +92,7 @@ def test_call_signature_has_correct_parameters():
 def test_instruction_string(agent_context: AgentContext):
     """Test static instruction string."""
     mock_agent = MagicMock(spec=Agent)
+    mock_agent.model.model_name = "test-model"
     mock_agent.name = "search"
 
     call_func = create_subagent_call_func(mock_agent)
@@ -108,6 +112,7 @@ def test_instruction_string(agent_context: AgentContext):
 def test_instruction_callable(agent_context: AgentContext):
     """Test dynamic instruction callable."""
     mock_agent = MagicMock(spec=Agent)
+    mock_agent.model.model_name = "test-model"
     mock_agent.name = "search"
 
     def dynamic_instruction(ctx: RunContext[AgentContext]) -> str:
@@ -131,6 +136,7 @@ def test_instruction_callable(agent_context: AgentContext):
 def test_instruction_none(agent_context: AgentContext):
     """Test that no instruction returns None."""
     mock_agent = MagicMock(spec=Agent)
+    mock_agent.model.model_name = "test-model"
     mock_agent.name = "search"
 
     call_func = create_subagent_call_func(mock_agent)
@@ -149,6 +155,7 @@ def test_instruction_none(agent_context: AgentContext):
 async def test_with_toolset(agent_context: AgentContext):
     """Test that created tool works with Toolset."""
     mock_agent = MagicMock(spec=Agent)
+    mock_agent.model.model_name = "test-model"
     mock_agent.name = "search"
 
     call_func = create_subagent_call_func(mock_agent)
@@ -211,6 +218,7 @@ async def test_stream_queues_multiple_tools(agent_context: AgentContext):
 async def test_create_subagent_call_func_basic():
     """Test create_subagent_call_func creates a working call function."""
     mock_agent = MagicMock(spec=Agent)
+    mock_agent.model.model_name = "test-model"
     mock_agent.name = "search"
 
     mock_run = MagicMock()
@@ -257,6 +265,7 @@ async def test_create_subagent_call_func_basic():
 async def test_create_subagent_call_func_registers_agent():
     """Test that create_subagent_call_func registers agent in agent_registry."""
     mock_agent = MagicMock(spec=Agent)
+    mock_agent.model.model_name = "test-model"
     mock_agent.name = "analyze"
 
     mock_run = MagicMock()
@@ -297,6 +306,7 @@ async def test_create_subagent_call_func_registers_agent():
 async def test_create_subagent_call_func_stores_history():
     """Test that create_subagent_call_func stores subagent history."""
     mock_agent = MagicMock(spec=Agent)
+    mock_agent.model.model_name = "test-model"
     mock_agent.name = "chat"
 
     mock_messages = [{"role": "user", "content": "test"}, {"role": "assistant", "content": "response"}]
@@ -335,6 +345,7 @@ async def test_create_subagent_call_func_stores_history():
 async def test_create_subagent_call_func_with_streaming_nodes():
     """Test create_subagent_call_func handles model request and call tools nodes."""
     mock_agent = MagicMock(spec=Agent)
+    mock_agent.model.model_name = "test-model"
     mock_agent.name = "streamer"
 
     mock_run = MagicMock()
@@ -416,6 +427,7 @@ async def test_create_subagent_call_func_with_streaming_nodes():
 async def test_create_subagent_call_func_agent_id_with_name():
     """Test that agent_id includes agent name when agent has a name."""
     mock_agent = MagicMock(spec=Agent)
+    mock_agent.model.model_name = "test-model"
     mock_agent.name = "search"
 
     mock_run = MagicMock()
@@ -455,6 +467,7 @@ async def test_create_subagent_call_func_agent_id_with_name():
 async def test_create_subagent_call_func_agent_id_without_name():
     """Test that agent_id uses 'subagent' as default name when agent has no name."""
     mock_agent = MagicMock(spec=Agent)
+    mock_agent.model.model_name = "test-model"
     mock_agent.name = None  # No name
 
     mock_run = MagicMock()
@@ -490,6 +503,7 @@ async def test_create_subagent_call_func_agent_id_without_name():
 async def test_create_subagent_call_func_resume_with_agent_id():
     """Test that resuming with explicit agent_id works correctly."""
     mock_agent = MagicMock(spec=Agent)
+    mock_agent.model.model_name = "test-model"
     mock_agent.name = "analyze"
 
     mock_run = MagicMock()
@@ -537,6 +551,7 @@ async def test_create_subagent_call_func_resume_with_agent_id():
 async def test_usage_not_recorded_without_tool_call_id():
     """Test that usage is not recorded when tool_call_id is None."""
     mock_agent = MagicMock(spec=Agent)
+    mock_agent.model.model_name = "test-model"
     mock_agent.name = "search"
 
     mock_run = MagicMock()

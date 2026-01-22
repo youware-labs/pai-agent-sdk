@@ -98,11 +98,11 @@ from pydantic_ai.messages import (
     ToolCallPart,
     ToolReturnPart,
 )
-from pydantic_ai.usage import RunUsage
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing_extensions import TypedDict
 
 from pai_agent_sdk.events import AgentEvent
+from pai_agent_sdk.usage import ExtraUsageRecord, InternalUsage
 from pai_agent_sdk.utils import get_latest_request_usage
 
 # =============================================================================
@@ -112,28 +112,6 @@ from pai_agent_sdk.utils import get_latest_request_usage
 # Hook function type for converting media data to URL.
 # Can be sync or async. Returns URL string or None to use default behavior.
 MediaToUrlHook = Callable[["RunContext[AgentContext]", bytes, str], "Awaitable[str | None] | str | None"]
-
-# =============================================================================
-# Extra Usage Record
-# =============================================================================
-
-
-class ExtraUsageRecord(BaseModel):
-    """Record of extra usage from tool calls or filters.
-
-    This model captures additional token usage that occurs outside the main
-    agent run, such as from sub-agents, filters, or tool calls that invoke
-    other models.
-    """
-
-    uuid: str
-    """Unique identifier for this usage record (e.g., tool_call_id or generated UUID)."""
-
-    agent: str
-    """Agent name that generated this usage (e.g., 'compact', 'search', 'image_understanding')."""
-
-    usage: RunUsage
-    """Token usage from this call."""
 
 
 if TYPE_CHECKING:
@@ -1047,18 +1025,25 @@ class AgentContext(BaseModel):
     def add_extra_usage(
         self,
         agent: str,
-        usage: RunUsage,
+        internal_usage: InternalUsage,
         uuid: str | None = None,
     ) -> None:
         """Add an extra usage record.
 
         Args:
             agent: Agent name that generated this usage.
-            usage: Token usage from this call.
+            internal_usage: Internal usage record containing model_id and token usage.
             uuid: Unique identifier (defaults to generated UUID if not provided).
         """
         record_uuid = uuid or uuid4().hex
-        self.extra_usages.append(ExtraUsageRecord(uuid=record_uuid, agent=agent, usage=usage))
+        self.extra_usages.append(
+            ExtraUsageRecord(
+                uuid=record_uuid,
+                agent=agent,
+                model_id=internal_usage.model_id,
+                usage=internal_usage.usage,
+            )
+        )
 
     async def emit_event(self, event: AgentStreamEvent) -> None:
         """Emit a custom event to the sideband stream queue.

@@ -601,7 +601,12 @@ async def test_export_and_with_state_with_data(env: LocalEnvironment) -> None:
             ModelResponse(parts=[TextPart(content="Hi there")]),
         ]
         ctx.extra_usages.append(
-            ExtraUsageRecord(uuid="test-uuid", agent="search", usage=RunUsage(input_tokens=50, output_tokens=50))
+            ExtraUsageRecord(
+                uuid="test-uuid",
+                agent="search",
+                model_id="openai:gpt-4o",
+                usage=RunUsage(input_tokens=50, output_tokens=50),
+            )
         )
         ctx.user_prompts = "Test prompt"
         ctx.handoff_message = "Handoff summary"
@@ -650,7 +655,12 @@ async def test_export_state_include_subagent_false(env: LocalEnvironment) -> Non
 
         # Set up non-subagent state
         ctx.extra_usages.append(
-            ExtraUsageRecord(uuid="test-uuid", agent="search", usage=RunUsage(input_tokens=50, output_tokens=50))
+            ExtraUsageRecord(
+                uuid="test-uuid",
+                agent="search",
+                model_id="openai:gpt-4o",
+                usage=RunUsage(input_tokens=50, output_tokens=50),
+            )
         )
         ctx.user_prompts = "Test prompt"
         ctx.handoff_message = "Handoff summary"
@@ -740,6 +750,7 @@ async def test_resumable_state_json_serialization_with_extra_usages(env: LocalEn
             ExtraUsageRecord(
                 uuid="usage-1",
                 agent="search",
+                model_id="openai:gpt-4o",
                 usage=RunUsage(input_tokens=100, output_tokens=200),
             )
         )
@@ -747,6 +758,7 @@ async def test_resumable_state_json_serialization_with_extra_usages(env: LocalEn
             ExtraUsageRecord(
                 uuid="usage-2",
                 agent="compact",
+                model_id="anthropic:claude-sonnet-4",
                 usage=RunUsage(input_tokens=50, output_tokens=75, requests=1, tool_calls=2),
             )
         )

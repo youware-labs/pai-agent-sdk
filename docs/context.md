@@ -188,6 +188,15 @@ config.model_extra["my_custom_key"]  # Also works
 | `handoff_message`         | `str \| None`            | Context handoff message                      |
 | `need_user_approve_tools` | `list[str]`              | Tool names requiring user approval           |
 
+### ExtraUsageRecord Fields
+
+| Field      | Type       | Description                                                           |
+| ---------- | ---------- | --------------------------------------------------------------------- |
+| `uuid`     | `str`      | Unique identifier (tool_call_id or generated UUID)                    |
+| `agent`    | `str`      | Agent name (e.g., 'compact', 'image_understanding', 'search')         |
+| `model_id` | `str`      | Model identifier (e.g., 'openai:gpt-4o', 'anthropic:claude-sonnet-4') |
+| `usage`    | `RunUsage` | Token usage from this call                                            |
+
 ## Extending AgentContext
 
 Extend `AgentContext` and `ResumableState` for custom fields:

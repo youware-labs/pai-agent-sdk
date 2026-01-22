@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from types import TracebackType
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from prompt_toolkit import Application
 from prompt_toolkit.formatted_text import ANSI
@@ -52,6 +52,7 @@ from pydantic_ai.messages import (
     ThinkingPartDelta,
     ToolCallPart,
 )
+from pydantic_ai.models import Model
 from rich.text import Text
 
 from pai_agent_sdk.agents.main import AgentRuntime, stream_agent
@@ -846,18 +847,19 @@ class TUIApp:
                 self._current_context_tokens = latest_usage.total_tokens if latest_usage else usage.total_tokens
 
                 # Accumulate session usage
-                model_id = self.config.general.model or "unknown"
-                self._session_usage.add(model_id, usage)
+                model_id = cast(Model, self.runtime.agent.model).model_name
+                self._session_usage.add("main", model_id, usage)
 
                 # Also accumulate extra_usages (subagents, image_understanding, etc.)
                 ctx = self.runtime.ctx
                 for record in ctx.extra_usages:
-                    self._session_usage.add(record.agent, record.usage)
-                # Clear extra_usages after accumulating to avoid double counting
-                ctx.extra_usages.clear()
+                    self._session_usage.add(record.agent, record.model_id, record.usage)
 
-                # Auto-save session after each run
+                # Auto-save session after each run (before clearing extra_usages)
                 self._auto_save_history()
+
+                # Clear extra_usages after saving to avoid double counting on next run
+                ctx.extra_usages.clear()
 
             return stream.run.result if stream.run else None
 
@@ -1666,6 +1668,13 @@ class TUIApp:
                 state_data = state_file.read_text()
                 state = ResumableState.model_validate_json(state_data)
                 state.restore(self.runtime.ctx)
+
+                # Re-populate session usage from restored extra_usages
+                for record in self.runtime.ctx.extra_usages:
+                    self._session_usage.add(record.agent, record.model_id, record.usage)
+                # Clear after populating to avoid double counting on next run
+                self.runtime.ctx.extra_usages.clear()
+
                 self._append_system_output(f"Session loaded from {load_dir}")
                 self._append_system_output(f"  - message_history.json ({len(history)} messages)")
                 self._append_system_output("  - context_state.json (restored)")

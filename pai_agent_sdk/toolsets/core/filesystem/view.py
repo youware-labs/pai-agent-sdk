@@ -213,7 +213,7 @@ class ViewTool(BaseTool):
                     model_settings = tool_config.image_understanding_model_settings
 
                 # Use image understanding to describe (prefer URL if available)
-                description, usage = await get_image_description(
+                description, internal_usage = await get_image_description(
                     image_url=image_url,
                     image_data=None if image_url else image_data,
                     media_type=media_type,
@@ -223,7 +223,9 @@ class ViewTool(BaseTool):
 
                 # Store usage in extra_usages
                 if ctx.tool_call_id:
-                    ctx.deps.add_extra_usage(agent="image_understanding", usage=usage, uuid=ctx.tool_call_id)
+                    ctx.deps.add_extra_usage(
+                        agent="image_understanding", internal_usage=internal_usage, uuid=ctx.tool_call_id
+                    )
 
                 return f"Image description (via image analysis):\n{description}"
             except Exception as e:
@@ -286,7 +288,7 @@ class ViewTool(BaseTool):
                     model_settings = tool_config.video_understanding_model_settings
 
                 # Use video understanding to describe video (prefer URL if available)
-                description, usage = await get_video_description(
+                description, internal_usage = await get_video_description(
                     video_url=video_url,
                     video_data=None if video_url else video_data,
                     media_type=media_type,
@@ -296,7 +298,9 @@ class ViewTool(BaseTool):
 
                 # Store usage in extra_usages with tool_call_id
                 if ctx.tool_call_id:
-                    ctx.deps.add_extra_usage(agent="video_understanding", usage=usage, uuid=ctx.tool_call_id)
+                    ctx.deps.add_extra_usage(
+                        agent="video_understanding", internal_usage=internal_usage, uuid=ctx.tool_call_id
+                    )
 
                 return f"Video description (via video understanding agent):\n{description}"
             except Exception as e:

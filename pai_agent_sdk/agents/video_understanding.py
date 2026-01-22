@@ -7,16 +7,17 @@ screen recordings and general video content, returning structured descriptions.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, BinaryContent, ModelSettings, VideoUrl
 from pydantic_ai.models import Model
-from pydantic_ai.usage import RunUsage
 
 from pai_agent_sdk._config import AgentSettings
 from pai_agent_sdk._logger import logger
 from pai_agent_sdk.agents.models import infer_model
+from pai_agent_sdk.usage import InternalUsage
 
 
 class VideoError(Exception):
@@ -222,7 +223,7 @@ async def get_video_description(
     model: str | Model | None = None,
     model_settings: ModelSettings | None = None,
     max_video_size: int = DEFAULT_MAX_VIDEO_SIZE,
-) -> tuple[str, RunUsage]:
+) -> tuple[str, InternalUsage]:
     """Analyze a video and get a structured description.
 
     Args:
@@ -235,13 +236,14 @@ async def get_video_description(
         max_video_size: Maximum allowed size for video_data in bytes.
 
     Returns:
-        Tuple of (XML description string, Usage).
+        Tuple of (description string, InternalUsage with model_id and usage).
 
     Raises:
         VideoInputError: If video input is invalid.
         VideoSizeError: If video exceeds size limit.
         VideoAnalysisError: If analysis fails.
     """
+
     video_content = build_video_content(
         video_url=video_url,
         video_data=video_data,
@@ -262,4 +264,7 @@ async def get_video_description(
         logger.error(f"Error analyzing video: {e}")
         raise VideoAnalysisError(f"Failed to analyze video: {e}", cause=e) from e
 
-    return result.output.description, result.usage()
+    # Get model_id from agent's model
+    model_id = cast(Model, agent.model).model_name
+
+    return result.output.description, InternalUsage(model_id=model_id, usage=result.usage())

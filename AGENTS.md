@@ -73,6 +73,7 @@ pai_agent_sdk/
 │
 ├── stream/                # Stream processing
 ├── presets.py             # Preset configurations (model settings, etc.)
+├── usage.py               # Usage tracking models (InternalUsage, ExtraUsageRecord)
 ├── utils.py               # Utility functions
 └── _logger.py             # Centralized logging
 

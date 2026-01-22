@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Sequence
 from pathlib import Path
+from typing import cast
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
@@ -36,6 +37,7 @@ from pai_agent_sdk.filters import (
     drop_gif_images,
     fix_truncated_tool_args,
 )
+from pai_agent_sdk.usage import InternalUsage
 from pai_agent_sdk.utils import get_latest_request_usage
 
 # =============================================================================
@@ -331,7 +333,13 @@ def create_compact_filter(
             )
 
             # Record usage in extra_usages
-            agent_ctx.add_extra_usage(agent=AGENT_NAME, usage=result.usage(), uuid=uuid4().hex)
+
+            model_id = cast(Model, agent.model).model_name
+            agent_ctx.add_extra_usage(
+                agent=AGENT_NAME,
+                internal_usage=InternalUsage(model_id=model_id, usage=result.usage()),
+                uuid=uuid4().hex,
+            )
 
             condense_result: CondenseResult = result.output
 

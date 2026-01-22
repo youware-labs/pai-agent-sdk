@@ -13,9 +13,11 @@ from uuid import uuid4
 
 from pydantic import Field
 from pydantic_ai import Agent, AgentRunResult, RunContext, UsageLimits
+from pydantic_ai.models import Model
 
 from pai_agent_sdk.context import AgentContext, ModelConfig
 from pai_agent_sdk.toolsets.core.base import BaseTool
+from pai_agent_sdk.usage import InternalUsage
 
 # Type alias for instruction functions
 InstructionFunc = Callable[[RunContext[AgentContext]], str | None]
@@ -231,7 +233,12 @@ def create_subagent_call_func(
 
             # Record usage in extra_usages
             if ctx.tool_call_id:
-                deps.add_extra_usage(agent=agent_id, usage=result.usage(), uuid=ctx.tool_call_id)
+                model_id = cast(Model, agent.model).model_name
+                deps.add_extra_usage(
+                    agent=agent_id,
+                    internal_usage=InternalUsage(model_id=model_id, usage=result.usage()),
+                    uuid=ctx.tool_call_id,
+                )
 
         # Return formatted result
         return f"""<id>{agent_id}</id>

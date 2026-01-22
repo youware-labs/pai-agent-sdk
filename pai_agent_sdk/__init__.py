@@ -3,8 +3,11 @@
 import importlib.metadata
 
 from pai_agent_sdk.mcp import MCPServerSpec, ProcessToolCallback, create_mcp_approval_hook
+from pai_agent_sdk.usage import ExtraUsageRecord, InternalUsage
 
 __all__ = [
+    "ExtraUsageRecord",
+    "InternalUsage",
     "MCPServerSpec",
     "ProcessToolCallback",
     "__version__",

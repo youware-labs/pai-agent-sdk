@@ -44,13 +44,27 @@ if TYPE_CHECKING:
 K_TOKENS = 1024
 
 # Anthropic beta headers for extended context
-ANTHROPIC_BETAS = [
-    "context-1m-2025-08-07",
-]
+ANTHROPIC_1M_BETA = "context-1m-2025-08-07"
+ANTHROPIC_INTERLEAVED_BETA = "interleaved-thinking-2025-05-14"
 
-ANTHROPIC_BETA_HEADERS = {
-    "anthropic-beta": ",".join(ANTHROPIC_BETAS),
-}
+
+def build_anthropic_betas(
+    *,
+    use_1m_context: bool = False,
+    use_interleaved_thinking: bool = False,
+) -> dict[str, str]:
+    """Build list of Anthropic beta headers for extended context."""
+    betas = []
+    if use_1m_context:
+        betas.append(ANTHROPIC_1M_BETA)
+    if use_interleaved_thinking:
+        betas.append(ANTHROPIC_INTERLEAVED_BETA)
+
+    if not betas:
+        return {}
+    return {
+        "anthropic-beta": ",".join(betas),
+    }
 
 
 # =============================================================================
@@ -133,7 +147,7 @@ def _anthropic_settings(
         "anthropic_cache_messages": True,
     }
     if use_1m_context:
-        settings["extra_headers"] = ANTHROPIC_BETA_HEADERS
+        settings["extra_headers"] = build_anthropic_betas(use_1m_context=use_1m_context, use_interleaved_thinking=True)
     return settings
 
 
@@ -155,7 +169,7 @@ def _anthropic_off_settings(*, use_1m_context: bool = False) -> dict[str, Any]:
         "anthropic_cache_messages": True,
     }
     if use_1m_context:
-        settings["extra_headers"] = ANTHROPIC_BETA_HEADERS
+        settings["extra_headers"] = build_anthropic_betas(use_1m_context=use_1m_context)
     return settings
 
 

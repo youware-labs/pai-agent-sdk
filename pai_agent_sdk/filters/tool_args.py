@@ -57,7 +57,7 @@ async def fix_truncated_tool_args(
         if isinstance(msg, ModelRequest):
             continue
         for part in msg.parts:
-            if isinstance(part, ToolCallPart) and isinstance(part.args, str):
+            if isinstance(part, ToolCallPart) and isinstance(part.args, str) and part.args:
                 try:
                     json.loads(part.args)
                 except json.JSONDecodeError:

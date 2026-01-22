@@ -115,7 +115,7 @@ async def test_fix_truncated_tool_args_dict_args_unchanged(tmp_path: Path) -> No
 
 
 async def test_fix_truncated_tool_args_empty_string(tmp_path: Path) -> None:
-    """Should handle empty string args as invalid JSON."""
+    """Should skip empty string args without modification."""
     async with LocalEnvironment(
         allowed_paths=[tmp_path],
         default_path=tmp_path,
@@ -127,7 +127,7 @@ async def test_fix_truncated_tool_args_empty_string(tmp_path: Path) -> None:
 
             tool_call = ToolCallPart(
                 tool_name="test_tool",
-                args="",  # Empty string - invalid JSON
+                args="",  # Empty string - should be skipped
                 tool_call_id="call_123",
             )
             response = ModelResponse(parts=[tool_call], model_name="test-model")
@@ -135,9 +135,8 @@ async def test_fix_truncated_tool_args_empty_string(tmp_path: Path) -> None:
 
             await fix_truncated_tool_args(mock_ctx, history)
 
-            # Empty string should be replaced with error dict
-            assert isinstance(tool_call.args, dict)
-            assert "system" in tool_call.args
+            # Empty string should be left unchanged (skipped)
+            assert tool_call.args == ""
 
 
 async def test_fix_truncated_tool_args_multiple_tool_calls(tmp_path: Path) -> None:

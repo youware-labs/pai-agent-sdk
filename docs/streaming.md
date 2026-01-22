@@ -50,6 +50,28 @@ async with stream_agent(runtime, "Hello") as streamer:
         print(f"[{event.agent_name}] {event.event}")
 ```
 
+## Dynamic Prompt Generation
+
+Use `user_prompt_factory` when the prompt requires runtime resources (e.g., reading files):
+
+```python
+async def build_prompt(runtime: AgentRuntime) -> str:
+    # Access runtime resources to build prompt
+    content = await runtime.ctx.file_operator.read_file("context.md")
+    return f"Based on this context:\n{content}\n\nAnswer the question."
+
+async with stream_agent(
+    runtime,
+    user_prompt_factory=build_prompt,
+) as streamer:
+    async for event in streamer:
+        pass
+```
+
+**Note**: `user_prompt` and `user_prompt_factory` are mutually exclusive. Providing both raises `UserError`.
+
+````
+
 ## Hook System
 
 ### Hook Types
@@ -100,7 +122,7 @@ async with stream_agent(
 ) as streamer:
     async for event in streamer:
         pass
-```
+````
 
 ### Node and Event Hooks
 

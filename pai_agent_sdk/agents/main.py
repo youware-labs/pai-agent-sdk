@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, Generic, cast
 
 import jinja2
 from agent_environment import Environment
-from pydantic_ai import Agent, DeferredToolRequests, DeferredToolResults, UsageLimits
+from pydantic_ai import Agent, DeferredToolRequests, DeferredToolResults, UsageLimits, UserError
 from pydantic_ai._agent_graph import CallToolsNode, HistoryProcessor, ModelRequestNode
 from pydantic_ai.messages import ModelMessage, UserContent
 from pydantic_ai.models import KnownModelName, Model
@@ -550,12 +550,16 @@ class EventHookContext(Generic[AgentDepsT, OutputT]):
     output_queue: asyncio.Queue[StreamEvent]
 
 
+# User prompt type alias
+UserPromptT = str | Sequence[UserContent]
+
 # Hook type aliases
 RuntimeReadyHook = Callable[[RuntimeReadyContext[AgentDepsT, OutputT]], Awaitable[None]]
 AgentStartHook = Callable[[AgentStartContext[AgentDepsT, OutputT]], Awaitable[None]]
 AgentCompleteHook = Callable[[AgentCompleteContext[AgentDepsT, OutputT]], Awaitable[None]]
 NodeHook = Callable[[NodeHookContext[AgentDepsT, OutputT]], Awaitable[None]]
 EventHook = Callable[[EventHookContext[AgentDepsT, OutputT]], Awaitable[None]]
+UserPromptFactory = Callable[[AgentRuntime[AgentDepsT, OutputT]], Awaitable[UserPromptT]]
 
 
 # =============================================================================
@@ -646,8 +650,9 @@ class AgentStreamer(Generic[AgentDepsT, OutputT]):
 @asynccontextmanager
 async def stream_agent(  # noqa: C901
     runtime: AgentRuntime[AgentDepsT, OutputT],
-    user_prompt: str | Sequence[UserContent] | None = None,
+    user_prompt: UserPromptT | None = None,
     *,
+    user_prompt_factory: UserPromptFactory[AgentDepsT, OutputT] | None = None,
     message_history: Sequence[ModelMessage] | None = None,
     deferred_tool_results: DeferredToolResults | None = None,
     usage_limits: UsageLimits | None = None,
@@ -686,6 +691,10 @@ async def stream_agent(  # noqa: C901
         runtime: The AgentRuntime containing agent and context.
         user_prompt: The prompt to send to the agent. Can be string or
             sequence of UserContent for multimodal input.
+        user_prompt_factory: Async callable that receives AgentRuntime and returns
+            a user prompt. Called after runtime enters, before on_runtime_ready.
+            Use when prompt generation requires runtime resources (e.g., reading files).
+            If both user_prompt and user_prompt_factory are provided, factory takes precedence.
         message_history: Optional conversation history.
         deferred_tool_results: Results from deferred tool calls.
         on_runtime_ready: Called after runtime enters but before agent.iter() starts.
@@ -723,6 +732,11 @@ async def stream_agent(  # noqa: C901
                     # Handle subagent events
                     pass
     """
+    # Validate mutually exclusive parameters
+    if user_prompt is not None and user_prompt_factory is not None:
+        msg = "Cannot specify both 'user_prompt' and 'user_prompt_factory'. Use one or the other."
+        raise UserError(msg)
+
     # Extract agent and ctx from runtime
     agent = runtime.agent
     ctx = runtime.ctx
@@ -791,20 +805,24 @@ async def stream_agent(  # noqa: C901
         """Run the main agent and push events to output_queue."""
         logger.debug("Main agent task started")
 
-        # These may be modified by on_runtime_ready hook
+        # These may be modified by user_prompt_factory or on_runtime_ready hook
         effective_user_prompt = user_prompt
         effective_deferred_tool_results = deferred_tool_results
 
         try:
             async with runtime:
+                # User prompt factory - called first to generate prompt from runtime
+                if user_prompt_factory:
+                    effective_user_prompt = await user_prompt_factory(runtime)
+
                 # Runtime ready hook - environment is open, agent not started yet
                 if on_runtime_ready:
                     ready_ctx = RuntimeReadyContext(
                         runtime=runtime,
                         agent_info=main_agent_info,
                         output_queue=output_queue,
-                        user_prompt=user_prompt,
-                        deferred_tool_results=deferred_tool_results,
+                        user_prompt=effective_user_prompt,
+                        deferred_tool_results=effective_deferred_tool_results,
                     )
                     await on_runtime_ready(ready_ctx)
                     # Use potentially modified values from hook

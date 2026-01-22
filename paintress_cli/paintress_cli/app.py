@@ -39,7 +39,7 @@ from prompt_toolkit.layout.controls import BufferControl, FormattedTextControl
 from prompt_toolkit.mouse_events import MouseEvent, MouseEventType
 from prompt_toolkit.styles import Style
 from prompt_toolkit.widgets import TextArea
-from pydantic_ai import DeferredToolRequests, DeferredToolResults, ToolDenied
+from pydantic_ai import DeferredToolRequests, DeferredToolResults, ToolDenied, UsageLimits
 from pydantic_ai.messages import (
     FunctionToolCallEvent,
     FunctionToolResultEvent,
@@ -831,6 +831,7 @@ class TUIApp:
             user_prompt=user_prompt if user_prompt else None,
             message_history=self._message_history,
             deferred_tool_results=deferred_results,
+            usage_limits=UsageLimits(request_limit=self.config.general.max_requests),
             post_node_hook=emit_context_update,
         ) as stream:
             async for event in stream:

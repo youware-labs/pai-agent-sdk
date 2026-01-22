@@ -106,6 +106,7 @@ Copy `examples/.env.example` to `examples/.env` and configure your API keys.
 ## Documentation
 
 - [AgentContext & Sessions](docs/context.md) - Session state, resumable sessions, extending context
+- [Streaming & Hooks](docs/streaming.md) - Real-time streaming, lifecycle hooks, event handling
 - [Toolset Architecture](docs/toolset.md) - Create tools, use hooks, handle errors, extend Toolset
 - [Subagent System](docs/subagent.md) - Hierarchical agents, builtin presets, markdown configuration
 - [Skills System](docs/skills.md) - Markdown-based skills, hot reload, pre-scan hooks

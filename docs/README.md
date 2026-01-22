@@ -7,6 +7,7 @@ This directory contains detailed documentation for pai-agent-sdk.
 | Document                                         | Description                                                                |
 | ------------------------------------------------ | -------------------------------------------------------------------------- |
 | [context.md](context.md)                         | AgentContext and session management, resumable sessions, extending context |
+| [streaming.md](streaming.md)                     | Streaming agent execution, lifecycle hooks, event handling                 |
 | [environment.md](environment.md)                 | Custom environments, async context manager patterns, resource management   |
 | [resumable-resources.md](resumable-resources.md) | Resumable resources, BaseResource, factory pattern, state persistence      |
 | [logging.md](logging.md)                         | Logging configuration and usage                                            |

@@ -443,6 +443,78 @@ def create_agent(
 
 
 @dataclass
+class RuntimeReadyContext(Generic[AgentDepsT, OutputT]):
+    """Context passed to runtime ready hook (after runtime enter, before agent.iter).
+
+    This hook is called after the runtime (env, ctx, agent) has been entered but
+    before agent.iter() starts. Use it to:
+    - Initialize resources that depend on the environment being ready
+    - Emit custom events to the output stream
+    - Modify context state before agent execution
+    - Modify user_prompt or deferred_tool_results to control agent input
+
+    Attributes:
+        runtime: The AgentRuntime containing env, ctx, and agent.
+        agent_info: Metadata about the main agent.
+        output_queue: Queue for emitting custom StreamEvent to the output stream.
+        user_prompt: The user prompt to send to the agent. Can be modified by hook.
+        deferred_tool_results: Results from deferred tool calls. Can be modified by hook.
+    """
+
+    runtime: AgentRuntime[AgentDepsT, OutputT]
+    agent_info: AgentInfo
+    output_queue: asyncio.Queue[StreamEvent]
+    user_prompt: str | Sequence[UserContent] | None
+    deferred_tool_results: DeferredToolResults | None
+
+
+@dataclass
+class AgentStartContext(Generic[AgentDepsT, OutputT]):
+    """Context passed to agent start hook (after agent.iter starts, before first node).
+
+    This hook is called after agent.iter() has started and the run object is available,
+    but before any nodes are processed. Use it to:
+    - Access the run object for initial state inspection
+    - Log agent start with run metadata
+    - Emit custom events at agent start
+
+    Attributes:
+        runtime: The AgentRuntime containing env, ctx, and agent.
+        agent_info: Metadata about the main agent.
+        output_queue: Queue for emitting custom StreamEvent to the output stream.
+        run: The AgentRun instance from agent.iter().
+    """
+
+    runtime: AgentRuntime[AgentDepsT, OutputT]
+    agent_info: AgentInfo
+    output_queue: asyncio.Queue[StreamEvent]
+    run: AgentRun[AgentDepsT, OutputT]
+
+
+@dataclass
+class AgentCompleteContext(Generic[AgentDepsT, OutputT]):
+    """Context passed to agent complete hook (after all nodes processed, before agent.iter exits).
+
+    This hook is called after all nodes have been processed but before the agent.iter()
+    context manager exits. Use it to:
+    - Access the final result and usage statistics
+    - Log agent completion with full run data
+    - Emit custom completion events
+
+    Attributes:
+        runtime: The AgentRuntime containing env, ctx, and agent.
+        agent_info: Metadata about the main agent.
+        output_queue: Queue for emitting custom StreamEvent to the output stream.
+        run: The AgentRun instance with result available.
+    """
+
+    runtime: AgentRuntime[AgentDepsT, OutputT]
+    agent_info: AgentInfo
+    output_queue: asyncio.Queue[StreamEvent]
+    run: AgentRun[AgentDepsT, OutputT]
+
+
+@dataclass
 class NodeHookContext(Generic[AgentDepsT, OutputT]):
     """Context passed to node-level hooks (pre/post node.stream).
 
@@ -479,6 +551,9 @@ class EventHookContext(Generic[AgentDepsT, OutputT]):
 
 
 # Hook type aliases
+RuntimeReadyHook = Callable[[RuntimeReadyContext[AgentDepsT, OutputT]], Awaitable[None]]
+AgentStartHook = Callable[[AgentStartContext[AgentDepsT, OutputT]], Awaitable[None]]
+AgentCompleteHook = Callable[[AgentCompleteContext[AgentDepsT, OutputT]], Awaitable[None]]
 NodeHook = Callable[[NodeHookContext[AgentDepsT, OutputT]], Awaitable[None]]
 EventHook = Callable[[EventHookContext[AgentDepsT, OutputT]], Awaitable[None]]
 
@@ -577,6 +652,9 @@ async def stream_agent(  # noqa: C901
     deferred_tool_results: DeferredToolResults | None = None,
     usage_limits: UsageLimits | None = None,
     # Hooks
+    on_runtime_ready: RuntimeReadyHook[AgentDepsT, OutputT] | None = None,
+    on_agent_start: AgentStartHook[AgentDepsT, OutputT] | None = None,
+    on_agent_complete: AgentCompleteHook[AgentDepsT, OutputT] | None = None,
     pre_node_hook: NodeHook[AgentDepsT, OutputT] | None = None,
     post_node_hook: NodeHook[AgentDepsT, OutputT] | None = None,
     pre_event_hook: EventHook[AgentDepsT, OutputT] | None = None,
@@ -610,6 +688,12 @@ async def stream_agent(  # noqa: C901
             sequence of UserContent for multimodal input.
         message_history: Optional conversation history.
         deferred_tool_results: Results from deferred tool calls.
+        on_runtime_ready: Called after runtime enters but before agent.iter() starts.
+            Use to initialize resources, emit events, or modify context state.
+        on_agent_start: Called after agent.iter() starts, before first node.
+            Use to access run object for initial state inspection.
+        on_agent_complete: Called after all nodes processed, before agent.iter() exits.
+            Use to access final result and usage statistics.
         pre_node_hook: Called before node.stream() starts.
         post_node_hook: Called after node.stream() completes.
         pre_event_hook: Called before each event is yielded.
@@ -706,27 +790,71 @@ async def stream_agent(  # noqa: C901
     async def run_main() -> None:
         """Run the main agent and push events to output_queue."""
         logger.debug("Main agent task started")
+
+        # These may be modified by on_runtime_ready hook
+        effective_user_prompt = user_prompt
+        effective_deferred_tool_results = deferred_tool_results
+
         try:
-            async with (
-                runtime,
-                agent.iter(
-                    user_prompt,
+            async with runtime:
+                # Runtime ready hook - environment is open, agent not started yet
+                if on_runtime_ready:
+                    ready_ctx = RuntimeReadyContext(
+                        runtime=runtime,
+                        agent_info=main_agent_info,
+                        output_queue=output_queue,
+                        user_prompt=user_prompt,
+                        deferred_tool_results=deferred_tool_results,
+                    )
+                    await on_runtime_ready(ready_ctx)
+                    # Use potentially modified values from hook
+                    effective_user_prompt = ready_ctx.user_prompt
+                    effective_deferred_tool_results = ready_ctx.deferred_tool_results
+
+                async with agent.iter(
+                    effective_user_prompt,
                     deps=ctx,
                     usage_limits=usage_limits,
                     message_history=message_history,
-                    deferred_tool_results=deferred_tool_results,
+                    deferred_tool_results=effective_deferred_tool_results,
                     metadata=cast(dict[str, Any], metadata) if metadata else None,
-                ) as run,
-            ):
-                streamer.run = run  # Expose run immediately
-                async for node in run:
-                    if Agent.is_user_prompt_node(node) or Agent.is_end_node(node):
-                        continue
+                ) as run:
+                    streamer.run = run  # Expose run immediately
 
-                    if Agent.is_model_request_node(node) or Agent.is_call_tools_node(node):
-                        await process_node(node, run)
-        except Exception:
-            logger.exception("Error in main agent task")
+                    # Agent start hook - run object available
+                    if on_agent_start:
+                        await on_agent_start(
+                            AgentStartContext(
+                                runtime=runtime,
+                                agent_info=main_agent_info,
+                                output_queue=output_queue,
+                                run=run,
+                            )
+                        )
+
+                    async for node in run:
+                        if Agent.is_user_prompt_node(node) or Agent.is_end_node(node):
+                            continue
+
+                        if Agent.is_model_request_node(node) or Agent.is_call_tools_node(node):
+                            await process_node(node, run)
+
+                    # Agent complete hook - all nodes processed, result available
+                    if on_agent_complete:
+                        await on_agent_complete(
+                            AgentCompleteContext(
+                                runtime=runtime,
+                                agent_info=main_agent_info,
+                                output_queue=output_queue,
+                                run=run,
+                            )
+                        )
+        except BaseException as e:
+            # Log all exceptions including CancelledError for debugging
+            if isinstance(e, asyncio.CancelledError):
+                logger.debug("Main agent task cancelled")
+            else:
+                logger.exception("Error in main agent task")
             raise
         finally:
             logger.debug("Main agent task finished")

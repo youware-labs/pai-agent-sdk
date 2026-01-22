@@ -152,6 +152,16 @@ See [docs/context.md](docs/context.md) for details:
 - Extending `AgentContext` and `ResumableState` for custom fields
 - Using `create_agent` with `state` parameter for session restoration
 
+### Streaming and Hooks
+
+See [docs/streaming.md](docs/streaming.md) for details:
+
+- `stream_agent` for real-time event streaming
+- Lifecycle hooks: `on_runtime_ready`, `on_agent_start`, `on_agent_complete`
+- Node/Event hooks: `pre_node_hook`, `post_node_hook`, `pre_event_hook`, `post_event_hook`
+- Hook context classes: `RuntimeReadyContext`, `AgentStartContext`, `AgentCompleteContext`, `NodeHookContext`, `EventHookContext`
+- Interruption and error handling
+
 ### Toolset Architecture
 
 See [docs/toolset.md](docs/toolset.md) for details:

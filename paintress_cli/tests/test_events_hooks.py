@@ -196,8 +196,8 @@ class TestTUIContext:
         # Verify buffer was consumed
         assert not ctx.steering_manager.has_pending()
 
-        # Verify event was emitted
-        queue = ctx.agent_stream_queues[ctx.run_id]
+        # Verify event was emitted (emit_event uses _agent_id as key)
+        queue = ctx.agent_stream_queues[ctx._agent_id]
         assert not queue.empty()
         event = queue.get_nowait()
         assert isinstance(event, SteeringInjectedEvent)
@@ -279,8 +279,8 @@ class TestEmitPhaseEvent:
             details="Generating...",
         )
 
-        # Check event was emitted
-        queue = ctx.agent_stream_queues[ctx.run_id]
+        # Check event was emitted (emit_event uses _agent_id as key)
+        queue = ctx.agent_stream_queues[ctx._agent_id]
         assert not queue.empty()
 
         event = queue.get_nowait()

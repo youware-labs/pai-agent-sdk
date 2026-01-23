@@ -414,11 +414,40 @@ async def test_create_subagent_call_func_with_streaming_nodes():
 
     assert "result with streaming" in output
 
-    # Check that events were put into stream queue
-    queue = ctx.agent_stream_queues[ctx.run_id]
+    # Check that events were put into subagent's stream queue
+    # The subagent has agent_id like "streamer-xxxx", find it from registry
+    subagent_id = next(iter(ctx.agent_registry.keys()))
+    queue = ctx.agent_stream_queues[subagent_id]
     assert not queue.empty()
+
+    # First event should be SubagentStartEvent
+    from pai_agent_sdk.events import SubagentCompleteEvent, SubagentStartEvent
+
+    start_event = await queue.get()
+    assert isinstance(start_event, SubagentStartEvent)
+    assert start_event.agent_name == "streamer"
+    assert start_event.prompt_preview == "test streaming"
+    assert start_event.agent_id.startswith("streamer-")
+
+    # Then the streamed events
     event = await queue.get()
     assert event == mock_event
+
+    # After all streaming, there should be SubagentCompleteEvent
+    # (need to drain any remaining mock_events first)
+    complete_event = None
+    while not queue.empty():
+        e = await queue.get()
+        if isinstance(e, SubagentCompleteEvent):
+            complete_event = e
+            break
+
+    assert complete_event is not None
+    assert complete_event.agent_name == "streamer"
+    assert complete_event.success is True
+    # Start and Complete should share the same event_id (= agent_id)
+    assert complete_event.event_id == start_event.event_id
+    assert complete_event.event_id == start_event.agent_id
 
 
 # Tests for agent_id generation

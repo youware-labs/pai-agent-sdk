@@ -70,15 +70,32 @@ from pai_agent_sdk.subagents.factory import (
     load_subagent_tools_from_dir,
 )
 from pai_agent_sdk.toolsets.core.base import BaseTool, Toolset
-from pai_agent_sdk.toolsets.core.subagent import (
-    create_subagent_call_func,
-    create_subagent_tool,
-    create_unified_subagent_tool,
-    get_available_subagent_names,
+
+# Lazy imports to avoid circular dependency with toolsets.core.subagent
+# These are re-exported via __getattr__ below
+_LAZY_IMPORTS = (
+    "create_subagent_call_func",
+    "create_subagent_tool",
+    "create_unified_subagent_tool",
+    "get_available_subagent_names",
 )
 
 if TYPE_CHECKING:
     from pydantic_ai.models import Model
+
+    # Type stubs for lazy imports (actual imports via __getattr__)
+    from pai_agent_sdk.toolsets.core.subagent import (
+        create_subagent_call_func as create_subagent_call_func,
+    )
+    from pai_agent_sdk.toolsets.core.subagent import (
+        create_subagent_tool as create_subagent_tool,
+    )
+    from pai_agent_sdk.toolsets.core.subagent import (
+        create_unified_subagent_tool as create_unified_subagent_tool,
+    )
+    from pai_agent_sdk.toolsets.core.subagent import (
+        get_available_subagent_names as get_available_subagent_names,
+    )
 
 _HERE = Path(__file__).parent
 PRESET_SUBAGNENTS_DIR = _HERE / "presets"
@@ -181,6 +198,8 @@ def load_unified_subagent_tool_from_dir(
             model="anthropic:claude-sonnet-4",
         )
     """
+    from pai_agent_sdk.toolsets.core.subagent import create_unified_subagent_tool
+
     configs = load_subagents_from_dir(dir_path)
     return create_unified_subagent_tool(
         list(configs.values()),
@@ -241,6 +260,26 @@ def load_builtin_unified_subagent_tool(
         history_processors=history_processors,
         model_cfg=model_cfg,
     )
+
+
+def __getattr__(name: str) -> Any:
+    """Lazy import for symbols from toolsets.core.subagent to avoid circular imports."""
+    if name in _LAZY_IMPORTS:
+        from pai_agent_sdk.toolsets.core.subagent import (
+            create_subagent_call_func,
+            create_subagent_tool,
+            create_unified_subagent_tool,
+            get_available_subagent_names,
+        )
+
+        _lazy_exports = {
+            "create_subagent_call_func": create_subagent_call_func,
+            "create_subagent_tool": create_subagent_tool,
+            "create_unified_subagent_tool": create_unified_subagent_tool,
+            "get_available_subagent_names": get_available_subagent_names,
+        }
+        return _lazy_exports[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 __all__ = [

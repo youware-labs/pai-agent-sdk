@@ -16,6 +16,7 @@ from pydantic_ai import Agent, AgentRunResult, RunContext, UsageLimits
 from pydantic_ai.models import Model
 
 from pai_agent_sdk.context import AgentContext, ModelConfig
+from pai_agent_sdk.events import SubagentCompleteEvent, SubagentStartEvent
 from pai_agent_sdk.toolsets.core.base import BaseTool
 from pai_agent_sdk.usage import InternalUsage
 
@@ -122,6 +123,44 @@ def _to_pascal_case(name: str) -> str:
     return "".join(part.capitalize() for part in parts)
 
 
+async def _run_subagent_iter(
+    agent: Agent[AgentContext, Any],
+    sub_ctx: AgentContext,
+    prompt: str,
+    message_history: list[Any] | None,
+) -> AgentRunResult:
+    """Run subagent iteration and stream events to subagent's queue.
+
+    Events are emitted to sub_ctx (subagent context) so they go to the
+    subagent's queue keyed by agent_id, not the parent's queue.
+
+    Args:
+        agent: The subagent to run.
+        sub_ctx: Subagent's context (events emitted here).
+        prompt: The prompt to send to the subagent.
+        message_history: Optional conversation history for resume.
+
+    Returns:
+        AgentRunResult from the subagent execution.
+    """
+    async with agent.iter(
+        prompt,
+        deps=sub_ctx,
+        usage_limits=UsageLimits(request_limit=1000),
+        message_history=message_history,
+    ) as run:
+        async for node in run:
+            if Agent.is_user_prompt_node(node) or Agent.is_end_node(node):
+                continue
+
+            if Agent.is_model_request_node(node) or Agent.is_call_tools_node(node):
+                async with node.stream(run.ctx) as request_stream:
+                    async for event in request_stream:
+                        await sub_ctx.emit_event(event)
+
+    return cast(AgentRunResult, run.result)
+
+
 def generate_unique_id(existing: Container[str], *, max_retries: int = 10) -> str:
     """Generate a unique 4-character ID with collision detection.
 
@@ -203,37 +242,61 @@ def create_subagent_call_func(
         if model_cfg is not None:
             override_kwargs["model_cfg"] = model_cfg
 
+        error_msg = ""
+        success = True
+        result_output = ""
+        request_count = 0
+
         async with deps.create_subagent_context(agent_name, agent_id=agent_id, **override_kwargs) as sub_ctx:
-            # Run agent with message history for conversation continuity
-            async with agent.iter(
-                prompt,
-                deps=sub_ctx,
-                usage_limits=UsageLimits(
-                    request_limit=1000,
-                ),
-                message_history=deps.subagent_history.get(agent_id),
-            ) as run:
-                async for node in run:
-                    if Agent.is_user_prompt_node(node) or Agent.is_end_node(node):
-                        continue
+            # Emit start event to subagent's queue (inside context so sub_ctx.start_at is set)
+            prompt_preview = prompt[:100] + "..." if len(prompt) > 100 else prompt
+            await sub_ctx.emit_event(
+                SubagentStartEvent(
+                    event_id=agent_id,  # Use agent_id as event_id to correlate Start/Complete
+                    agent_id=agent_id,
+                    agent_name=agent_name,
+                    prompt_preview=prompt_preview,
+                )
+            )
 
-                    elif Agent.is_model_request_node(node) or Agent.is_call_tools_node(node):
-                        async with node.stream(run.ctx) as request_stream:
-                            async for event in request_stream:
-                                await deps.emit_event(event)
+            try:
+                result = await _run_subagent_iter(agent, sub_ctx, prompt, deps.subagent_history.get(agent_id))
+                result_output = result.output
+                request_count = result.usage().requests
 
-            result = cast(AgentRunResult, run.result)
+                # Store message history for future resume
+                deps.subagent_history[agent_id] = result.all_messages()
 
-            # Store message history for future resume
-            deps.subagent_history[agent_id] = result.all_messages()
+                # Record usage in extra_usages
+                if ctx.tool_call_id:
+                    model_id = cast(Model, agent.model).model_name
+                    deps.add_extra_usage(
+                        agent=agent_id,
+                        internal_usage=InternalUsage(model_id=model_id, usage=result.usage()),
+                        uuid=ctx.tool_call_id,
+                    )
 
-            # Record usage in extra_usages
-            if ctx.tool_call_id:
-                model_id = cast(Model, agent.model).model_name
-                deps.add_extra_usage(
-                    agent=agent_id,
-                    internal_usage=InternalUsage(model_id=model_id, usage=result.usage()),
-                    uuid=ctx.tool_call_id,
+            except Exception as e:
+                success = False
+                error_msg = str(e)
+                raise
+
+            finally:
+                # Emit complete event to subagent's queue (use sub_ctx.elapsed_time for duration)
+                elapsed = sub_ctx.elapsed_time
+                duration = elapsed.total_seconds() if elapsed else 0.0
+                result_preview = result_output[:500] + "..." if len(result_output) > 500 else result_output
+                await sub_ctx.emit_event(
+                    SubagentCompleteEvent(
+                        event_id=agent_id,  # Same event_id as Start for correlation
+                        agent_id=agent_id,
+                        agent_name=agent_name,
+                        success=success,
+                        request_count=request_count,
+                        result_preview=result_preview,
+                        error=error_msg,
+                        duration_seconds=duration,
+                    )
                 )
 
         # Return formatted result

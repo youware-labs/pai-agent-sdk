@@ -108,3 +108,53 @@ class HandoffFailedEvent(AgentEvent):
 
     error: str = ""
     message_count: int = 0
+
+
+# =============================================================================
+# Subagent Lifecycle Events
+# =============================================================================
+
+
+@dataclass
+class SubagentStartEvent(AgentEvent):
+    """Emitted when a subagent starts execution.
+
+    This event is emitted by the delegate tool when a subagent begins processing.
+    Consumers can use this to display a progress indicator for the subagent.
+
+    Attributes:
+        agent_id: Unique identifier for this subagent instance (e.g., "explorer-a7b9").
+        agent_name: Human-readable subagent name (e.g., "explorer").
+        prompt_preview: First N characters of the prompt sent to subagent.
+    """
+
+    agent_id: str = ""
+    agent_name: str = ""
+    prompt_preview: str = ""
+
+
+@dataclass
+class SubagentCompleteEvent(AgentEvent):
+    """Emitted when a subagent completes execution.
+
+    This event is emitted by the delegate tool when a subagent finishes,
+    regardless of success or failure. Consumers can use this to update
+    the progress indicator to show completion status.
+
+    Attributes:
+        agent_id: Unique identifier for this subagent instance.
+        agent_name: Human-readable subagent name.
+        success: Whether the subagent completed successfully.
+        request_count: Number of LLM requests the subagent made during execution.
+        result_preview: First N characters of the subagent's output.
+        error: Error message if success is False.
+        duration_seconds: How long the subagent ran.
+    """
+
+    agent_id: str = ""
+    agent_name: str = ""
+    success: bool = True
+    request_count: int = 0
+    result_preview: str = ""
+    error: str = ""
+    duration_seconds: float = 0.0

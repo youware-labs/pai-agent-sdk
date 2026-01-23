@@ -6,6 +6,7 @@ Hierarchical agent architectures where a main agent delegates specialized tasks 
 
 - **Markdown-based Configuration**: Define subagents using markdown files with YAML frontmatter
 - **Tool Inheritance**: Subagents inherit tools from parent toolset with optional filtering
+- **Auto-Inherit Tools**: Management tools (task\_\*, handoff) are automatically inherited by all subagents
 - **Model Flexibility**: Subagents can use different models or inherit from parent
 - **Dynamic Availability**: Subagent tools are automatically disabled when required tools are unavailable
 - **Unified Delegation** (Recommended): Single `delegate` tool to call any subagent by name
@@ -28,27 +29,15 @@ flowchart TB
     Subagents -->|returns result| MainAgent
 ```
 
-## Quick Start (Recommended: Unified Subagent)
+## Quick Start (Recommended: create_agent with unified_subagents)
 
-The unified subagent approach creates a single `delegate` tool that can call any configured subagent by name. This is the recommended approach as it reduces tool count and provides a cleaner interface.
+The simplest way to use subagents is via `create_agent` with `unified_subagents=True`:
 
 ```python
 from pai_agent_sdk.agents import create_agent
-from pai_agent_sdk.subagents import (
-    SubagentConfig,
-    create_unified_subagent_tool,
-    load_builtin_unified_subagent_tool,
-)
-from pai_agent_sdk.toolsets.core.base import Toolset
+from pai_agent_sdk.subagents import SubagentConfig
 
-# Option 1: Load builtin subagents as unified tool
-parent_toolset = Toolset(tools=[GrepTool, ViewTool, SearchTool, ...])
-DelegateTool = load_builtin_unified_subagent_tool(
-    parent_toolset,
-    model="anthropic:claude-sonnet-4",
-)
-
-# Option 2: Custom subagents as unified tool
+# Define custom subagents
 configs = [
     SubagentConfig(
         name="researcher",
@@ -63,16 +52,21 @@ configs = [
         tools=["view", "grep"],
     ),
 ]
-DelegateTool = create_unified_subagent_tool(
-    configs,
-    parent_toolset,
-    model="anthropic:claude-sonnet-4",
-)
 
-# Use with create_agent
+# Create agent with unified subagents (single 'delegate' tool)
 runtime = create_agent(
     "anthropic:claude-sonnet-4",
-    tools=[..., DelegateTool],
+    tools=[...],
+    subagent_configs=configs,
+    unified_subagents=True,  # Creates single 'delegate' tool
+)
+
+# Or with builtin subagents
+runtime = create_agent(
+    "anthropic:claude-sonnet-4",
+    tools=[...],
+    include_builtin_subagents=True,
+    unified_subagents=True,
 )
 ```
 
@@ -95,6 +89,40 @@ async def delegate(
 | Instruction | Single combined instruction       | N separate instructions |
 | Selection   | `subagent_name` parameter         | Tool name selection     |
 | Flexibility | Dynamic availability per subagent | Per-tool availability   |
+
+## Alternative: Manual Unified Tool Creation
+
+For more control, you can create the unified tool manually:
+
+```python
+from pai_agent_sdk.agents import create_agent
+from pai_agent_sdk.subagents import (
+    SubagentConfig,
+    create_unified_subagent_tool,
+    load_builtin_unified_subagent_tool,
+)
+from pai_agent_sdk.toolsets.core.base import Toolset
+
+# Option 1: Load builtin subagents as unified tool
+parent_toolset = Toolset(tools=[GrepTool, ViewTool, SearchTool, ...])
+DelegateTool = load_builtin_unified_subagent_tool(
+    parent_toolset,
+    model="anthropic:claude-sonnet-4",
+)
+
+# Option 2: Custom subagents as unified tool
+DelegateTool = create_unified_subagent_tool(
+    configs,
+    parent_toolset,
+    model="anthropic:claude-sonnet-4",
+)
+
+# Use with create_agent
+runtime = create_agent(
+    "anthropic:claude-sonnet-4",
+    tools=[..., DelegateTool],
+)
+```
 
 ## Alternative: Individual Subagent Tools
 
@@ -161,7 +189,32 @@ You are an expert debugger specializing in systematic root cause analysis.
 
 - **Required tools** (`tools`): ALL must be available in parent toolset for subagent to be enabled
 - **Optional tools** (`optional_tools`): Included if available, not required for availability
+- **Auto-inherit tools**: Tools with `auto_inherit=True` are automatically included in all subagents (e.g., `task_*`, `handoff`)
 - **No tools specified**: Subagent inherits all tools from parent and is always available
+
+### Auto-Inherit Tools
+
+Some management tools are automatically inherited by all subagents without explicit configuration:
+
+| Tool          | Purpose                                |
+| ------------- | -------------------------------------- |
+| `task_create` | Create tasks for tracking work         |
+| `task_update` | Update task status and dependencies    |
+| `task_list`   | List all tasks                         |
+| `task_get`    | Get task details                       |
+| `handoff`     | Context handoff for session management |
+
+To create a custom auto-inherit tool:
+
+```python
+class MyManagementTool(BaseTool):
+    name = "my_tool"
+    description = "A management tool"
+    auto_inherit = True  # Automatically inherited by all subagents
+
+    async def call(self, ctx: RunContext[AgentContext]) -> str:
+        return "result"
+```
 
 ## Builtin Presets
 

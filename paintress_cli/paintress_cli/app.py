@@ -64,6 +64,8 @@ from pai_agent_sdk.events import (
     HandoffCompleteEvent,
     HandoffFailedEvent,
     HandoffStartEvent,
+    SubagentCompleteEvent,
+    SubagentStartEvent,
 )
 from pai_agent_sdk.utils import get_latest_request_usage
 from paintress_cli.browser import BrowserManager
@@ -140,7 +142,7 @@ class TUIApp:
     # UI components
     _app: Application[None] | None = field(default=None, init=False, repr=False)
     _output_lines: list[str] = field(default_factory=list, init=False)
-    _max_output_lines: int = field(default=1000, init=False)  # Overridden from config.display
+    _max_output_lines: int = field(default=500, init=False)  # Overridden from config.display
     _renderer: RichRenderer = field(default_factory=RichRenderer, init=False)
     _event_renderer: EventRenderer = field(default_factory=EventRenderer, init=False)
 
@@ -152,6 +154,9 @@ class TUIApp:
     # Tool tracking
     _tool_messages: dict[str, ToolMessage] = field(default_factory=dict, init=False)
     _printed_tool_calls: set[str] = field(default_factory=set, init=False)
+
+    # Subagent state tracking: agent_id -> {"line_index": int, "tool_names": list[str]}
+    _subagent_states: dict[str, dict[str, Any]] = field(default_factory=dict, init=False)
 
     # Steering pane
     _steering_items: list[tuple[str, str, str]] = field(default_factory=list, init=False)
@@ -740,6 +745,7 @@ class TUIApp:
         self._state = TUIState.RUNNING
         self._tool_messages.clear()
         self._printed_tool_calls.clear()
+        self._subagent_states.clear()
         self._event_renderer.clear()
 
         try:
@@ -817,6 +823,7 @@ class TUIApp:
         # Clear tracking for new stream
         self._tool_messages.clear()
         self._printed_tool_calls.clear()
+        self._subagent_states.clear()
 
         # Build user prompt if string input
         if isinstance(prompt, str):
@@ -1026,10 +1033,144 @@ class TUIApp:
         rendered = self._renderer.render(panel, width=self._get_terminal_width())
         self._append_output(rendered.rstrip())
 
+    # =========================================================================
+    # Subagent Event Handling
+    # =========================================================================
+
+    def _handle_subagent_start(self, event: SubagentStartEvent) -> None:
+        """Handle subagent start event - create progress line."""
+        agent_id = event.agent_id
+        agent_name = event.agent_name
+
+        # Create progress line
+        text = Text()
+        text.append(f"[{agent_id}] ", style="cyan")
+        text.append("Running...", style="dim")
+        rendered = self._renderer.render(text, width=self._get_terminal_width())
+
+        # Track state with line index for later update
+        line_index = len(self._output_lines)
+        self._subagent_states[agent_id] = {
+            "line_index": line_index,
+            "tool_names": [],
+            "agent_name": agent_name,
+        }
+        self._output_lines.append(rendered.rstrip())
+        self._throttled_invalidate()
+
+    def _handle_subagent_complete(self, event: SubagentCompleteEvent) -> None:
+        """Handle subagent complete event - update progress line to summary."""
+        agent_id = event.agent_id
+
+        if agent_id not in self._subagent_states:
+            # Start event was missed, just show completion
+            text = Text()
+            if event.success:
+                text.append(f"[{agent_id}] ", style="cyan")
+                text.append("Done ", style="bold green")
+                text.append(f"({event.duration_seconds:.1f}s)", style="dim")
+                if event.request_count > 0:
+                    text.append(f" | {event.request_count} reqs", style="dim")
+            else:
+                text.append(f"[{agent_id}] ", style="cyan")
+                text.append("Failed ", style="bold red")
+                text.append(f"({event.duration_seconds:.1f}s)", style="dim")
+                if event.error:
+                    text.append(f" | {event.error[:50]}", style="dim red")
+            rendered = self._renderer.render(text, width=self._get_terminal_width())
+            self._append_output(rendered.rstrip())
+            return
+
+        state = self._subagent_states[agent_id]
+        line_index = state["line_index"]
+
+        # Build summary line
+        text = Text()
+        if event.success:
+            text.append(f"[{agent_id}] ", style="cyan")
+            text.append("Done ", style="bold green")
+            text.append(f"({event.duration_seconds:.1f}s)", style="dim")
+            if event.request_count > 0:
+                text.append(f" | {event.request_count} reqs", style="dim")
+            if event.result_preview:
+                # Truncate result preview
+                preview = event.result_preview.replace("\n", " ")[:60]
+                if len(event.result_preview) > 60:
+                    preview += "..."
+                text.append(f' | "{preview}"', style="dim italic")
+        else:
+            text.append(f"[{agent_id}] ", style="cyan")
+            text.append("Failed ", style="bold red")
+            text.append(f"({event.duration_seconds:.1f}s)", style="dim")
+            if event.error:
+                error_preview = event.error[:50]
+                text.append(f" | {error_preview}", style="dim red")
+
+        rendered = self._renderer.render(text, width=self._get_terminal_width())
+
+        # Update the line in place
+        if line_index < len(self._output_lines):
+            self._output_lines[line_index] = rendered.rstrip()
+
+        # Clean up state
+        del self._subagent_states[agent_id]
+        self._throttled_invalidate()
+
+    def _update_subagent_progress_line(self, agent_id: str) -> None:
+        """Update subagent progress line with current tool list."""
+        if agent_id not in self._subagent_states:
+            return
+
+        state = self._subagent_states[agent_id]
+        line_index = state["line_index"]
+        tool_names = state["tool_names"]
+
+        # Build progress line
+        text = Text()
+        text.append(f"[{agent_id}] ", style="cyan")
+        text.append("Running... ", style="dim")
+
+        if tool_names:
+            # Show last few tools
+            recent_tools = tool_names[-3:]  # Last 3 tools
+            tools_str = ", ".join(recent_tools)
+            if len(tool_names) > 3:
+                tools_str = f"...{tools_str}"
+            text.append(tools_str, style="dim yellow")
+            text.append(f" ({len(tool_names)} tools)", style="dim")
+
+        rendered = self._renderer.render(text, width=self._get_terminal_width())
+
+        # Update the line in place
+        if line_index < len(self._output_lines):
+            self._output_lines[line_index] = rendered.rstrip()
+            self._throttled_invalidate()
+
     def _handle_stream_event(self, event: StreamEvent) -> None:
         """Handle a stream event from agent execution."""
         message_event = event.event
+        agent_id = event.agent_id
 
+        # Handle subagent lifecycle events (from any agent)
+        if isinstance(message_event, SubagentStartEvent):
+            self._handle_subagent_start(message_event)
+            return
+
+        if isinstance(message_event, SubagentCompleteEvent):
+            self._handle_subagent_complete(message_event)
+            return
+
+        # For subagent events (not main), only track tool calls silently
+        if agent_id != "main" and agent_id in self._subagent_states:
+            if isinstance(message_event, FunctionToolCallEvent):
+                # Track tool name for progress display
+                tool_name = message_event.part.tool_name
+                self._subagent_states[agent_id]["tool_names"].append(tool_name)
+                self._update_subagent_progress_line(agent_id)
+            # Ignore all other subagent events (text streaming, tool results, etc.)
+            return
+
+        # Main agent events - normal processing
         if isinstance(message_event, PartStartEvent) and isinstance(message_event.part, TextPart):
             # Start new streaming text block
             self._finalize_streaming_text()  # Finalize any previous
@@ -1584,6 +1725,7 @@ class TUIApp:
         self._streaming_thinking_line_index = None
         self._printed_tool_calls.clear()
         self._tool_messages.clear()
+        self._subagent_states.clear()
         self._steering_items.clear()
         # Clear conversation history
         self._message_history = None

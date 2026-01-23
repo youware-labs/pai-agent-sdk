@@ -109,7 +109,7 @@ async def test_emit_event_puts_event_in_queue(agent_context: AgentContext) -> No
 
     await agent_context.emit_event(event)
 
-    queue = agent_context.agent_stream_queues[agent_context.run_id]
+    queue = agent_context.agent_stream_queues[agent_context._agent_id]
     assert not queue.empty()
 
     received = await queue.get()
@@ -134,7 +134,7 @@ async def test_emit_event_multiple_events(agent_context: AgentContext) -> None:
     await agent_context.emit_event(start_event)
     await agent_context.emit_event(complete_event)
 
-    queue = agent_context.agent_stream_queues[agent_context.run_id]
+    queue = agent_context.agent_stream_queues[agent_context._agent_id]
 
     first = await queue.get()
     assert isinstance(first, CompactStartEvent)
@@ -156,7 +156,7 @@ async def test_emit_event_failed_event(agent_context: AgentContext) -> None:
     await agent_context.emit_event(start_event)
     await agent_context.emit_event(failed_event)
 
-    queue = agent_context.agent_stream_queues[agent_context.run_id]
+    queue = agent_context.agent_stream_queues[agent_context._agent_id]
 
     first = await queue.get()
     assert isinstance(first, CompactStartEvent)
@@ -176,7 +176,7 @@ async def test_emit_event_noop_when_disabled(agent_context: AgentContext) -> Non
     await agent_context.emit_event(event)
 
     # Queue should remain empty since emit_event is no-op
-    queue = agent_context.agent_stream_queues[agent_context.run_id]
+    queue = agent_context.agent_stream_queues[agent_context._agent_id]
     assert queue.empty()
 
 

@@ -998,10 +998,11 @@ class AgentContext(BaseModel):
     agent_stream_queues: dict[str, asyncio.Queue[AgentStreamEvent]] = Field(
         default_factory=_create_stream_queue_factory
     )
-    """Stream queues for agent events, keyed by run_id(tool_call_id).
+    """Stream queues for agent events, keyed by agent_id (e.g., "main", "explorer-a7b9").
 
     Each queue receives AgentStreamEvent instances during agent execution,
     enabling real-time streaming of agent responses via a sideband channel.
+    The key matches agent_registry keys for consistent lookup in poll_subagents.
     """
 
     need_user_approve_tools: list[str] = Field(default_factory=list)
@@ -1396,7 +1397,7 @@ class AgentContext(BaseModel):
         """
         if not self._stream_queue_enabled:
             return
-        await self.agent_stream_queues[self.run_id].put(event)
+        await self.agent_stream_queues[self._agent_id].put(event)
 
     async def __aenter__(self):
         """Enter the context and start timing.

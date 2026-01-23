@@ -589,20 +589,18 @@ async def test_usage_not_recorded_without_tool_call_id():
 
 def test_generate_unique_id_uses_run_id_suffix():
     """Test that generate_unique_id returns last 4 chars of run_id when no collision."""
-    run_id = "abcd1234efgh5678"
     existing: set[str] = set()
 
-    result = generate_unique_id(run_id, existing)
+    result = generate_unique_id(existing)
 
-    assert result == "5678"
+    assert result
 
 
 def test_generate_unique_id_with_collision():
     """Test that generate_unique_id generates new ID on collision."""
-    run_id = "abcd1234efgh5678"
     existing = {"5678"}  # Collision with run_id[-4:]
 
-    result = generate_unique_id(run_id, existing)
+    result = generate_unique_id(existing)
 
     assert result != "5678"
     assert len(result) == 4
@@ -610,10 +608,9 @@ def test_generate_unique_id_with_collision():
 
 def test_generate_unique_id_retries_until_unique():
     """Test that generate_unique_id retries until finding unique ID."""
-    run_id = "abcd1234efgh5678"
     existing = {"5678"}
 
-    result = generate_unique_id(run_id, existing)
+    result = generate_unique_id(existing)
 
     assert result not in existing
     assert len(result) == 4
@@ -621,7 +618,6 @@ def test_generate_unique_id_retries_until_unique():
 
 def test_generate_unique_id_raises_on_max_retries(monkeypatch):
     """Test that generate_unique_id raises RuntimeError after max retries."""
-    run_id = "abcd1234efgh5678"
 
     class MockUUID:
         hex = "aaaa0000bbbb1111"
@@ -631,17 +627,7 @@ def test_generate_unique_id_raises_on_max_retries(monkeypatch):
     existing = {"5678", "aaaa"}
 
     with pytest.raises(RuntimeError, match="Failed to generate unique agent_id after 10 retries"):
-        generate_unique_id(run_id, existing)
-
-
-def test_generate_unique_id_with_custom_max_retries():
-    """Test generate_unique_id with custom max_retries parameter."""
-    run_id = "abcd1234efgh5678"
-    existing: set[str] = set()
-
-    result = generate_unique_id(run_id, existing, max_retries=5)
-
-    assert result == "5678"
+        generate_unique_id(existing)
 
 
 # Helper functions

@@ -223,6 +223,7 @@ class Toolset(BaseToolset[AgentDepsT]):
         tool_names: list[str] | None = None,
         *,
         inherit_hooks: bool = False,
+        include_auto_inherit: bool = False,
     ) -> Toolset[AgentDepsT]:
         """Create a subset Toolset with only the specified tools.
 
@@ -232,17 +233,21 @@ class Toolset(BaseToolset[AgentDepsT]):
         Args:
             tool_names: List of tool names to include. None means all tools.
             inherit_hooks: Whether to inherit pre/post hooks for selected tools.
+            include_auto_inherit: Whether to automatically include tools with
+                auto_inherit=True, even if not in tool_names. Default False.
 
         Returns:
             A new Toolset instance with the selected tools.
 
-        Example::
-
+        Example::\n
             # Create main toolset
             main_toolset = Toolset(tools=[ViewTool, EditTool, ShellTool])
 
             # Create subset for subagent (only view and edit)
             sub_toolset = main_toolset.subset(["view", "edit"])
+
+            # Include auto_inherit tools automatically
+            sub_toolset = main_toolset.subset(["view"], include_auto_inherit=True)
         """
         if tool_names is None:
             selected_classes = list(self._tool_classes.values())
@@ -256,6 +261,14 @@ class Toolset(BaseToolset[AgentDepsT]):
                     selected_names.add(name)
                 else:
                     logger.debug(f"Tool {name!r} not found in parent toolset, skipping")
+
+            # Add auto_inherit tools if requested
+            if include_auto_inherit:
+                for name, tool_cls in self._tool_classes.items():
+                    if name not in selected_names and getattr(tool_cls, "auto_inherit", False):
+                        selected_classes.append(tool_cls)
+                        selected_names.add(name)
+                        logger.debug(f"Auto-including tool {name!r} (auto_inherit=True)")
 
         pre_hooks: dict[str, PreHookFunc[AgentDepsT]] | None = None
         post_hooks: dict[str, PostHookFunc[AgentDepsT]] | None = None

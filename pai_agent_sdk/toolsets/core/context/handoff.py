@@ -82,6 +82,7 @@ class HandoffTool(BaseTool):
 Use this tool when context is getting large and you need to preserve essential information
 before resetting. The handoff message will be injected into the new context automatically.
 """
+    auto_inherit = True
 
     def get_instruction(self, ctx: RunContext[AgentContext]) -> str:
         """Load instruction from prompts/handoff.md."""

@@ -108,6 +108,14 @@ class BaseTool(ABC):
     description: str
     """Description of what the tool does, shown to the model."""
 
+    auto_inherit: bool = False
+    """Whether this tool is automatically inherited by subagents.
+
+    When True, this tool will be automatically included in subagent toolsets
+    without being explicitly listed in the subagent's tools or optional_tools.
+    Useful for management/utility tools like task_*, handoff, etc.
+    """
+
     def is_available(self, ctx: RunContext[AgentContext]) -> bool:
         """Check if tool is available in current context.
 

@@ -124,7 +124,7 @@ def _build_subagent_entry(
     resolved_model_cfg = _resolve_model_cfg(config, model_cfg)
     all_tools = _collect_tools(config)
 
-    sub_toolset = parent_toolset.subset(all_tools)
+    sub_toolset = parent_toolset.subset(all_tools, include_auto_inherit=True)
 
     agent: Agent[AgentContext, str] = Agent(
         model=infer_model(effective_model),

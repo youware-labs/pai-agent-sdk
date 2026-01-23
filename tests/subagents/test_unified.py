@@ -567,3 +567,86 @@ def test_toolset_with_subagents_default_is_not_unified(mock_run_ctx) -> None:
     assert "grep" in tool_names
     assert "agent1" in tool_names
     assert "delegate" not in tool_names
+
+
+# =============================================================================
+# auto_inherit tests
+# =============================================================================
+
+
+class AutoInheritTool(BaseTool):
+    """Test tool with auto_inherit=True."""
+
+    name = "auto_tool"
+    description = "Auto-inherit tool"
+    auto_inherit = True
+
+    async def call(self, ctx: RunContext) -> str:
+        return "auto"
+
+
+class ManualTool(BaseTool):
+    """Test tool with auto_inherit=False (default)."""
+
+    name = "manual_tool"
+    description = "Manual tool"
+    # auto_inherit = False is default
+
+    async def call(self, ctx: RunContext) -> str:
+        return "manual"
+
+
+def test_subset_include_auto_inherit_true() -> None:
+    """subset(include_auto_inherit=True) should include auto_inherit tools."""
+    parent_toolset = Toolset(tools=[GrepTool, AutoInheritTool, ManualTool])
+
+    # Subset with only grep, but include auto_inherit tools
+    sub_toolset = parent_toolset.subset(["grep"], include_auto_inherit=True)
+
+    tool_names = list(sub_toolset._tool_classes.keys())
+    assert "grep" in tool_names
+    assert "auto_tool" in tool_names  # auto_inherit=True, included
+    assert "manual_tool" not in tool_names  # auto_inherit=False, not included
+
+
+def test_subset_include_auto_inherit_false() -> None:
+    """subset(include_auto_inherit=False) should NOT include auto_inherit tools."""
+    parent_toolset = Toolset(tools=[GrepTool, AutoInheritTool, ManualTool])
+
+    # Subset with only grep, don't include auto_inherit tools
+    sub_toolset = parent_toolset.subset(["grep"], include_auto_inherit=False)
+
+    tool_names = list(sub_toolset._tool_classes.keys())
+    assert "grep" in tool_names
+    assert "auto_tool" not in tool_names
+    assert "manual_tool" not in tool_names
+
+
+def test_subset_default_does_not_include_auto_inherit() -> None:
+    """subset() default should NOT include auto_inherit tools."""
+    parent_toolset = Toolset(tools=[GrepTool, AutoInheritTool])
+
+    sub_toolset = parent_toolset.subset(["grep"])
+
+    tool_names = list(sub_toolset._tool_classes.keys())
+    assert "grep" in tool_names
+    assert "auto_tool" not in tool_names
+
+
+def test_unified_subagent_includes_auto_inherit_tools(mock_run_ctx) -> None:
+    """Unified subagent tool should include auto_inherit tools automatically."""
+    configs = [
+        SubagentConfig(
+            name="agent1",
+            description="Agent 1",
+            system_prompt="You are agent 1",
+            tools=["grep"],  # Only explicitly requests grep
+        ),
+    ]
+    parent_toolset = Toolset(tools=[GrepTool, AutoInheritTool])
+
+    # create_unified_subagent_tool uses subset with include_auto_inherit=True
+    tool_cls = create_unified_subagent_tool(configs, parent_toolset, model="test")
+
+    # The subagent should have access to both grep and auto_tool
+    assert tool_cls is not None

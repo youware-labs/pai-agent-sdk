@@ -36,6 +36,7 @@ class TaskCreateTool(BaseTool):
 
     name = "task_create"
     description = "Create a new task. Task status defaults to pending."
+    auto_inherit = True
 
     def get_instruction(self, ctx: RunContext[AgentContext]) -> Instruction | None:
         """Get instruction for this tool (shared with other task tools)."""
@@ -69,6 +70,7 @@ class TaskGetTool(BaseTool):
 
     name = "task_get"
     description = "Get task details by ID."
+    auto_inherit = True
 
     def get_instruction(self, ctx: RunContext[AgentContext]) -> Instruction | None:
         """Get instruction for this tool (shared with other task tools)."""
@@ -109,6 +111,7 @@ class TaskUpdateTool(BaseTool):
 
     name = "task_update"
     description = "Update task status, content, or dependencies."
+    auto_inherit = True
 
     def get_instruction(self, ctx: RunContext[AgentContext]) -> Instruction | None:
         """Get instruction for this tool (shared with other task tools)."""
@@ -179,6 +182,7 @@ class TaskListTool(BaseTool):
 
     name = "task_list"
     description = "List all tasks and their status."
+    auto_inherit = True
 
     def get_instruction(self, ctx: RunContext[AgentContext]) -> Instruction | None:
         """Get instruction for this tool (shared with other task tools)."""

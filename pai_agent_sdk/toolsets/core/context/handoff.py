@@ -49,67 +49,28 @@ def _load_instruction() -> str:
 class HandoffMessage(BaseModel):
     """Structured summary for context handoff between conversation sessions."""
 
-    primary_request: str = Field(
+    content: str = Field(
         ...,
-        description="The user's main request and intent that drove this conversation session.",
+        description="""Context summary to preserve across handoff. Should include:
+1. User's primary request and intent
+2. Current state and completed work
+3. Key technical decisions
+4. Pending tasks
+5. Next step (if any)
+""",
     )
-    key_decisions: list[str] = Field(
+
+    auto_load_files: list[str] = Field(
         default_factory=list,
-        description="Important technical decisions, architectural choices, or patterns established.",
-    )
-    files_modified: list[str] = Field(
-        default_factory=list,
-        description="List of file paths that were created, modified, or are relevant to continue work.",
-    )
-    current_state: str = Field(
-        ...,
-        description="What was accomplished and the current state of the work. Include specific details.",
-    )
-    pending_tasks: list[str] = Field(
-        default_factory=list,
-        description="Tasks explicitly requested by the user that are not yet completed.",
-    )
-    next_step: str | None = Field(
-        default=None,
-        description="The immediate next action to take, if work is ongoing. Must align with user's explicit request.",
+        description="""File paths to auto-load after handoff.
+Files will be read and injected into context on next request.
+Use for: key config files, source code being edited, important references.
+""",
     )
 
     def render(self) -> str:
         """Render handoff message as Markdown for context injection."""
-        lines: list[str] = []
-
-        lines.append("# Context Handoff")
-        lines.append("")
-        lines.append("## Primary Request")
-        lines.append(self.primary_request)
-        lines.append("")
-        lines.append("## Current State")
-        lines.append(self.current_state)
-
-        if self.key_decisions:
-            lines.append("")
-            lines.append("## Key Decisions")
-            for decision in self.key_decisions:
-                lines.append(f"- {decision}")
-
-        if self.files_modified:
-            lines.append("")
-            lines.append("## Files Modified")
-            for file in self.files_modified:
-                lines.append(f"- `{file}`")
-
-        if self.pending_tasks:
-            lines.append("")
-            lines.append("## Pending Tasks")
-            for task in self.pending_tasks:
-                lines.append(f"- {task}")
-
-        if self.next_step:
-            lines.append("")
-            lines.append("## Next Step")
-            lines.append(self.next_step)
-
-        return "\n".join(lines)
+        return f"# Context Handoff\n\n{self.content}"
 
 
 class HandoffTool(BaseTool):
@@ -137,4 +98,6 @@ before resetting. The handoff message will be injected into the new context auto
         # Store rendered message for history processor to pick up
         rendered = message.render()
         ctx.deps.handoff_message = rendered
+        # Set auto_load_files for the auto_load_files filter to process
+        ctx.deps.auto_load_files = message.auto_load_files
         return f"Handoff complete. Summary:\n\n{rendered}"

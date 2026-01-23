@@ -171,6 +171,9 @@ class ResumableState(BaseModel):
     need_user_approve_mcps: list[str] = Field(default_factory=list)
     """List of MCP server names that require user approval for all tools."""
 
+    auto_load_files: list[str] = Field(default_factory=list)
+    """Files to auto-load on next request. Set by handoff/compact, consumed by auto_load_files filter."""
+
     def to_subagent_history(self) -> dict[str, list[ModelMessage]]:
         """Deserialize subagent_history to ModelMessage objects.
 
@@ -209,6 +212,7 @@ class ResumableState(BaseModel):
         ctx.agent_registry = {agent_id: AgentInfo(**info) for agent_id, info in self.agent_registry.items()}
         ctx.need_user_approve_tools = list(self.need_user_approve_tools)
         ctx.need_user_approve_mcps = list(self.need_user_approve_mcps)
+        ctx.auto_load_files = list(self.auto_load_files)
 
 
 class ToolIdWrapper:
@@ -756,6 +760,9 @@ class AgentContext(BaseModel):
     Populated by enter_subagent when subagents are created.
     """
 
+    auto_load_files: list[str] = Field(default_factory=list)
+    """Files to auto-load on next request. Set by handoff/compact tool, consumed by auto_load_files filter."""
+
     _agent_id: str = "main"
     _entered: bool = False
     _enter_lock: asyncio.Lock = None  # type: ignore[assignment]  # Initialized in __init__
@@ -1000,6 +1007,7 @@ class AgentContext(BaseModel):
                 )
         """
         # Import filters here to avoid circular imports
+        from pai_agent_sdk.filters.auto_load_files import process_auto_load_files
         from pai_agent_sdk.filters.capability import filter_by_capability
         from pai_agent_sdk.filters.handoff import process_handoff_message
         from pai_agent_sdk.filters.image import drop_extra_images, drop_extra_videos, drop_gif_images
@@ -1017,6 +1025,7 @@ class AgentContext(BaseModel):
             drop_extra_videos,
             fix_truncated_tool_args,
             process_handoff_message,
+            process_auto_load_files,
             filter_by_capability,
             inject_runtime_instructions,
             dynamic_tool_id_wrapper,
@@ -1143,6 +1152,7 @@ class AgentContext(BaseModel):
             deferred_tool_metadata=dict(self.deferred_tool_metadata),
             agent_registry=serialized_registry,
             need_user_approve_tools=list(self.need_user_approve_tools),
+            auto_load_files=list(self.auto_load_files),
         )
 
     def with_state(self, state: ResumableState | None) -> Self:

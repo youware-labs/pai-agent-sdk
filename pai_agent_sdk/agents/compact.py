@@ -97,6 +97,12 @@ class CondenseResult(BaseModel):
         description="The original prompt and key information from the user. "
         "Used as fallback when agent_ctx.user_prompts is not set.",
     )
+    auto_load_files: list[str] = Field(
+        default_factory=list,
+        description="File paths to auto-load when resuming. "
+        "Files will be read and injected into context on next request. "
+        "Use for: files being actively edited, key references needed to continue work.",
+    )
 
 
 # =============================================================================
@@ -342,6 +348,9 @@ def create_compact_filter(
             )
 
             condense_result: CondenseResult = result.output
+
+            # Set auto_load_files for the auto_load_files filter to process
+            agent_ctx.auto_load_files = condense_result.auto_load_files
 
             # Build summary with condense result and user prompts
             condense_markdown = condense_result_to_markdown(condense_result)

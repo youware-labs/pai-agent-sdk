@@ -21,6 +21,7 @@ Your summary should include the following sections:
 7. Optional Next Step: List the next step that you will take that is related to the most recent work you were doing. IMPORTANT: ensure that this step is DIRECTLY in line with the user's explicit requests, and the task you were working on immediately before this summary request. If your last task was concluded, then only list next steps if they are explicitly in line with the users request. Do not start on tangential requests without confirming with the user first.
 8. If there is a next step, include direct quotes from the most recent conversation showing exactly what task you were working on and where you left off. This should be verbatim to ensure there's no drift in task interpretation.
 9. Skills Documentation: If any Skills were accessed during the conversation (files in /skills/ directory such as SKILL.md or skill resources), include a reminder to re-read the relevant skill documentation when resuming work. List the specific skills that were referenced.
+10. Auto-load Files: If there are specific files that should be automatically loaded when resuming (e.g., files being actively edited, key configuration files, important references), list their paths. These files will be read and injected into the context automatically on the next request. Only include truly necessary files to avoid context bloat.
 
 Here's an example of how your output should be structured:
 
@@ -64,6 +65,9 @@ Here's an example of how your output should be structured:
 
 8. Skills Documentation:
    [If applicable: List specific skills accessed (e.g., /skills/ai-integration/SKILL.md) and reminder to re-read them]
+
+9. Auto-load Files:
+   [If applicable: List file paths that should be auto-loaded when resuming, e.g., src/main.py, config.yaml]
 
 </context>
 </condense>

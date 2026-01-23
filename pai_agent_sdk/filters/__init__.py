@@ -3,6 +3,7 @@
 This module provides history processors for pydantic-ai agents.
 """
 
+from pai_agent_sdk.filters.auto_load_files import process_auto_load_files
 from pai_agent_sdk.filters.environment_instructions import create_environment_instructions_filter
 from pai_agent_sdk.filters.handoff import process_handoff_message
 from pai_agent_sdk.filters.image import drop_extra_images, drop_extra_videos, drop_gif_images
@@ -16,5 +17,6 @@ __all__ = [
     "drop_extra_videos",
     "drop_gif_images",
     "fix_truncated_tool_args",
+    "process_auto_load_files",
     "process_handoff_message",
 ]

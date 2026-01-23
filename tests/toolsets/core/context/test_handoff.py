@@ -8,66 +8,29 @@ from pai_agent_sdk.context import AgentContext
 from pai_agent_sdk.toolsets.core.context.handoff import HandoffMessage, HandoffTool
 
 
-def test_handoff_message_render_minimal() -> None:
-    """Should render minimal handoff message with only required fields."""
+def test_handoff_message_render() -> None:
+    """Should render handoff message with content."""
     msg = HandoffMessage(
-        primary_request="Build a REST API",
-        current_state="Initial setup complete",
+        content="## User Intent\nBuild a REST API\n\n## Current State\nInitial setup complete",
     )
     result = msg.render()
     assert "# Context Handoff" in result
-    assert "## Primary Request" in result
     assert "Build a REST API" in result
-    assert "## Current State" in result
     assert "Initial setup complete" in result
-    assert "## Key Decisions" not in result
-    assert "## Files Modified" not in result
-    assert "## Pending Tasks" not in result
-    assert "## Next Step" not in result
 
 
-def test_handoff_message_render_full() -> None:
-    """Should render full handoff message with all fields."""
+def test_handoff_message_render_with_auto_load_files() -> None:
+    """Should render handoff message, auto_load_files is not included in render."""
     msg = HandoffMessage(
-        primary_request="Build a REST API",
-        current_state="Database models created",
-        key_decisions=["Use PostgreSQL", "Use FastAPI"],
-        files_modified=["models.py", "api.py"],
-        pending_tasks=["Add authentication", "Write tests"],
-        next_step="Implement user endpoint",
+        content="Working on API implementation",
+        auto_load_files=["main.py", "config.py"],
     )
     result = msg.render()
     assert "# Context Handoff" in result
-    assert "## Primary Request" in result
-    assert "Build a REST API" in result
-    assert "## Current State" in result
-    assert "Database models created" in result
-    assert "## Key Decisions" in result
-    assert "- Use PostgreSQL" in result
-    assert "- Use FastAPI" in result
-    assert "## Files Modified" in result
-    assert "`models.py`" in result
-    assert "`api.py`" in result
-    assert "## Pending Tasks" in result
-    assert "- Add authentication" in result
-    assert "- Write tests" in result
-    assert "## Next Step" in result
-    assert "Implement user endpoint" in result
-
-
-def test_handoff_message_render_partial() -> None:
-    """Should render partial handoff message with some optional fields."""
-    msg = HandoffMessage(
-        primary_request="Fix bug",
-        current_state="Issue identified",
-        key_decisions=["Root cause found"],
-    )
-    result = msg.render()
-    assert "## Key Decisions" in result
-    assert "- Root cause found" in result
-    assert "## Files Modified" not in result
-    assert "## Pending Tasks" not in result
-    assert "## Next Step" not in result
+    assert "Working on API implementation" in result
+    # auto_load_files should not be in the rendered output
+    # They are stored separately for the filter to process
+    assert msg.auto_load_files == ["main.py", "config.py"]
 
 
 def test_handoff_tool_attributes(agent_context: AgentContext) -> None:
@@ -109,10 +72,7 @@ async def test_handoff_tool_call(agent_context: AgentContext) -> None:
     mock_run_ctx.deps = agent_context
 
     msg = HandoffMessage(
-        primary_request="Build API",
-        current_state="Done",
-        key_decisions=["Use REST"],
-        files_modified=["main.py"],
+        content="## User Intent\nBuild API\n\n## Key Decisions\n- Use REST",
     )
 
     result = await tool.call(mock_run_ctx, message=msg)
@@ -127,6 +87,24 @@ async def test_handoff_tool_call(agent_context: AgentContext) -> None:
     assert "# Context Handoff" in result
 
 
+async def test_handoff_tool_call_sets_auto_load_files(agent_context: AgentContext) -> None:
+    """Should set auto_load_files on context."""
+    tool = HandoffTool()
+
+    mock_run_ctx = MagicMock(spec=RunContext)
+    mock_run_ctx.deps = agent_context
+
+    msg = HandoffMessage(
+        content="Working on implementation",
+        auto_load_files=["main.py", "utils.py"],
+    )
+
+    await tool.call(mock_run_ctx, message=msg)
+
+    # Verify auto_load_files is set on context
+    assert agent_context.auto_load_files == ["main.py", "utils.py"]
+
+
 async def test_handoff_tool_call_overwrites_previous(agent_context: AgentContext) -> None:
     """Should overwrite previous handoff message."""
     tool = HandoffTool()
@@ -136,17 +114,15 @@ async def test_handoff_tool_call_overwrites_previous(agent_context: AgentContext
 
     # First handoff
     msg1 = HandoffMessage(
-        primary_request="First request",
-        current_state="First state",
+        content="First request content",
     )
     await tool.call(mock_run_ctx, message=msg1)
-    assert "First request" in agent_context.handoff_message
+    assert "First request content" in agent_context.handoff_message
 
     # Second handoff overwrites
     msg2 = HandoffMessage(
-        primary_request="Second request",
-        current_state="Second state",
+        content="Second request content",
     )
     await tool.call(mock_run_ctx, message=msg2)
-    assert "Second request" in agent_context.handoff_message
-    assert "First request" not in agent_context.handoff_message
+    assert "Second request content" in agent_context.handoff_message
+    assert "First request content" not in agent_context.handoff_message

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from pai_agent_sdk.context import AgentContext
+from pai_agent_sdk.context import AgentContext, TaskStatus
 from pai_agent_sdk.environment.local import LocalEnvironment
 
 
@@ -1312,6 +1312,88 @@ async def test_get_context_instructions_no_subagents(env: LocalEnvironment) -> N
 
         # Should not have known-subagents section
         assert "<known-subagents" not in instructions
+
+
+async def test_get_context_instructions_with_active_tasks_user_prompt(env: LocalEnvironment) -> None:
+    """Should include detailed active-tasks for user prompts."""
+    async with AgentContext(env=env) as ctx:
+        # Create tasks
+        task1 = ctx.task_manager.create("Implement API", "Create REST endpoints", active_form="Implementing API")
+        task2 = ctx.task_manager.create("Write tests", "Unit tests for API")
+
+        # Set task1 in progress and task2 blocked by task1
+        ctx.task_manager.update(task1.id, status=TaskStatus.IN_PROGRESS)
+        ctx.task_manager.update(task2.id, add_blocked_by=[task1.id])
+
+        instructions = await ctx.get_context_instructions(is_user_prompt=True)
+
+        # Should have active-tasks section with hint
+        assert '<active-tasks hint="Update status with task_update tool">' in instructions
+        # Should have task elements with subject as sub-element
+        assert f'<task id="{task1.id}" status="in_progress">' in instructions
+        assert "<subject>Implement API</subject>" in instructions
+        assert "<active-form>Implementing API</active-form>" in instructions
+        # Task2 should show blocked-by
+        assert f'blocked-by="{task1.id}"' in instructions
+        assert "<subject>Write tests</subject>" in instructions
+
+
+async def test_get_context_instructions_with_active_tasks_non_user_prompt(env: LocalEnvironment) -> None:
+    """Should include compact active-tasks for non-user prompts."""
+    async with AgentContext(env=env) as ctx:
+        # Create tasks
+        task1 = ctx.task_manager.create("Implement API", "Create REST endpoints", active_form="Implementing API")
+        ctx.task_manager.update(task1.id, status=TaskStatus.IN_PROGRESS)
+
+        instructions = await ctx.get_context_instructions(is_user_prompt=False)
+
+        # Should have active-tasks section without hint
+        assert "<active-tasks>" in instructions
+        assert "hint=" not in instructions.split("<active-tasks>")[1].split("</active-tasks>")[0]
+        # Should have compact format: subject as text content, no active-form
+        assert f'<task id="{task1.id}" status="in_progress">Implement API</task>' in instructions
+        assert "<active-form>" not in instructions
+
+
+async def test_get_context_instructions_no_active_tasks(env: LocalEnvironment) -> None:
+    """Should not include active-tasks when no tasks exist."""
+    async with AgentContext(env=env) as ctx:
+        instructions = await ctx.get_context_instructions()
+
+        # Should not have active-tasks section
+        assert "<active-tasks" not in instructions
+
+
+async def test_get_context_instructions_excludes_completed_tasks(env: LocalEnvironment) -> None:
+    """Should exclude completed tasks from active-tasks."""
+    async with AgentContext(env=env) as ctx:
+        # Create and complete a task
+        task = ctx.task_manager.create("Completed task", "This is done")
+        ctx.task_manager.update(task.id, status=TaskStatus.COMPLETED)
+
+        instructions = await ctx.get_context_instructions()
+
+        # Should not have active-tasks section (no active tasks)
+        assert "<active-tasks" not in instructions
+
+
+async def test_get_context_instructions_excludes_completed_blockers(env: LocalEnvironment) -> None:
+    """Should exclude completed blockers from blocked-by attribute."""
+    async with AgentContext(env=env) as ctx:
+        # Create tasks
+        task1 = ctx.task_manager.create("Task 1", "First task")
+        task2 = ctx.task_manager.create("Task 2", "Second task")
+        ctx.task_manager.update(task2.id, add_blocked_by=[task1.id])
+
+        # Complete task1
+        ctx.task_manager.update(task1.id, status=TaskStatus.COMPLETED)
+
+        instructions = await ctx.get_context_instructions()
+
+        # Task2 should not show blocked-by since task1 is completed
+        assert "<active-tasks" in instructions
+        assert f'<task id="{task2.id}" status="pending">' in instructions
+        assert "blocked-by=" not in instructions
 
 
 # =============================================================================

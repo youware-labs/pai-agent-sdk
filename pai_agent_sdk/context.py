@@ -1106,6 +1106,45 @@ class AgentContext(BaseModel):
         """
         return datetime.now().astimezone()
 
+    def _build_active_tasks_element(self, parent: Element, detailed: bool) -> None:
+        """Build active-tasks XML element and append to parent if tasks exist.
+
+        Args:
+            parent: Parent XML element to append to.
+            detailed: If True, use detailed format with hints and active_form;
+                otherwise use compact format.
+        """
+        active_tasks = [t for t in self.task_manager.list_all() if t.status != TaskStatus.COMPLETED]
+        if not active_tasks:
+            return
+
+        tasks_elem = SubElement(parent, "active-tasks")
+        if detailed:
+            tasks_elem.set("hint", "Update status with task_update tool")
+
+        for task in active_tasks:
+            task_elem = SubElement(tasks_elem, "task")
+            task_elem.set("id", task.id)
+            task_elem.set("status", task.status.value)
+
+            # Only show active (incomplete) blockers
+            active_blockers = [
+                bid
+                for bid in task.blocked_by
+                if (blocker := self.task_manager.get(bid)) and blocker.status != TaskStatus.COMPLETED
+            ]
+            if active_blockers:
+                task_elem.set("blocked-by", ",".join(active_blockers))
+
+            if detailed:
+                # Detailed format: subject as sub-element, include active_form
+                SubElement(task_elem, "subject").text = task.subject
+                if task.active_form and task.status == TaskStatus.IN_PROGRESS:
+                    SubElement(task_elem, "active-form").text = task.active_form
+            else:
+                # Compact format: subject as text content
+                task_elem.text = task.subject
+
     async def get_context_instructions(
         self,
         run_context: RunContext[AgentContext] | None = None,
@@ -1168,6 +1207,9 @@ class AgentContext(BaseModel):
                     agent_elem = SubElement(subagents_elem, "agent")
                     agent_elem.set("id", info.agent_id)
                     agent_elem.set("name", info.agent_name)
+
+        # Active tasks (pending + in_progress)
+        self._build_active_tasks_element(root, detailed=is_user_prompt)
 
         parts.append(_xml_to_string(root))
 

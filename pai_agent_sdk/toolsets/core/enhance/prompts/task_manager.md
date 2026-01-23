@@ -25,4 +25,21 @@ Status: pending -> in_progress -> completed
 - Set up dependencies early when planning
 </dependencies>
 
+<parallel-with-subagents>
+For independent tasks, delegate to subagents for parallel execution:
+
+1. Create tasks and identify which can run in parallel
+2. Assign owner to track which subagent handles each task:
+   `task_update(task_id="T1", owner="debugger", status="in_progress")`
+3. Delegate to subagent:
+   `delegate(subagent_name="debugger", prompt="Work on T1: ...")`
+4. When subagent returns, mark task completed:
+   `task_update(task_id="T1", status="completed")`
+
+Best for:
+- Multiple independent investigations (e.g., debug + search docs)
+- Parallel code analysis across different files
+- Concurrent research on different topics
+</parallel-with-subagents>
+
 </task-manager-guidelines>

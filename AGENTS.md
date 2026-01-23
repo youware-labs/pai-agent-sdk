@@ -116,7 +116,7 @@ After modifying any code:
 - Framework: pytest with pytest-asyncio
 - Coverage: pytest-cov
 - Test location: `tests/`
-- **Test Style**: Use standalone functions (not classes)
+- **Test Style**: Use standalone functions (not classes). Prefer `def test_xxx()` over `class TestXxx`.
 
 ## Dependencies
 

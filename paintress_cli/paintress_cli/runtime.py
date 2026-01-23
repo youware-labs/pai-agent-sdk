@@ -37,7 +37,8 @@ from pydantic_ai.output import OutputSpec
 from pai_agent_sdk.agents.main import AgentRuntime, create_agent
 from pai_agent_sdk.context import ModelCapability, ModelConfig, ToolConfig
 from pai_agent_sdk.presets import resolve_model_cfg, resolve_model_settings
-from pai_agent_sdk.subagents import SubagentConfig, load_subagents_from_dir
+from pai_agent_sdk.subagents import SubagentConfig, create_unified_subagent_tool, load_subagents_from_dir
+from pai_agent_sdk.toolsets.core.base import BaseTool, Toolset
 from pai_agent_sdk.toolsets.core.content import tools as content_tools
 from pai_agent_sdk.toolsets.core.context import tools as context_tools
 from pai_agent_sdk.toolsets.core.document import tools as document_tools
@@ -163,6 +164,52 @@ def _load_subagent_configs(
     return enabled_configs
 
 
+def _create_unified_subagent_tool(
+    subagent_configs: list[SubagentConfig],
+    core_tools: list[type[BaseTool]],
+    *,
+    model: str | None = None,
+    model_settings: dict[str, Any] | None = None,
+) -> type[BaseTool] | None:
+    """Create unified subagent tool from configs.
+
+    Creates a single 'delegate' tool that can call any of the configured
+    subagents by name.
+
+    Args:
+        subagent_configs: List of subagent configurations.
+        core_tools: Core tools that subagents can inherit from.
+        model: Default model for subagents.
+        model_settings: Default model settings for subagents.
+
+    Returns:
+        Unified subagent tool class, or None if no configs provided.
+    """
+    if not subagent_configs:
+        return None
+
+    # Create parent toolset from core tools for subagent inheritance
+    parent_toolset = Toolset(tools=core_tools)
+
+    # Create unified subagent tool
+    delegate_tool = create_unified_subagent_tool(
+        subagent_configs,
+        parent_toolset,
+        name="delegate",
+        description="Delegate task to a specialized subagent",
+        model=model,
+        model_settings=model_settings,
+    )
+
+    logger.info(
+        "Created unified subagent tool with %d subagents: %s",
+        len(subagent_configs),
+        ", ".join(cfg.name for cfg in subagent_configs),
+    )
+
+    return delegate_tool
+
+
 def create_tui_runtime(
     config: PaintressConfig,
     mcp_config: MCPConfig | None = None,
@@ -247,6 +294,34 @@ def create_tui_runtime(
     # Load subagent configs from user config directory
     subagent_configs = _load_subagent_configs(config.subagents)
 
+    # Core tools that subagents can inherit from
+    core_tools: list[type[BaseTool]] = [
+        *content_tools,
+        *context_tools,
+        *document_tools,
+        *enhance_tools,
+        *filesystem_tools,
+        *multimodal_tools,
+        *shell_tools,
+        *web_tools,
+    ]
+
+    # Create unified subagent tool (single 'delegate' tool for all subagents)
+    delegate_tool = _create_unified_subagent_tool(
+        subagent_configs,
+        core_tools,
+        model=config.general.model,
+        model_settings=model_settings,
+    )
+
+    # Build final tools list
+    all_tools: list[type[BaseTool]] = [
+        *core_tools,
+        *subagent_tools,  # SubagentInfoTool for introspection
+    ]
+    if delegate_tool:
+        all_tools.append(delegate_tool)
+
     # Load system prompt
     effective_system_prompt = system_prompt or _load_system_prompt(config)
 
@@ -265,24 +340,12 @@ def create_tui_runtime(
         env_kwargs=env_kwargs,
         context_type=TUIContext,
         model_cfg=model_cfg,
-        tools=[
-            *content_tools,
-            *context_tools,
-            *document_tools,
-            *enhance_tools,
-            *filesystem_tools,
-            *multimodal_tools,
-            *shell_tools,
-            *web_tools,
-            *subagent_tools,
-        ],
+        tools=all_tools,
         tool_config=tool_config,
         toolsets=toolsets if toolsets else None,
         system_prompt=effective_system_prompt,
         need_user_approve_tools=config.tools.need_approval or None,
         need_user_approve_mcps=config.tools.need_approval_mcps or None,
-        subagent_configs=subagent_configs if subagent_configs else None,
-        include_builtin_subagents=False,
     )
 
     logger.info(

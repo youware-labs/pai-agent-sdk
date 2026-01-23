@@ -70,7 +70,12 @@ from pai_agent_sdk.subagents.factory import (
     load_subagent_tools_from_dir,
 )
 from pai_agent_sdk.toolsets.core.base import BaseTool, Toolset
-from pai_agent_sdk.toolsets.core.subagent import create_subagent_call_func, create_subagent_tool
+from pai_agent_sdk.toolsets.core.subagent import (
+    create_subagent_call_func,
+    create_subagent_tool,
+    create_unified_subagent_tool,
+    get_available_subagent_names,
+)
 
 if TYPE_CHECKING:
     from pydantic_ai.models import Model
@@ -139,6 +144,105 @@ def load_builtin_subagent_tools(
     )
 
 
+def load_unified_subagent_tool_from_dir(
+    dir_path: Path | str,
+    parent_toolset: Toolset[Any],
+    *,
+    name: str = "delegate",
+    description: str = "Delegate task to a specialized subagent",
+    model: str | Model | None = None,
+    model_settings: dict[str, Any] | str | None = None,
+    history_processors: Sequence[HistoryProcessor[AgentContext]] | None = None,
+    model_cfg: ModelConfig | None = None,
+) -> type[BaseTool]:
+    """Load all subagent configs from a directory and create a unified tool.
+
+    This combines all subagents from the directory into a single "delegate" tool
+    that selects subagents by name parameter.
+
+    Args:
+        dir_path: Path to directory containing .md subagent files.
+        parent_toolset: The parent toolset to derive tools from.
+        name: Tool name (default: "delegate").
+        description: Tool description shown to the model.
+        model: Fallback model for subagents with model="inherit".
+        model_settings: Fallback model settings for subagents.
+        history_processors: History processors for all subagents.
+        model_cfg: Fallback ModelConfig for subagents.
+
+    Returns:
+        A BaseTool subclass that delegates to subagents by name.
+
+    Example::
+
+        DelegateTool = load_unified_subagent_tool_from_dir(
+            "~/.config/myapp/subagents",
+            parent_toolset,
+            model="anthropic:claude-sonnet-4",
+        )
+    """
+    configs = load_subagents_from_dir(dir_path)
+    return create_unified_subagent_tool(
+        list(configs.values()),
+        parent_toolset,
+        name=name,
+        description=description,
+        model=model,
+        model_settings=model_settings,
+        history_processors=history_processors,
+        model_cfg=model_cfg,
+    )
+
+
+def load_builtin_unified_subagent_tool(
+    parent_toolset: Toolset[Any],
+    *,
+    name: str = "delegate",
+    description: str = "Delegate task to a specialized subagent",
+    model: str | Model | None = None,
+    model_settings: dict[str, Any] | str | None = None,
+    history_processors: Sequence[HistoryProcessor[AgentContext]] | None = None,
+    model_cfg: ModelConfig | None = None,
+) -> type[BaseTool]:
+    """Load all builtin subagents as a single unified tool.
+
+    This is a convenience function that creates a unified "delegate" tool
+    from all predefined subagent configurations.
+
+    Args:
+        parent_toolset: The parent toolset to derive tools from.
+        name: Tool name (default: "delegate").
+        description: Tool description shown to the model.
+        model: Fallback model for subagents with model="inherit".
+        model_settings: Fallback model settings for subagents.
+        history_processors: History processors for all subagents.
+        model_cfg: Fallback ModelConfig for subagents.
+
+    Returns:
+        A BaseTool subclass that delegates to builtin subagents by name.
+
+    Example::
+
+        from pai_agent_sdk.subagents import load_builtin_unified_subagent_tool
+
+        DelegateTool = load_builtin_unified_subagent_tool(
+            parent_toolset,
+            model="anthropic:claude-sonnet-4",
+        )
+        # Can call: delegate(subagent_name="debugger", prompt="Fix this error...")
+    """
+    return load_unified_subagent_tool_from_dir(
+        PRESET_SUBAGNENTS_DIR,
+        parent_toolset,
+        name=name,
+        description=description,
+        model=model,
+        model_settings=model_settings,
+        history_processors=history_processors,
+        model_cfg=model_cfg,
+    )
+
+
 __all__ = [
     "INHERIT",
     "SubagentConfig",
@@ -146,10 +250,14 @@ __all__ = [
     "create_subagent_tool",
     "create_subagent_tool_from_config",
     "create_subagent_tool_from_markdown",
+    "create_unified_subagent_tool",
+    "get_available_subagent_names",
     "get_builtin_subagent_configs",
     "load_builtin_subagent_tools",
+    "load_builtin_unified_subagent_tool",
     "load_subagent_from_file",
     "load_subagent_tools_from_dir",
     "load_subagents_from_dir",
+    "load_unified_subagent_tool_from_dir",
     "parse_subagent_markdown",
 ]

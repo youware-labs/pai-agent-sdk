@@ -50,6 +50,10 @@ from pai_agent_sdk.toolsets.core.subagent.factory import (
 from pai_agent_sdk.toolsets.core.subagent.tools import (
     SubagentInfoTool,
 )
+from pai_agent_sdk.toolsets.core.subagent.unified import (
+    create_unified_subagent_tool,
+    get_available_subagent_names,
+)
 
 # Management tools for inspecting subagent state
 tools: list[type[BaseTool]] = [
@@ -62,5 +66,7 @@ __all__ = [
     "SubagentInfoTool",
     "create_subagent_call_func",
     "create_subagent_tool",
+    "create_unified_subagent_tool",
+    "get_available_subagent_names",
     "tools",
 ]

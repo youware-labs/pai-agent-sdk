@@ -122,7 +122,7 @@ def _to_pascal_case(name: str) -> str:
     return "".join(part.capitalize() for part in parts)
 
 
-def generate_unique_id(run_id: str, existing: Container[str], *, max_retries: int = 10) -> str:
+def generate_unique_id(existing: Container[str], *, max_retries: int = 10) -> str:
     """Generate a unique 4-character ID with collision detection.
 
     First tries using the last 4 characters of run_id. If that collides
@@ -139,10 +139,6 @@ def generate_unique_id(run_id: str, existing: Container[str], *, max_retries: in
     Raises:
         RuntimeError: If unable to generate unique ID within max_retries.
     """
-    agent_id = run_id[-4:]
-    if agent_id not in existing:
-        return agent_id
-
     for _ in range(max_retries):
         agent_id = uuid4().hex[:4]
         if agent_id not in existing:
@@ -199,7 +195,7 @@ def create_subagent_call_func(
 
         # Generate stable agent_id if not provided
         if not agent_id:
-            short_id = generate_unique_id(deps.run_id, deps.subagent_history)
+            short_id = generate_unique_id(deps.subagent_history)
             agent_id = f"{agent_name}-{short_id}"
 
         # Create subagent context (handles registration in agent_registry)

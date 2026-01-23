@@ -8,28 +8,100 @@ Hierarchical agent architectures where a main agent delegates specialized tasks 
 - **Tool Inheritance**: Subagents inherit tools from parent toolset with optional filtering
 - **Model Flexibility**: Subagents can use different models or inherit from parent
 - **Dynamic Availability**: Subagent tools are automatically disabled when required tools are unavailable
+- **Unified Delegation** (Recommended): Single `delegate` tool to call any subagent by name
 
 ```mermaid
 flowchart TB
     subgraph MainAgent["Main Agent"]
         MainToolset["Toolset"]
-        SubagentTool["Subagent Tool"]
+        DelegateTool["delegate Tool"]
     end
 
-    subgraph Subagent["Subagent (e.g., debugger)"]
-        SubToolset["Subset Toolset"]
-        SubPrompt["System Prompt"]
+    subgraph Subagents["Subagents"]
+        Debugger["debugger"]
+        Explorer["explorer"]
+        Searcher["searcher"]
     end
 
-    MainToolset -->|subset| SubToolset
-    SubagentTool -->|delegates| Subagent
-    Subagent -->|returns result| MainAgent
+    MainToolset -->|subset| Subagents
+    DelegateTool -->|delegates by name| Subagents
+    Subagents -->|returns result| MainAgent
 ```
 
-## Quick Start
+## Quick Start (Recommended: Unified Subagent)
+
+The unified subagent approach creates a single `delegate` tool that can call any configured subagent by name. This is the recommended approach as it reduces tool count and provides a cleaner interface.
 
 ```python
-from pai_agent_sdk.agents import create_agent, stream_agent
+from pai_agent_sdk.agents import create_agent
+from pai_agent_sdk.subagents import (
+    SubagentConfig,
+    create_unified_subagent_tool,
+    load_builtin_unified_subagent_tool,
+)
+from pai_agent_sdk.toolsets.core.base import Toolset
+
+# Option 1: Load builtin subagents as unified tool
+parent_toolset = Toolset(tools=[GrepTool, ViewTool, SearchTool, ...])
+DelegateTool = load_builtin_unified_subagent_tool(
+    parent_toolset,
+    model="anthropic:claude-sonnet-4",
+)
+
+# Option 2: Custom subagents as unified tool
+configs = [
+    SubagentConfig(
+        name="researcher",
+        description="Research specialist",
+        system_prompt="You are a research specialist...",
+        tools=["search", "scrape"],
+    ),
+    SubagentConfig(
+        name="analyst",
+        description="Data analyst",
+        system_prompt="You are a data analyst...",
+        tools=["view", "grep"],
+    ),
+]
+DelegateTool = create_unified_subagent_tool(
+    configs,
+    parent_toolset,
+    model="anthropic:claude-sonnet-4",
+)
+
+# Use with create_agent
+runtime = create_agent(
+    "anthropic:claude-sonnet-4",
+    tools=[..., DelegateTool],
+)
+```
+
+### Unified Tool Signature
+
+```python
+async def delegate(
+    subagent_name: str,  # Name of subagent to call (e.g., "debugger", "explorer")
+    prompt: str,         # Task to delegate
+    agent_id: str | None = None,  # Optional ID to resume conversation
+) -> str:
+    ...
+```
+
+### Key Benefits
+
+| Aspect      | Unified (Recommended)             | Individual Tools        |
+| ----------- | --------------------------------- | ----------------------- |
+| Tool Count  | 1 tool                            | N tools                 |
+| Instruction | Single combined instruction       | N separate instructions |
+| Selection   | `subagent_name` parameter         | Tool name selection     |
+| Flexibility | Dynamic availability per subagent | Per-tool availability   |
+
+## Alternative: Individual Subagent Tools
+
+For cases where you need each subagent as a separate tool:
+
+```python
+from pai_agent_sdk.agents import create_agent
 from pai_agent_sdk.subagents import SubagentConfig
 
 config = SubagentConfig(
@@ -46,8 +118,6 @@ runtime = create_agent(
     include_builtin_subagents=True,
 )
 ```
-
-> For more examples, see `pai_agent_sdk/subagents/__init__.py` and `examples/`.
 
 ## Configuration Format
 
@@ -77,8 +147,8 @@ You are an expert debugger specializing in systematic root cause analysis.
 
 | Field            | Type          | Required | Description                                                      |
 | ---------------- | ------------- | -------- | ---------------------------------------------------------------- |
-| `name`           | `str`         | Yes      | Unique identifier, used as tool name                             |
-| `description`    | `str`         | Yes      | Shown to model when selecting tools                              |
+| `name`           | `str`         | Yes      | Unique identifier, used as tool name or subagent_name parameter  |
+| `description`    | `str`         | Yes      | Shown to model when selecting tools/subagents                    |
 | `instruction`    | `str`         | No       | Injected into parent's system prompt                             |
 | `system_prompt`  | `str`         | Yes      | Markdown body content (after frontmatter)                        |
 | `tools`          | `list[str]`   | No       | Required tools from parent (ALL must be available)               |
@@ -105,12 +175,19 @@ Located in `pai_agent_sdk/subagents/presets/`:
 | `searcher`      | Web research for documentation and solutions    | `search`                     |
 
 ```python
-from pai_agent_sdk.subagents import get_builtin_subagent_configs, load_builtin_subagent_tools
+from pai_agent_sdk.subagents import (
+    get_builtin_subagent_configs,
+    load_builtin_unified_subagent_tool,  # Recommended
+    load_builtin_subagent_tools,         # Individual tools
+)
 
 # Inspect configurations
 configs = get_builtin_subagent_configs()
 
-# Load as tools
+# Load as unified tool (recommended)
+DelegateTool = load_builtin_unified_subagent_tool(parent_toolset, model="anthropic:claude-sonnet-4")
+
+# Or load as individual tools
 subagent_tools = load_builtin_subagent_tools(parent_toolset, model="anthropic:claude-sonnet-4")
 ```
 
@@ -128,7 +205,16 @@ subagent_tools = load_builtin_subagent_tools(parent_toolset, model="anthropic:cl
 | `load_subagent_from_file` | Load SubagentConfig from a markdown file         |
 | `load_subagents_from_dir` | Load all SubagentConfigs from a directory        |
 
-### Factory Functions
+### Unified Subagent Factory (Recommended)
+
+| Function                              | Description                                       |
+| ------------------------------------- | ------------------------------------------------- |
+| `create_unified_subagent_tool`        | Create single delegate tool from multiple configs |
+| `load_unified_subagent_tool_from_dir` | Load from directory as unified tool               |
+| `load_builtin_unified_subagent_tool`  | Load builtin presets as unified tool              |
+| `get_available_subagent_names`        | Get subagent names from unified tool class        |
+
+### Individual Subagent Factory
 
 | Function                             | Description                              |
 | ------------------------------------ | ---------------------------------------- |
@@ -136,7 +222,7 @@ subagent_tools = load_builtin_subagent_tools(parent_toolset, model="anthropic:cl
 | `create_subagent_tool_from_markdown` | Create tool from markdown file or string |
 | `load_subagent_tools_from_dir`       | Load all subagent tools from a directory |
 | `get_builtin_subagent_configs`       | Get builtin preset configurations        |
-| `load_builtin_subagent_tools`        | Load builtin presets as tools            |
+| `load_builtin_subagent_tools`        | Load builtin presets as individual tools |
 
 ### Low-Level (Advanced)
 
@@ -147,10 +233,32 @@ subagent_tools = load_builtin_subagent_tools(parent_toolset, model="anthropic:cl
 
 ## Best Practices
 
-1. **Focused Responsibility**: Each subagent should have a clear, specific purpose
-2. **Minimal Required Tools**: Only require essential tools; use `optional_tools` for nice-to-haves
-3. **Clear Instructions**: Write `instruction` to help parent agent decide when to delegate
-4. **Handle Missing Tools**: Subagents auto-disable when required tools are unavailable
+1. **Use Unified Subagent**: Prefer `create_unified_subagent_tool` over individual tools for cleaner interface
+2. **Focused Responsibility**: Each subagent should have a clear, specific purpose
+3. **Minimal Required Tools**: Only require essential tools; use `optional_tools` for nice-to-haves
+4. **Clear Instructions**: Write `instruction` to help parent agent decide when to delegate
+5. **Handle Missing Tools**: Subagents auto-disable when required tools are unavailable
+6. **Parallel Execution**: Use with task manager to delegate independent tasks to subagents in parallel
+
+## Integration with Task Manager
+
+Subagents work well with the task manager for parallel execution of independent tasks:
+
+```python
+# In your workflow:
+# 1. Create tasks with task_create
+# 2. Delegate independent tasks to subagents via delegate tool
+# 3. Each subagent works on its task concurrently
+# 4. Update task status when subagent returns
+```
+
+The task manager can assign tasks to subagents using the `owner` field:
+
+```python
+task_update(task_id="TASK-1", owner="debugger", status="in_progress")
+# Then delegate to debugger subagent
+delegate(subagent_name="debugger", prompt="Fix the error in TASK-1...")
+```
 
 ## See Also
 

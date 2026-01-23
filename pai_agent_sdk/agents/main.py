@@ -220,6 +220,7 @@ def create_agent(
     # --- Subagent ---
     subagent_configs: Sequence[SubagentConfig] | None = None,
     include_builtin_subagents: bool = False,
+    unified_subagents: bool = False,
     # --- Agent ---
     agent_tools: Sequence[Any] | None = None,
     agent_name: str = "main",
@@ -260,6 +261,8 @@ def create_agent(
 
         subagent_configs: Sequence of SubagentConfig for custom subagents.
         include_builtin_subagents: If True, include builtin subagents from presets/.
+        unified_subagents: If True, create a single 'delegate' tool that can call any
+            subagent by name. If False (default), create separate tools for each subagent.
         pre_hooks: Dict mapping tool names to pre-hook functions.
         post_hooks: Dict mapping tool names to post-hook functions.
         global_hooks: GlobalHooks instance for all tools.
@@ -390,6 +393,8 @@ def create_agent(
                 model=model,
                 model_settings=model_settings,
                 history_processors=[*ctx.get_history_processors()],
+                model_cfg=effective_model_cfg,
+                unified=unified_subagents,
             )
 
     all_toolsets.append(core_toolset)

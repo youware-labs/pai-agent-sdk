@@ -29,12 +29,13 @@ Status: pending -> in_progress -> completed
 For independent tasks, delegate to subagents for parallel execution:
 
 1. Create tasks and identify which can run in parallel
-2. Assign owner to track which subagent handles each task:
-   `task_update(task_id="T1", owner="debugger", status="in_progress")`
-3. Delegate to subagent:
-   `delegate(subagent_name="debugger", prompt="Work on T1: ...")`
-4. When subagent returns, mark task completed:
-   `task_update(task_id="T1", status="completed")`
+2. Delegate multiple tasks simultaneously by calling delegate multiple times in the same turn:
+   - `delegate(subagent_name="debugger", prompt="Work on T1: ...")`
+   - `delegate(subagent_name="searcher", prompt="Research T2: ...")`
+3. When subagents return, update task status accordingly
+
+Note: True parallel execution requires calling multiple delegate tools in the same turn.
+Sequential delegate calls will execute serially.
 
 Best for:
 - Multiple independent investigations (e.g., debug + search docs)

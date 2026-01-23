@@ -509,3 +509,61 @@ def test_unified_tool_only_optional_tools(mock_run_ctx) -> None:
     tool = tool_cls()
 
     assert tool.is_available(mock_run_ctx) is True
+
+
+# =============================================================================
+# Toolset.with_subagents(unified=True) tests
+# =============================================================================
+
+
+def test_toolset_with_subagents_unified_true(mock_run_ctx) -> None:
+    """Toolset.with_subagents(unified=True) should create a single delegate tool."""
+    configs = [
+        SubagentConfig(name="agent1", description="Agent 1", system_prompt="You are agent 1"),
+        SubagentConfig(name="agent2", description="Agent 2", system_prompt="You are agent 2"),
+    ]
+    parent_toolset = Toolset(tools=[GrepTool, ViewTool])
+
+    toolset_with_subs = parent_toolset.with_subagents(configs, model="test", unified=True)
+
+    # Should have original tools + 1 unified delegate tool
+    tool_names = list(toolset_with_subs._tool_classes.keys())
+    assert "grep" in tool_names
+    assert "view" in tool_names
+    assert "delegate" in tool_names
+    assert len(tool_names) == 3  # grep, view, delegate
+
+
+def test_toolset_with_subagents_unified_false(mock_run_ctx) -> None:
+    """Toolset.with_subagents(unified=False) should create individual tools per subagent."""
+    configs = [
+        SubagentConfig(name="agent1", description="Agent 1", system_prompt="You are agent 1"),
+        SubagentConfig(name="agent2", description="Agent 2", system_prompt="You are agent 2"),
+    ]
+    parent_toolset = Toolset(tools=[GrepTool, ViewTool])
+
+    toolset_with_subs = parent_toolset.with_subagents(configs, model="test", unified=False)
+
+    # Should have original tools + 2 individual subagent tools
+    tool_names = list(toolset_with_subs._tool_classes.keys())
+    assert "grep" in tool_names
+    assert "view" in tool_names
+    assert "agent1" in tool_names
+    assert "agent2" in tool_names
+    assert len(tool_names) == 4  # grep, view, agent1, agent2
+
+
+def test_toolset_with_subagents_default_is_not_unified(mock_run_ctx) -> None:
+    """Toolset.with_subagents() default behavior should create individual tools."""
+    configs = [
+        SubagentConfig(name="agent1", description="Agent 1", system_prompt="You are agent 1"),
+    ]
+    parent_toolset = Toolset(tools=[GrepTool])
+
+    toolset_with_subs = parent_toolset.with_subagents(configs, model="test")
+
+    # Should have original tool + individual subagent tool
+    tool_names = list(toolset_with_subs._tool_classes.keys())
+    assert "grep" in tool_names
+    assert "agent1" in tool_names
+    assert "delegate" not in tool_names

@@ -283,6 +283,7 @@ class Toolset(BaseToolset[AgentDepsT]):
         model_settings: ModelSettings | dict[str, Any] | str | None = None,
         history_processors: Sequence[HistoryProcessor[AgentContext]] | None = None,
         model_cfg: ModelConfig | None = None,
+        unified: bool = False,
     ) -> Toolset[AgentDepsT]:
         """Create a new Toolset that includes subagent tools.
 
@@ -296,6 +297,9 @@ class Toolset(BaseToolset[AgentDepsT]):
             model_settings: Fallback model settings for subagents with 'inherit' or None.
             history_processors: History processors for subagents.
             model_cfg: Fallback ModelConfig for subagents.
+            unified: If True, create a single 'delegate' tool that can call any subagent
+                by name parameter. If False (default), create separate tools for each
+                subagent.
 
         Returns:
             A new Toolset instance with subagent tools added.
@@ -304,7 +308,7 @@ class Toolset(BaseToolset[AgentDepsT]):
 
             from pai_agent_sdk.subagents import SubagentConfig
 
-            # Create toolset with subagents
+            # Create toolset with subagents (individual tools)
             config = SubagentConfig(
                 name="debugger",
                 description="Debug code issues",
@@ -315,24 +319,45 @@ class Toolset(BaseToolset[AgentDepsT]):
                 [config],
                 model="anthropic:claude-sonnet-4",
             )
+
+            # Or create unified delegate tool (recommended)
+            toolset_unified = toolset.with_subagents(
+                [config1, config2],
+                model="anthropic:claude-sonnet-4",
+                unified=True,
+            )
         """
         # Import here to avoid circular dependency
-        from pai_agent_sdk.subagents import create_subagent_tool_from_config
+        from pai_agent_sdk.subagents import create_subagent_tool_from_config, create_unified_subagent_tool
 
         if not configs:
             return self
 
-        subagent_tools = [
-            create_subagent_tool_from_config(
-                cfg,
+        if unified:
+            # Create single unified 'delegate' tool
+            unified_tool = create_unified_subagent_tool(
+                configs,
                 parent_toolset=self,
                 model=model,
                 model_settings=model_settings,
                 history_processors=history_processors,
                 model_cfg=model_cfg,
             )
-            for cfg in configs
-        ]
+            subagent_tools = [unified_tool]
+        else:
+            # Create individual tool for each subagent
+            subagent_tools = [
+                create_subagent_tool_from_config(
+                    cfg,
+                    parent_toolset=self,
+                    model=model,
+                    model_settings=model_settings,
+                    history_processors=history_processors,
+                    model_cfg=model_cfg,
+                )
+                for cfg in configs
+            ]
+
         all_tools = list(self._tool_classes.values()) + subagent_tools
 
         return Toolset(

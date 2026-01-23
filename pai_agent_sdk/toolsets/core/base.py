@@ -32,7 +32,8 @@ from pai_agent_sdk.context import AgentContext
 from pai_agent_sdk.toolsets.base import (
     BaseTool,
     BaseToolset,
-    resolve_instructions,
+    Instruction,
+    resolve_instruction,
 )
 from pai_agent_sdk.utils import get_tool_name_from_id
 
@@ -491,19 +492,34 @@ class Toolset(BaseToolset[AgentDepsT]):
         return result
 
     async def get_instructions(self, ctx: RunContext[AgentDepsT]) -> str | None:
-        """Collect instructions from all tools.
+        """Collect instructions from all tools with group-based deduplication.
+
+        When multiple tools return Instructions with the same group,
+        only the first one is included. Tools returning plain strings
+        use their tool name as the implicit group.
 
         Returns a combined instruction string or None if no tools have instructions.
         Supports both sync and async get_instruction methods on tools.
         """
-        instructions: list[str] = []
+        instructions: dict[str, str] = {}  # group -> content
+
         for name in self._tool_classes:
             tool_instance = self._get_tool_instance(name)
-            instruction = await resolve_instructions(tool_instance.get_instruction(ctx))
-            if instruction:
-                instructions.append(f'<tool-instruction name="{tool_instance.name}">{instruction}</tool-instruction>')
+            result = await resolve_instruction(tool_instance.get_instruction(ctx))
 
-        return "\n".join(instructions) if instructions else None
+            if result is None:
+                continue
+
+            if isinstance(result, Instruction):
+                group, content = result.group, result.content
+            else:  # str - use tool name as implicit group
+                group, content = tool_instance.name, result
+
+            # First instruction for this group wins
+            if group not in instructions:
+                instructions[group] = f'<tool-instruction name="{group}">{content}</tool-instruction>'
+
+        return "\n".join(instructions.values()) if instructions else None
 
     def _get_tool_impl_by_name(self, name: str) -> BaseTool | None:
         """Get a tool instance by name."""

@@ -41,11 +41,61 @@ class MyCustomTool(BaseTool):
 
     # Optional overrides:
     # def is_available(self, ctx) -> bool: ...
-    # def get_instruction(self, ctx) -> str | None: ...
+    # def get_instruction(self, ctx) -> str | Instruction | None: ...
     # def get_approval_metadata(self) -> dict | None: ...
 ```
 
-> Full interface: `pai_agent_sdk/toolsets/core/base.py`
+> Full interface: `pai_agent_sdk/toolsets/base.py`
+
+## Tool Instructions
+
+Tools can provide instructions to inject into the system prompt via `get_instruction()`.
+
+### Basic Usage
+
+Return a plain string (uses tool name as group):
+
+```python
+class MyTool(BaseTool):
+    name = "my_tool"
+    description = "..."
+
+    def get_instruction(self, ctx):
+        return "Guidelines for using my_tool..."
+```
+
+### Grouped Instructions (Deduplication)
+
+When multiple related tools share the same instruction, use `Instruction` with a `group`:
+
+```python
+from pai_agent_sdk.toolsets import Instruction
+
+class TaskCreateTool(BaseTool):
+    name = "task_create"
+
+    def get_instruction(self, ctx):
+        return Instruction(
+            group="task-manager",  # Same group = deduplicated
+            content="Task manager guidelines..."
+        )
+
+class TaskListTool(BaseTool):
+    name = "task_list"
+
+    def get_instruction(self, ctx):
+        return Instruction(
+            group="task-manager",  # Same group, only first one kept
+            content="Task manager guidelines..."
+        )
+```
+
+**Deduplication behavior**: When `Toolset.get_instructions()` collects instructions, tools with the same `group` only contribute once (first wins). This reduces prompt bloat for related tool families.
+
+| Return Type   | Group ID  | Deduplicated |
+| ------------- | --------- | ------------ |
+| `str`         | tool name | No           |
+| `Instruction` | `.group`  | Yes          |
 
 ## Using Toolset
 

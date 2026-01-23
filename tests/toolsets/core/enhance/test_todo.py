@@ -54,29 +54,9 @@ def test_todo_read_tool_attributes(agent_context: AgentContext) -> None:
     tool = TodoReadTool()
     mock_run_ctx = MagicMock(spec=RunContext)
     mock_run_ctx.deps = agent_context
-    assert tool.get_instruction(mock_run_ctx) == snapshot(
-        """\
-<todo-guidelines>
-
-<when-to-use>
-Use `to_do_write`/`to_do_read` to track multi-step or multi-request tasks, or when user asks for a plan.
-</when-to-use>
-
-<workflow>
-- Create entries with `{id, content, status, priority}` using uppercase slug prefix (e.g., TASK-1, TASK-2)
-- Keep numbering stable within the session
-- Update statuses immediately after finishing an item
-- Rely on the last `to_do_write` state; call `to_do_read` only when truly needed
-- Once every item is completed or cancelled, stop issuing further to-do tool calls
-</workflow>
-
-<language>
-Use user's language when writing task content.
-</language>
-
-</todo-guidelines>
-"""
-    )
+    instruction = tool.get_instruction(mock_run_ctx)
+    assert instruction is not None
+    assert "<todo-read-guidelines>" in instruction
 
 
 def test_todo_read_tool_initialization(agent_context: AgentContext) -> None:
@@ -180,12 +160,13 @@ def test_todo_write_tool_attributes(agent_context: AgentContext) -> None:
     """Should have correct name, description and instruction."""
     assert TodoWriteTool.name == "to_do_write"
     assert TodoWriteTool.description == snapshot("Replace the session's to-do list with an updated list.")
-    # Same instruction as TodoReadTool - both load from same file
-    read_tool = TodoReadTool()
+    # Test get_instruction with a mock context
     write_tool = TodoWriteTool()
     mock_run_ctx = MagicMock(spec=RunContext)
     mock_run_ctx.deps = agent_context
-    assert write_tool.get_instruction(mock_run_ctx) == read_tool.get_instruction(mock_run_ctx)
+    instruction = write_tool.get_instruction(mock_run_ctx)
+    assert instruction is not None
+    assert "<todo-write-guidelines>" in instruction
 
 
 def test_todo_write_tool_initialization(agent_context: AgentContext) -> None:
@@ -319,4 +300,10 @@ def test_enhance_module_exports() -> None:
     assert hasattr(enhance, "TodoReadTool")
     assert hasattr(enhance, "TodoWriteTool")
     assert hasattr(enhance, "tools")
-    assert len(enhance.tools) == 3
+    # 4 task tools are now enabled by default
+    assert len(enhance.tools) == 4
+    # Also check new task tools are exported
+    assert hasattr(enhance, "TaskCreateTool")
+    assert hasattr(enhance, "TaskGetTool")
+    assert hasattr(enhance, "TaskUpdateTool")
+    assert hasattr(enhance, "TaskListTool")

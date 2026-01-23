@@ -4,7 +4,6 @@ These tools allow the agent to manage a session-level to-do list
 stored in the file operator's temporary directory.
 """
 
-from functools import cache
 from pathlib import Path
 from typing import Annotated, Literal, cast
 
@@ -20,13 +19,6 @@ from pai_agent_sdk.toolsets.core.base import BaseTool
 logger = get_logger(__name__)
 
 _PROMPTS_DIR = Path(__file__).parent / "prompts"
-
-
-@cache
-def _load_instruction() -> str:
-    """Load TO-DO instruction from prompts/todo.md."""
-    prompt_file = _PROMPTS_DIR / "todo.md"
-    return prompt_file.read_text()
 
 
 def _get_todo_file_name(run_id: str) -> str:
@@ -65,9 +57,12 @@ class TodoReadTool(BaseTool):
             return False
         return True
 
-    def get_instruction(self, ctx: RunContext[AgentContext]) -> str:
-        """Load instruction from prompts/todo.md."""
-        return _load_instruction()
+    def get_instruction(self, ctx: RunContext[AgentContext]) -> str | None:
+        """Get instruction for this tool."""
+        instruction_file = _PROMPTS_DIR / "to_do_read.md"
+        if instruction_file.exists():
+            return instruction_file.read_text()
+        return None
 
     async def call(
         self,
@@ -111,9 +106,12 @@ class TodoWriteTool(BaseTool):
             return False
         return True
 
-    def get_instruction(self, ctx: RunContext[AgentContext]) -> str:
-        """Load instruction from prompts/todo.md."""
-        return _load_instruction()
+    def get_instruction(self, ctx: RunContext[AgentContext]) -> str | None:
+        """Get instruction for this tool."""
+        instruction_file = _PROMPTS_DIR / "to_do_write.md"
+        if instruction_file.exists():
+            return instruction_file.read_text()
+        return None
 
     async def call(
         self,

@@ -12,7 +12,9 @@ from pai_agent_sdk.toolsets.base import (
     BaseTool,
     BaseToolset,
     InstructableToolset,
+    Instruction,
     UserInputPreprocessResult,
+    resolve_instruction,
     resolve_instructions,
 )
 from pai_agent_sdk.toolsets.browser_use import BrowserUseSettings, BrowserUseToolset
@@ -39,10 +41,12 @@ __all__ = [
     "GlobalPreHookFunc",
     "HookableToolsetTool",
     "InstructableToolset",
+    "Instruction",
     "PostHookFunc",
     "PreHookFunc",
     "Toolset",
     "UserInputPreprocessResult",
     "UserInteraction",
+    "resolve_instruction",
     "resolve_instructions",
 ]

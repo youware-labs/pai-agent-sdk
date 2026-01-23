@@ -36,6 +36,33 @@ class UserInputPreprocessResult(BaseModel):
     """Additional metadata from user input processing."""
 
 
+class Instruction(BaseModel):
+    """Tool instruction with optional group for deduplication.
+
+    When multiple tools return Instructions with the same group,
+    only the first one is included in the system prompt.
+
+    Example:
+        # Multiple task tools sharing one instruction
+        class TaskCreateTool(BaseTool):
+            def get_instruction(self, ctx):
+                return Instruction(
+                    group="task-manager",
+                    content="Task manager guidelines..."
+                )
+    """
+
+    group: str
+    """Group identifier for deduplication. Same group = only first instruction kept."""
+
+    content: str
+    """The instruction content to inject into system prompt."""
+
+
+# Type alias for instruction results
+InstructionResult = str | Instruction | Awaitable["str | Instruction | None"] | None
+
+
 @runtime_checkable
 class InstructableToolset(Protocol[AgentDepsT]):
     """Protocol for toolsets that provide instructions.
@@ -96,18 +123,29 @@ class BaseTool(ABC):
         """
         return True
 
-    def get_instruction(self, ctx: RunContext[AgentContext]) -> str | Awaitable[str] | None:
+    def get_instruction(self, ctx: RunContext[AgentContext]) -> InstructionResult:
         """Get instruction for this tool.
 
         Override this method to provide dynamic instructions based on context.
         Can be implemented as either sync or async method.
         Default implementation returns None (no instruction).
 
-        Args:
-            ctx: The run context containing runtime information.
-
         Returns:
-            Instruction text to inject into system prompt, or None.
+            - str: Plain instruction text (uses tool name as group)
+            - Instruction: Instruction with explicit group for deduplication
+            - None: No instruction for this tool
+
+        Example:
+            # Plain string (no deduplication)
+            def get_instruction(self, ctx):
+                return "Use this tool to read files."
+
+            # Instruction with group (deduplicated with same group)
+            def get_instruction(self, ctx):
+                return Instruction(
+                    group="file-tools",
+                    content="File operation guidelines..."
+                )
         """
         return None
 
@@ -192,21 +230,22 @@ class BaseToolset(AbstractToolset[AgentDepsT], ABC):
         return None
 
 
-async def resolve_instructions(result: str | Awaitable[str | None] | None) -> str | None:
+async def resolve_instruction(result: InstructionResult) -> str | Instruction | None:
     """Resolve instruction result that may be sync or async.
 
     Args:
-        result: The result from get_instructions(), which may be:
+        result: The result from get_instruction(), which may be:
             - str: Return as-is
-            - Awaitable[str]: Await and return
+            - Instruction: Return as-is
+            - Awaitable[str | Instruction]: Await and return
             - None: Return None
 
     Returns:
-        The resolved instruction string, or None.
+        The resolved instruction (str or Instruction), or None.
     """
     if result is None:
         return None
-    if isinstance(result, str):
+    if isinstance(result, (str, Instruction)):
         return result
     if inspect.isawaitable(result):
         return await result
@@ -214,3 +253,15 @@ async def resolve_instructions(result: str | Awaitable[str | None] | None) -> st
     if asyncio.iscoroutine(result):
         return await result
     return result
+
+
+# Backward compatibility alias
+async def resolve_instructions(result: str | Awaitable[str | None] | None) -> str | None:
+    """Resolve instruction result (backward compatibility).
+
+    Deprecated: Use resolve_instruction instead.
+    """
+    resolved = await resolve_instruction(result)
+    if isinstance(resolved, Instruction):
+        return resolved.content
+    return resolved

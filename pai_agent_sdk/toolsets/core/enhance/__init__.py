@@ -4,16 +4,30 @@ Tools for thinking, task management, and other enhancements.
 """
 
 from pai_agent_sdk.toolsets.core.base import BaseTool
+from pai_agent_sdk.toolsets.core.enhance.task import (
+    TaskCreateTool,
+    TaskGetTool,
+    TaskListTool,
+    TaskUpdateTool,
+)
 from pai_agent_sdk.toolsets.core.enhance.thinking import ThinkingTool
 from pai_agent_sdk.toolsets.core.enhance.todo import TodoItem, TodoReadTool, TodoWriteTool
 
 tools: list[type[BaseTool]] = [
-    ThinkingTool,
-    TodoReadTool,
-    TodoWriteTool,
+    # ThinkingTool,  # Disable by default via interleaved thinking
+    # TodoReadTool,
+    # TodoWriteTool, # Prefer task tools over individual todo tools
+    TaskCreateTool,
+    TaskGetTool,
+    TaskUpdateTool,
+    TaskListTool,
 ]
 
 __all__ = [
+    "TaskCreateTool",
+    "TaskGetTool",
+    "TaskListTool",
+    "TaskUpdateTool",
     "ThinkingTool",
     "TodoItem",
     "TodoReadTool",

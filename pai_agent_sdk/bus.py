@@ -33,6 +33,21 @@ from datetime import datetime
 from jinja2 import Template
 
 
+def render_template(content: str, template: str | None) -> str:
+    """Render content using a Jinja2 template, or return raw content if no template.
+
+    Args:
+        content: The message content.
+        template: Jinja2 template string with {{ content }} placeholder. None for raw content.
+
+    Returns:
+        Rendered string.
+    """
+    if template is None:
+        return content
+    return Template(template).render(content=content)
+
+
 @dataclass
 class BusMessage:
     """A message in the message bus.
@@ -53,9 +68,7 @@ class BusMessage:
 
     def render(self) -> str:
         """Render the message using its Jinja2 template, or return raw content if no template."""
-        if self.template is None:
-            return self.content
-        return Template(self.template).render(content=self.content)
+        return render_template(self.content, self.template)
 
 
 class MessageBus:

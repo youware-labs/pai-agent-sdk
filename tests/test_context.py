@@ -72,8 +72,8 @@ async def test_agent_context_create_subagent_context(env: LocalEnvironment) -> N
         assert child.parent_run_id == parent.run_id
         assert child.run_id != parent.run_id
         # Verify agent is registered with correct info
-        assert child._agent_id in parent.agent_registry
-        assert parent.agent_registry[child._agent_id].agent_name == "search"
+        assert child.agent_id in parent.agent_registry
+        assert parent.agent_registry[child.agent_id].agent_name == "search"
         assert child.start_at is not None
         assert child.end_at is None
 

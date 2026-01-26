@@ -35,7 +35,7 @@ async def message_bus_guard(ctx: RunContext[AgentContext], output: OutputT) -> O
     Raises:
         ModelRetry: If there are pending bus messages.
     """
-    agent_id = ctx.deps._agent_id
+    agent_id = ctx.deps.agent_id
     if ctx.deps.message_bus.has_pending(agent_id):
         raise ModelRetry(
             "<system-reminder>There are pending messages in your message bus. Please address them before completing.</system-reminder>"

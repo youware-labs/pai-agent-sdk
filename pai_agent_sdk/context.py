@@ -1066,6 +1066,14 @@ class AgentContext(BaseModel):
         object.__setattr__(self, "_enter_lock", asyncio.Lock())
 
     @property
+    def agent_id(self) -> str:
+        """Unique identifier for this agent context.
+
+        Returns "main" for the main agent, or a generated short ID for subagents.
+        """
+        return self._agent_id
+
+    @property
     def file_operator(self) -> FileOperator | None:
         """File operator for file system operations. Derived from env."""
         if self.env is not None:

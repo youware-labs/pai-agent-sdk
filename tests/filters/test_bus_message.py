@@ -15,7 +15,7 @@ def create_mock_ctx(agent_id: str = "main", message_bus: MessageBus | None = Non
     bus = message_bus or MessageBus()
 
     mock_deps = MagicMock()
-    mock_deps._agent_id = agent_id
+    mock_deps.agent_id = agent_id
     mock_deps.message_bus = bus
     mock_deps.emit_event = AsyncMock()
 

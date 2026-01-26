@@ -192,8 +192,8 @@ async def test_process_handoff_emits_events(tmp_path: Path) -> None:
 
             # Collect events from queue
             events = []
-            while not ctx.agent_stream_queues[ctx._agent_id].empty():
-                events.append(await ctx.agent_stream_queues[ctx._agent_id].get())
+            while not ctx.agent_stream_queues[ctx.agent_id].empty():
+                events.append(await ctx.agent_stream_queues[ctx.agent_id].get())
 
             # Should have start and complete events
             assert len(events) == 2

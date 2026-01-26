@@ -45,7 +45,7 @@ async def inject_bus_messages(
         return messages
 
     # Consume messages for current agent
-    agent_id = ctx.deps._agent_id
+    agent_id = ctx.deps.agent_id
     pending = ctx.deps.message_bus.consume(agent_id)
 
     if not pending:

@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from jinja2 import Template
+from pai_agent_sdk.bus import render_template
 
 
 @dataclass
@@ -185,9 +185,7 @@ class BusMessageInfo:
 
     def render(self) -> str:
         """Render the message using its Jinja2 template, or return raw content if no template."""
-        if self.template is None:
-            return self.content
-        return Template(self.template).render(content=self.content)
+        return render_template(self.content, self.template)
 
 
 @dataclass

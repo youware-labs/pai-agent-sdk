@@ -1209,7 +1209,7 @@ class AgentContext(BaseModel):
         Args:
             content: The message content (markdown text).
             source: Who is sending the message (e.g., "user", agent_id).
-            target: Who should receive the message, or None for current active agent.
+            target: Who should receive the message, or None for broadcast to all subscribers.
             template: Jinja2 template string for rendering. Use {{ content }} placeholder. None means raw content.
 
         Returns:

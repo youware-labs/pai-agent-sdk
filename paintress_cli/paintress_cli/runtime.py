@@ -30,7 +30,7 @@ from importlib import resources
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from pydantic_ai import DeferredToolRequests, ModelSettings, TextOutput
+from pydantic_ai import DeferredToolRequests, ModelSettings
 from pydantic_ai.mcp import MCPServer
 from pydantic_ai.output import OutputSpec
 
@@ -55,7 +55,6 @@ from paintress_cli.environment import TUIEnvironment
 from paintress_cli.logging import get_logger
 from paintress_cli.mcp import build_mcp_servers
 from paintress_cli.session import TUIContext
-from paintress_cli.steering import steering_output_guard
 
 if TYPE_CHECKING:
     from pydantic_ai.toolsets import AbstractToolset
@@ -269,12 +268,8 @@ def create_tui_runtime(
     # Load system prompt
     effective_system_prompt = system_prompt or _load_system_prompt(config)
 
-    # Configure output type with steering guard
-    # This ensures agent retries when user adds steering messages during output
-    output_type: OutputSpec[str | DeferredToolRequests] = [
-        TextOutput(steering_output_guard),
-        DeferredToolRequests,
-    ]
+    # Output type - SDK's message_bus_guard automatically handles pending messages
+    output_type: OutputSpec[str | DeferredToolRequests] = [str, DeferredToolRequests]
     # Create runtime using SDK factory
     # Use unified_subagents=True to create single 'delegate' tool for all subagents
     runtime = create_agent(

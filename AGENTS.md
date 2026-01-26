@@ -180,6 +180,14 @@ See [docs/subagent.md](docs/subagent.md) for details:
 - Tool inheritance and availability rules
 - Built-in presets (debugger, explorer, searcher, code-reviewer)
 
+### Message Bus
+
+See [docs/message-bus.md](docs/message-bus.md) for details:
+
+- Inter-agent communication with one-time consumption
+- User steering during agent execution
+- Async agent systems and background process coordination
+
 ### Skills System
 
 See [docs/skills.md](docs/skills.md) for details:

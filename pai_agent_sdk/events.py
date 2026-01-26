@@ -158,3 +158,40 @@ class SubagentCompleteEvent(AgentEvent):
     result_preview: str = ""
     error: str = ""
     duration_seconds: float = 0.0
+
+
+# =============================================================================
+# Message Bus Events
+# =============================================================================
+
+
+@dataclass
+class BusMessageInfo:
+    """Info about a single bus message.
+
+    Attributes:
+        content: Original message content (before template rendering).
+        rendered_content: Rendered message content (template already applied).
+        source: Who sent the message (e.g., "user", agent_id).
+        target: Who should receive the message (agent_id, or None for broadcast).
+    """
+
+    content: str
+    rendered_content: str
+    source: str
+    target: str | None = None
+
+
+@dataclass
+class MessageReceivedEvent(AgentEvent):
+    """Emitted when bus messages are received and injected into conversation.
+
+    This event is emitted by the bus_message filter when pending messages
+    are consumed and injected. Consumers can use this to display
+    incoming messages in the UI.
+
+    Attributes:
+        messages: List of received message info.
+    """
+
+    messages: list[BusMessageInfo] = field(default_factory=list)

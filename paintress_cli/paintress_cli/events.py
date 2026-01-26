@@ -5,6 +5,10 @@ the SDK's agent_stream_queues mechanism. This allows TUI events to flow
 through the same channel as SDK events (compact, handoff, etc.).
 
 Events are emitted via AgentContext.emit_event() and consumed by stream_agent().
+
+Note: Steering functionality now uses SDK's MessageReceivedEvent from
+pai_agent_sdk.events. The TUI sends steering messages via ctx.send_message()
+and receives MessageReceivedEvent when they are injected.
 """
 
 from __future__ import annotations
@@ -51,27 +55,6 @@ class AgentPhaseEvent(AgentEvent):
     agent_name: str = ""
     node_type: str = ""
     details: str = ""
-
-
-# -----------------------------------------------------------------------------
-# Steering Events
-# -----------------------------------------------------------------------------
-
-
-@dataclass
-class SteeringInjectedEvent(AgentEvent):
-    """Emitted when steering messages are injected into agent context.
-
-    This event is emitted by TUIContext._inject_steering after successfully
-    injecting user guidance into the message history.
-
-    Attributes:
-        message_count: Number of messages injected.
-        content: Full content of all injected messages for user audit.
-    """
-
-    message_count: int = 0
-    content: str = ""
 
 
 # -----------------------------------------------------------------------------

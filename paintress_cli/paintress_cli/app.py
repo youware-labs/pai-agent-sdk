@@ -64,6 +64,7 @@ from pai_agent_sdk.events import (
     HandoffCompleteEvent,
     HandoffFailedEvent,
     HandoffStartEvent,
+    MessageReceivedEvent,
     SubagentCompleteEvent,
     SubagentStartEvent,
 )
@@ -74,7 +75,6 @@ from paintress_cli.display import EventRenderer, RichRenderer, ToolMessage
 from paintress_cli.events import (
     AgentPhaseEvent,
     ContextUpdateEvent,
-    SteeringInjectedEvent,
 )
 from paintress_cli.hooks import emit_context_update
 from paintress_cli.logging import configure_tui_logging, get_logger
@@ -86,6 +86,21 @@ if TYPE_CHECKING:
     from prompt_toolkit.key_binding import KeyPressEvent
 
 logger = get_logger(__name__)
+
+
+# =============================================================================
+# Constants
+# =============================================================================
+
+STEERING_TEMPLATE = """<steering>
+{{ content }}
+</steering>
+
+<system-reminder>
+The user has provided additional guidance during task execution.
+Review the <steering> content carefully, consider how it affects your current approach,
+and adjust your work accordingly while continuing toward the goal.
+</system-reminder>"""
 
 
 # =============================================================================
@@ -538,13 +553,13 @@ class TUIApp:
         return min(len(self._steering_items), self._max_steering_lines)
 
     def _add_steering_message(self, message: str) -> None:
-        """Add a steering message to UI and enqueue to steering manager.
+        """Add a steering message to UI and send to message bus.
 
         This method:
         1. Adds the message to UI list with 'pending' status
-        2. Schedules async enqueue to steering manager
+        2. Sends formatted message to message bus via ctx.send_message
 
-        The UI status will be updated to 'acked' when SteeringInjectedEvent
+        The UI status will be updated to 'acked' when MessageReceivedEvent
         is received (event-driven UI update).
         """
         # Add to UI list with pending status (use content as key for matching)
@@ -552,29 +567,28 @@ class TUIApp:
         if self._app:
             self._app.invalidate()
 
-        # Schedule async enqueue to steering manager
-        asyncio.create_task(self._enqueue_steering(message))  # noqa: RUF006
+        # Send to message bus with TUI-specific formatting
+        self._send_steering_message(message)
 
-    async def _enqueue_steering(self, message: str) -> None:
-        """Enqueue steering message to the steering manager."""
+    def _send_steering_message(self, message: str) -> None:
+        """Send steering message to the message bus with TUI formatting."""
         try:
-            await self.runtime.ctx.steering_manager.enqueue(message)
-            logger.debug("Steering message enqueued: %s", message[:50])
+            self.runtime.ctx.send_message(message, source="user", target="main", template=STEERING_TEMPLATE)
+            logger.debug("Steering message sent: %s", message[:50])
         except Exception:
-            logger.exception("Failed to enqueue steering message")
+            logger.exception("Failed to send steering message")
 
-    def _ack_steering_by_content(self, content: str) -> None:
+    def _ack_steering_by_content(self, content_preview: str) -> None:
         """Mark steering messages as acknowledged by matching content.
 
-        Called when SteeringInjectedEvent is received. Matches messages
-        by content since the event contains the full injected content.
+        Called when MessageReceivedEvent is received. Matches messages
+        by content preview.
         """
-        # Split content into individual messages and match
-        injected_messages = {line.strip() for line in content.split("\n") if line.strip()}
-
         for i, (key, text, status) in enumerate(self._steering_items):
-            if status == "pending" and text.strip() in injected_messages:
+            # Match if the preview contains part of the original message
+            if status == "pending" and text.strip() in content_preview:
                 self._steering_items[i] = (key, text, "acked")
+                break  # Only ack one message per event
 
         if self._app:
             self._app.invalidate()
@@ -1277,15 +1291,18 @@ class TUIApp:
             # Update status based on phase (handled by status bar)
             pass
 
-        elif isinstance(message_event, SteeringInjectedEvent):
+        elif isinstance(message_event, MessageReceivedEvent):
             # Update UI status to acked for matched steering messages
-            self._ack_steering_by_content(message_event.content)
+            for msg_info in message_event.messages:
+                if msg_info.source == "user":
+                    self._ack_steering_by_content(msg_info.content)
 
-            rendered = self._event_renderer.render_steering_injected(
-                message_event.message_count,
-                message_event.content,
-            )
-            self._append_output(rendered.rstrip())
+            # Render user messages
+            user_messages = [m for m in message_event.messages if m.source == "user"]
+            if user_messages:
+                previews = [m.content for m in user_messages]
+                rendered = self._event_renderer.render_steering_injected(previews)
+                self._append_output(rendered.rstrip())
 
         if self._app:
             self._app.invalidate()

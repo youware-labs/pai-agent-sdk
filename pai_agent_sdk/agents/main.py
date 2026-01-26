@@ -25,6 +25,7 @@ from typing_extensions import TypeVar
 
 from pai_agent_sdk._logger import get_logger
 from pai_agent_sdk.agents.compact import create_compact_filter
+from pai_agent_sdk.agents.guards import attach_message_bus_guard
 from pai_agent_sdk.agents.models import infer_model
 from pai_agent_sdk.context import (
     AgentContext,
@@ -433,6 +434,9 @@ def create_agent(
         ),
         all_toolsets,
     )
+
+    # Attach message bus guard for pending message handling
+    attach_message_bus_guard(agent)
 
     logger.debug(
         "Agent created: toolsets=%d, history_processors=%d",

@@ -1035,12 +1035,13 @@ class EventRenderer:
         text.append(error[:100], style="dim")
         return self._renderer.render(text)
 
-    def render_steering_injected(self, message_count: int, content: str) -> str:
+    def render_steering_injected(self, messages: list[str], max_line_len: int = 100) -> str:
         """Render steering message injected panel."""
         panel_content = Text()
-        panel_content.append(f"Guidance injected ({message_count} message(s))\n", style="bold")
-        if content:
-            preview = content[:150] + "..." if len(content) > 150 else content
-            panel_content.append(f'"{preview}"', style="dim italic")
+        panel_content.append(f"Guidance injected ({len(messages)} message(s))\n", style="bold")
+        for msg in messages:
+            line = msg.replace("\n", " ")
+            preview = line[:max_line_len] + "..." if len(line) > max_line_len else line
+            panel_content.append(f'"{preview}"\n', style="dim italic")
         panel = Panel(panel_content, border_style="yellow", title="[yellow]Steering[/yellow]", title_align="left")
         return self._renderer.render(panel)

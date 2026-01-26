@@ -120,6 +120,49 @@ class TaskUpdateTool(BaseTool):
             return Instruction(group="task-manager", content=instruction_file.read_text())
         return None
 
+    def _broadcast_update(
+        self,
+        ctx: RunContext[AgentContext],
+        task: Any,
+        update_summary: str,
+    ) -> None:
+        """Broadcast task update to message bus (subagents only)."""
+        if ctx.deps.agent_id == "main":
+            return
+        msg = f"Task '{task.subject}' (#{task.id}) updated: {update_summary}"
+        ctx.deps.message_bus.send(msg, source=ctx.deps.agent_id, target=None)
+
+    def _build_update_summary(
+        self,
+        status: str | None,
+        subject: str | None,
+        description: str | None,
+        active_form: str | None,
+        owner: str | None,
+        add_blocks: list[str] | None,
+        add_blocked_by: list[str] | None,
+        metadata: dict[str, Any] | None,
+    ) -> str:
+        """Build a summary of what was updated."""
+        updates = []
+        if status:
+            updates.append(f"status -> {status}")
+        if subject:
+            updates.append("subject")
+        if description:
+            updates.append("description")
+        if active_form:
+            updates.append("activeForm")
+        if owner:
+            updates.append("owner")
+        if add_blocks:
+            updates.append(f"blocks (+{len(add_blocks)})")
+        if add_blocked_by:
+            updates.append(f"blockedBy (+{len(add_blocked_by)})")
+        if metadata:
+            updates.append("metadata")
+        return ", ".join(updates) if updates else "no changes"
+
     async def call(
         self,
         ctx: RunContext[AgentContext],
@@ -154,26 +197,13 @@ class TaskUpdateTool(BaseTool):
         if task is None:
             return f"Task #{task_id} not found."
 
-        # Build update summary
-        updates = []
-        if status:
-            updates.append(f"status -> {status}")
-        if subject:
-            updates.append("subject")
-        if description:
-            updates.append("description")
-        if active_form:
-            updates.append("activeForm")
-        if owner:
-            updates.append("owner")
-        if add_blocks:
-            updates.append(f"blocks (+{len(add_blocks)})")
-        if add_blocked_by:
-            updates.append(f"blockedBy (+{len(add_blocked_by)})")
-        if metadata:
-            updates.append("metadata")
+        update_text = self._build_update_summary(
+            status, subject, description, active_form, owner, add_blocks, add_blocked_by, metadata
+        )
 
-        update_text = ", ".join(updates) if updates else "no changes"
+        # Broadcast task update to message bus (subagents only)
+        self._broadcast_update(ctx, task, update_text)
+
         return f"Updated task #{task_id}: {update_text}"
 
 

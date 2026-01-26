@@ -38,6 +38,7 @@ from pydantic_ai import Agent, RunContext
 from pydantic_ai._agent_graph import HistoryProcessor
 
 from pai_agent_sdk._logger import get_logger
+from pai_agent_sdk.agents.guards import attach_message_bus_guard
 from pai_agent_sdk.agents.models import infer_model
 from pai_agent_sdk.context import AgentContext, ModelConfig
 from pai_agent_sdk.presets import resolve_model_cfg, resolve_model_settings
@@ -135,6 +136,9 @@ def _build_subagent_entry(
         history_processors=history_processors,
         name=config.name,
     )
+
+    # Attach message bus guard for pending message handling
+    attach_message_bus_guard(agent)
 
     call_func = create_subagent_call_func(agent, model_cfg=resolved_model_cfg)
 

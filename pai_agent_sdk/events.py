@@ -10,6 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from jinja2 import Template
+
 
 @dataclass
 class AgentEvent:
@@ -182,10 +184,10 @@ class BusMessageInfo:
     template: str | None = None
 
     def render(self) -> str:
-        """Render the message using its template, or return raw content if no template."""
+        """Render the message using its Jinja2 template, or return raw content if no template."""
         if self.template is None:
             return self.content
-        return self.template.format(content=self.content)
+        return Template(self.template).render(content=self.content)
 
 
 @dataclass

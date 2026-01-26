@@ -1432,7 +1432,7 @@ class AgentContext(BaseModel):
             content: The message content (markdown text).
             source: Who is sending the message (e.g., "user", agent_id).
             target: Who should receive the message, or None for current active agent.
-            template: Template string for rendering. Use {content} placeholder. None means raw content.
+            template: Jinja2 template string for rendering. Use {{ content }} placeholder. None means raw content.
 
         Returns:
             The created BusMessage.
@@ -1446,7 +1446,7 @@ class AgentContext(BaseModel):
             ctx.send_message("Focus on security issues", source="main", target=subagent_id)
 
             # With custom template
-            ctx.send_message("Stop now", source="user", template="[URGENT] {content}")
+            ctx.send_message("Stop now", source="user", template="[URGENT] {{ content }}")
         """
         return self.message_bus.send(content, source=source, target=target, template=template)
 

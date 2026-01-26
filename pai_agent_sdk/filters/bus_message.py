@@ -7,6 +7,8 @@ between user and agents, or between agents.
 
 from __future__ import annotations
 
+import uuid
+
 from pydantic_ai import RunContext
 from pydantic_ai.messages import ModelMessage, ModelRequest, UserPromptPart
 
@@ -57,7 +59,7 @@ async def inject_bus_messages(
 
     # Emit single event with all messages
     event = MessageReceivedEvent(
-        event_id=f"bus-recv-{id(pending):x}",
+        event_id=f"bus-recv-{uuid.uuid4().hex[:8]}",
         messages=[
             BusMessageInfo(
                 content=msg.content,

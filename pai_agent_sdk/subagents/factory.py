@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic_ai import Agent, RunContext
 from pydantic_ai._agent_graph import HistoryProcessor
 
+from pai_agent_sdk.agents.guards import attach_message_bus_guard
 from pai_agent_sdk.agents.models import infer_model
 from pai_agent_sdk.context import AgentContext, ModelConfig
 from pai_agent_sdk.presets import INHERIT, resolve_model_cfg, resolve_model_settings
@@ -117,8 +118,6 @@ def create_subagent_tool_from_config(
     )
 
     # Attach message bus guard for pending message handling
-    from pai_agent_sdk.agents.guards import attach_message_bus_guard
-
     attach_message_bus_guard(subagent)
 
     required_tools = config.tools

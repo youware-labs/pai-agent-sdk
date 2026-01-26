@@ -22,18 +22,6 @@ class TUIContext(AgentContext):
 
     Currently an empty shell that inherits all functionality from AgentContext.
     The message bus (inherited) handles user steering:
-
-    - ctx.send_message(content, source="user") to inject guidance
-    - Messages are automatically injected via SDK's bus_message filter
-    - SDK's guard prevents completion while messages are pending
-
-    Example:
-        async with TUIContext(env=env) as ctx:
-            # Send steering message (will be injected on next LLM call)
-            ctx.send_message(
-                "<steering>Focus on performance</steering>",
-                source="user"
-            )
     """
 
     def __init__(self, **data: Any) -> None:

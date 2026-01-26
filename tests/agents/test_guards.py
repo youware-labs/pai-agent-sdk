@@ -7,8 +7,7 @@ from pydantic_ai import Agent, RunContext
 from pydantic_ai.exceptions import ModelRetry
 
 from pai_agent_sdk.agents.guards import attach_message_bus_guard, message_bus_guard
-from pai_agent_sdk.bus import MessageBus
-from pai_agent_sdk.context import AgentContext
+from pai_agent_sdk.context import AgentContext, MessageBus
 
 
 def create_mock_ctx(agent_id: str = "main", message_bus: MessageBus | None = None) -> RunContext[AgentContext]:

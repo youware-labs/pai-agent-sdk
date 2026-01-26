@@ -63,9 +63,9 @@ async def inject_bus_messages(
         messages=[
             BusMessageInfo(
                 content=msg.content,
+                rendered_content=msg.render(),
                 source=msg.source,
                 target=msg.target,
-                template=msg.template,
             )
             for msg in pending
         ],

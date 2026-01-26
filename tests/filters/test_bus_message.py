@@ -6,7 +6,7 @@ import pytest
 from pydantic_ai import RunContext
 from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
 
-from pai_agent_sdk.bus import MessageBus
+from pai_agent_sdk.context import MessageBus
 from pai_agent_sdk.filters.bus_message import inject_bus_messages
 
 
@@ -124,14 +124,14 @@ async def test_inject_bus_messages_emits_event() -> None:
     ctx.deps.emit_event.assert_called_once()
     event = ctx.deps.emit_event.call_args[0][0]
     assert len(event.messages) == 2
-    # First message - no template
+    # First message - no template, content equals rendered_content
     assert event.messages[0].source == "user"
     assert event.messages[0].content == "First"
-    assert event.messages[0].template is None
-    # Second message - with template
+    assert event.messages[0].rendered_content == "First"
+    # Second message - with template, rendered_content has template applied
     assert event.messages[1].source == "system"
     assert event.messages[1].content == "Second"
-    assert event.messages[1].template == "[SYSTEM] {{ content }}"
+    assert event.messages[1].rendered_content == "[SYSTEM] Second"
 
 
 @pytest.mark.asyncio

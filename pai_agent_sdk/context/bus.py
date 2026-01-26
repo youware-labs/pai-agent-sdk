@@ -19,7 +19,7 @@ Example:
 
     Direct MessageBus usage (advanced)::
 
-        from pai_agent_sdk.bus import MessageBus
+        from pai_agent_sdk.context import MessageBus
 
         bus = MessageBus(maxlen=100)
         bus.subscribe("main")

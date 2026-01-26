@@ -1300,11 +1300,8 @@ class TUIApp:
             # Render user messages
             user_messages = [m for m in message_event.messages if m.source == "user"]
             if user_messages:
-                preview = user_messages[0].content[:200] if len(user_messages) == 1 else ""
-                rendered = self._event_renderer.render_steering_injected(
-                    len(user_messages),
-                    preview,
-                )
+                previews = [m.content for m in user_messages]
+                rendered = self._event_renderer.render_steering_injected(previews)
                 self._append_output(rendered.rstrip())
 
         if self._app:

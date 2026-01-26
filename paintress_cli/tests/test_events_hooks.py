@@ -54,13 +54,13 @@ class TestMessageReceivedEvent:
         event = MessageReceivedEvent(
             event_id="msg-abc",
             messages=[
-                BusMessageInfo(content="Focus on the UI...", source="user"),
+                BusMessageInfo(content="Focus on the UI...", rendered_content="Focus on the UI...", source="user"),
             ],
         )
         assert event.event_id == "msg-abc"
         assert len(event.messages) == 1
         assert event.messages[0].source == "user"
-        assert event.messages[0].content == "Focus on the UI..."
+        assert event.messages[0].rendered_content == "Focus on the UI..."
 
     def test_inherits_from_agent_event(self):
         """Test that event inherits from AgentEvent."""

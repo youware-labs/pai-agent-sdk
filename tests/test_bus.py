@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pai_agent_sdk.bus import BusMessage, MessageBus
+from pai_agent_sdk.context import BusMessage, MessageBus
 
 # =============================================================================
 # BusMessage Tests

@@ -573,7 +573,7 @@ class TUIApp:
     def _send_steering_message(self, message: str) -> None:
         """Send steering message to the message bus with TUI formatting."""
         try:
-            self.runtime.ctx.send_message(message, source="user", template=STEERING_TEMPLATE)
+            self.runtime.ctx.send_message(message, source="user", target="main", template=STEERING_TEMPLATE)
             logger.debug("Steering message sent: %s", message[:50])
         except Exception:
             logger.exception("Failed to send steering message")

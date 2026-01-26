@@ -11,7 +11,8 @@ from pai_agent_sdk.bus import BusMessage, MessageBus
 
 def test_bus_message_creation() -> None:
     """Test BusMessage creation with required fields."""
-    msg = BusMessage(content="Hello", source="user")
+    msg = BusMessage(id=1, content="Hello", source="user")
+    assert msg.id == 1
     assert msg.content == "Hello"
     assert msg.source == "user"
     assert msg.target is None
@@ -20,12 +21,72 @@ def test_bus_message_creation() -> None:
 
 def test_bus_message_with_target() -> None:
     """Test BusMessage creation with target."""
-    msg = BusMessage(content="Hello", source="user", target="main")
+    msg = BusMessage(id=1, content="Hello", source="user", target="main")
     assert msg.target == "main"
 
 
+def test_bus_message_render_without_template() -> None:
+    """Test message rendering without template."""
+    msg = BusMessage(id=1, content="Hello", source="user")
+    assert msg.render() == "Hello"
+
+
+def test_bus_message_render_with_template() -> None:
+    """Test message rendering with Jinja2 template."""
+    msg = BusMessage(id=1, content="Stop", source="user", template="[URGENT] {{ content }}")
+    assert msg.render() == "[URGENT] Stop"
+
+
 # =============================================================================
-# MessageBus Tests
+# MessageBus Subscribe/Unsubscribe Tests
+# =============================================================================
+
+
+def test_message_bus_subscribe() -> None:
+    """Test subscribing to the bus."""
+    bus = MessageBus()
+    assert bus.subscriber_count == 0
+
+    bus.subscribe("main")
+    assert bus.subscriber_count == 1
+
+    # Idempotent
+    bus.subscribe("main")
+    assert bus.subscriber_count == 1
+
+
+def test_message_bus_unsubscribe() -> None:
+    """Test unsubscribing from the bus."""
+    bus = MessageBus()
+    bus.subscribe("main")
+    bus.subscribe("subagent")
+    assert bus.subscriber_count == 2
+
+    bus.unsubscribe("subagent")
+    assert bus.subscriber_count == 1
+
+    # Unsubscribe non-existent is no-op
+    bus.unsubscribe("nonexistent")
+    assert bus.subscriber_count == 1
+
+
+def test_message_bus_auto_subscribe_on_consume() -> None:
+    """Test that consume auto-subscribes if not already subscribed."""
+    bus = MessageBus()
+    bus.send("Hello", source="user", target="main")
+
+    # Not subscribed yet
+    assert bus.subscriber_count == 0
+
+    # Consume auto-subscribes
+    messages = bus.consume("main")
+    assert bus.subscriber_count == 1
+    # But since we subscribed at latest, we won't see the old message
+    assert len(messages) == 0
+
+
+# =============================================================================
+# MessageBus Send/Consume Tests
 # =============================================================================
 
 
@@ -34,119 +95,160 @@ def test_message_bus_send() -> None:
     bus = MessageBus()
     msg = bus.send("Hello", source="user")
 
+    assert msg.id == 1
     assert msg.content == "Hello"
     assert msg.source == "user"
     assert len(bus) == 1
 
 
-def test_message_bus_send_with_target() -> None:
-    """Test sending messages with specific target."""
+def test_message_bus_send_increments_id() -> None:
+    """Test that message IDs auto-increment."""
     bus = MessageBus()
-    bus.send("Hello", source="user", target="main")
+    msg1 = bus.send("First", source="user")
+    msg2 = bus.send("Second", source="user")
+    msg3 = bus.send("Third", source="user")
 
-    assert len(bus) == 1
-    assert bus.has_pending("main")
-    assert not bus.has_pending("other")
+    assert msg1.id == 1
+    assert msg2.id == 2
+    assert msg3.id == 3
 
 
 def test_message_bus_consume_targeted() -> None:
     """Test consuming messages targeted at specific agent."""
     bus = MessageBus()
+    bus.subscribe("main")
+    bus.subscribe("other")
+
     bus.send("For main", source="user", target="main")
     bus.send("For other", source="user", target="other")
 
     messages = bus.consume("main")
-
     assert len(messages) == 1
     assert messages[0].content == "For main"
-    assert len(bus) == 1  # "For other" remains
+
+    messages = bus.consume("other")
+    assert len(messages) == 1
+    assert messages[0].content == "For other"
 
 
 def test_message_bus_consume_broadcast() -> None:
     """Test consuming broadcast messages (target=None)."""
     bus = MessageBus()
+    bus.subscribe("main")
+    bus.subscribe("other")
+
     bus.send("Broadcast", source="user")  # No target = broadcast
-    bus.send("For main", source="user", target="main")
 
-    messages = bus.consume("main")
+    # Both subscribers receive the broadcast
+    main_messages = bus.consume("main")
+    assert len(main_messages) == 1
+    assert main_messages[0].content == "Broadcast"
 
-    assert len(messages) == 2
-    assert messages[0].content == "Broadcast"
-    assert messages[1].content == "For main"
-    assert len(bus) == 0
+    other_messages = bus.consume("other")
+    assert len(other_messages) == 1
+    assert other_messages[0].content == "Broadcast"
 
 
 def test_message_bus_consume_fifo_order() -> None:
     """Test that messages are consumed in FIFO order."""
     bus = MessageBus()
+    bus.subscribe("main")
+
     bus.send("First", source="user", target="main")
     bus.send("Second", source="user", target="main")
     bus.send("Third", source="user", target="main")
 
     messages = bus.consume("main")
-
     assert [m.content for m in messages] == ["First", "Second", "Third"]
 
 
-def test_message_bus_consume_removes_messages() -> None:
-    """Test that consumed messages are removed from bus."""
+def test_message_bus_consume_advances_cursor() -> None:
+    """Test that cursor advances after consume."""
     bus = MessageBus()
-    bus.send("Hello", source="user", target="main")
+    bus.subscribe("main")
 
-    assert len(bus) == 1
+    bus.send("First", source="user", target="main")
     messages = bus.consume("main")
     assert len(messages) == 1
-    assert len(bus) == 0
 
-    # Second consume returns empty
+    # Second consume returns empty (already read)
     messages = bus.consume("main")
     assert len(messages) == 0
+
+    # New message is visible
+    bus.send("Second", source="user", target="main")
+    messages = bus.consume("main")
+    assert len(messages) == 1
+    assert messages[0].content == "Second"
 
 
 def test_message_bus_has_pending() -> None:
     """Test has_pending check."""
     bus = MessageBus()
+    bus.subscribe("main")
+
     assert not bus.has_pending("main")
 
     bus.send("Hello", source="user", target="main")
     assert bus.has_pending("main")
-    assert not bus.has_pending("other")
+
+    bus.consume("main")
+    assert not bus.has_pending("main")
 
 
 def test_message_bus_has_pending_broadcast() -> None:
     """Test has_pending with broadcast messages."""
     bus = MessageBus()
+    bus.subscribe("main")
+    bus.subscribe("other")
+
     bus.send("Broadcast", source="user")  # No target
 
     assert bus.has_pending("main")
     assert bus.has_pending("other")
-    assert bus.has_pending("any_agent")
+
+
+def test_message_bus_has_pending_unsubscribed() -> None:
+    """Test has_pending for unsubscribed agent returns False."""
+    bus = MessageBus()
+    bus.send("Hello", source="user", target="main")
+
+    # Not subscribed, so has_pending is False
+    assert not bus.has_pending("main")
 
 
 def test_message_bus_peek() -> None:
-    """Test peeking at messages without consuming."""
+    """Test peeking at messages without advancing cursor."""
     bus = MessageBus()
+    bus.subscribe("main")
     bus.send("Hello", source="user", target="main")
 
     messages = bus.peek("main")
     assert len(messages) == 1
-    assert len(bus) == 1  # Not removed
 
-    # Can peek again
+    # Peek again still returns same messages
     messages = bus.peek("main")
     assert len(messages) == 1
 
+    # Consume advances cursor
+    bus.consume("main")
+    messages = bus.peek("main")
+    assert len(messages) == 0
+
 
 def test_message_bus_clear() -> None:
-    """Test clearing all messages."""
+    """Test clearing all messages and cursors."""
     bus = MessageBus()
+    bus.subscribe("main")
     bus.send("One", source="user")
     bus.send("Two", source="user")
-    bus.send("Three", source="user")
 
-    assert len(bus) == 3
+    assert len(bus) == 2
+    assert bus.subscriber_count == 1
+
     bus.clear()
     assert len(bus) == 0
+    assert bus.subscriber_count == 0
 
 
 def test_message_bus_bool() -> None:
@@ -158,24 +260,117 @@ def test_message_bus_bool() -> None:
     assert bus
 
 
-def test_message_bus_multiple_agents() -> None:
-    """Test message routing between multiple agents."""
+# =============================================================================
+# MessageBus Maxlen Tests
+# =============================================================================
+
+
+def test_message_bus_maxlen() -> None:
+    """Test that old messages are trimmed when maxlen exceeded."""
+    bus = MessageBus(maxlen=3)
+    bus.subscribe("main")
+
+    bus.send("One", source="user", target="main")
+    bus.send("Two", source="user", target="main")
+    bus.send("Three", source="user", target="main")
+    assert len(bus) == 3
+
+    bus.send("Four", source="user", target="main")
+    assert len(bus) == 3
+
+    messages = bus.consume("main")
+    # "One" was trimmed
+    assert [m.content for m in messages] == ["Two", "Three", "Four"]
+
+
+def test_message_bus_cursor_correction_on_trim() -> None:
+    """Test that cursor is corrected when it points to trimmed messages."""
+    bus = MessageBus(maxlen=3)
+    bus.subscribe("main")
+
+    # Send and don't consume
+    bus.send("One", source="user", target="main")
+    bus.send("Two", source="user", target="main")
+    bus.send("Three", source="user", target="main")
+
+    # Add more messages, trimming old ones
+    bus.send("Four", source="user", target="main")
+    bus.send("Five", source="user", target="main")
+
+    # Cursor still at 0, but messages 1-2 are trimmed
+    # Should get messages from earliest available
+    messages = bus.consume("main")
+    assert [m.content for m in messages] == ["Three", "Four", "Five"]
+
+
+# =============================================================================
+# MessageBus Multi-Agent Tests
+# =============================================================================
+
+
+def test_message_bus_subagent_lifecycle() -> None:
+    """Test typical subagent subscribe/unsubscribe lifecycle."""
     bus = MessageBus()
+    bus.subscribe("main")
 
-    # User sends to main
-    bus.send("User to main", source="user", target="main")
+    # Send message to main
+    bus.send("For main", source="user", target="main")
+
+    # Subagent starts, subscribes
+    bus.subscribe("subagent-123")
+
+    # Broadcast goes to both
+    bus.send("Broadcast", source="user")
+
+    # Main gets both messages
+    main_msgs = bus.consume("main")
+    assert len(main_msgs) == 2
+
+    # Subagent only gets broadcast (subscribed after first message)
+    sub_msgs = bus.consume("subagent-123")
+    assert len(sub_msgs) == 1
+    assert sub_msgs[0].content == "Broadcast"
+
+    # Subagent exits, unsubscribes
+    bus.unsubscribe("subagent-123")
+    assert bus.subscriber_count == 1
+
+
+def test_message_bus_targeted_inter_agent() -> None:
+    """Test targeted messages between agents."""
+    bus = MessageBus()
+    bus.subscribe("main")
+    bus.subscribe("subagent")
+
     # Main sends to subagent
-    bus.send("Main to sub", source="main", target="subagent-123")
+    bus.send("Task for you", source="main", target="subagent")
     # Subagent sends to main
-    bus.send("Sub to main", source="subagent-123", target="main")
+    bus.send("Result", source="subagent", target="main")
 
-    # Main agent consumes
-    main_messages = bus.consume("main")
-    assert len(main_messages) == 2
-    assert main_messages[0].content == "User to main"
-    assert main_messages[1].content == "Sub to main"
+    main_msgs = bus.consume("main")
+    assert len(main_msgs) == 1
+    assert main_msgs[0].content == "Result"
 
-    # Subagent consumes
-    sub_messages = bus.consume("subagent-123")
-    assert len(sub_messages) == 1
-    assert sub_messages[0].content == "Main to sub"
+    sub_msgs = bus.consume("subagent")
+    assert len(sub_msgs) == 1
+    assert sub_msgs[0].content == "Task for you"
+
+
+def test_message_bus_new_subscriber_only_sees_new_messages() -> None:
+    """Test that new subscribers only see messages sent after subscribing."""
+    bus = MessageBus()
+    bus.subscribe("main")
+
+    # Send before subagent subscribes
+    bus.send("Old message", source="user", target="main")
+
+    # Subagent subscribes (should not see old broadcast)
+    bus.subscribe("subagent")
+
+    # New broadcast
+    bus.send("New broadcast", source="user")
+
+    # Subagent only sees new message
+    sub_msgs = bus.consume("subagent")
+    assert len(sub_msgs) == 1
+    assert sub_msgs[0].content == "New broadcast"

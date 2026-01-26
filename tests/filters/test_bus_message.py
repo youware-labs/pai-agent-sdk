@@ -28,6 +28,7 @@ def create_mock_ctx(agent_id: str = "main", message_bus: MessageBus | None = Non
 async def test_inject_bus_messages_no_pending() -> None:
     """Test filter with no pending messages."""
     bus = MessageBus()
+    bus.subscribe("main")
     ctx = create_mock_ctx(message_bus=bus)
     messages = [ModelRequest(parts=[UserPromptPart(content="Hello")])]
 
@@ -41,7 +42,8 @@ async def test_inject_bus_messages_no_pending() -> None:
 async def test_inject_bus_messages_with_pending() -> None:
     """Test filter injects pending messages into last request parts."""
     bus = MessageBus()
-    bus.send("Please stop", source="user")
+    bus.subscribe("main")
+    bus.send("Please stop", source="user", target="main")
     ctx = create_mock_ctx(message_bus=bus)
     messages = [ModelRequest(parts=[UserPromptPart(content="Hello")])]
 
@@ -59,7 +61,8 @@ async def test_inject_bus_messages_with_pending() -> None:
 async def test_inject_bus_messages_custom_template() -> None:
     """Test filter uses custom template from BusMessage."""
     bus = MessageBus()
-    bus.send("Hello", source="system", template="[SYSTEM] {{ content }}")
+    bus.subscribe("main")
+    bus.send("Hello", source="system", target="main", template="[SYSTEM] {{ content }}")
     ctx = create_mock_ctx(message_bus=bus)
     messages = [ModelRequest(parts=[UserPromptPart(content="Hi")])]
 
@@ -73,8 +76,9 @@ async def test_inject_bus_messages_custom_template() -> None:
 async def test_inject_bus_messages_multiple() -> None:
     """Test filter injects multiple pending messages as separate parts."""
     bus = MessageBus()
-    bus.send("First message", source="user")
-    bus.send("Second message", source="system", template="From system: {{ content }}")
+    bus.subscribe("main")
+    bus.send("First message", source="user", target="main")
+    bus.send("Second message", source="system", target="main", template="From system: {{ content }}")
     ctx = create_mock_ctx(message_bus=bus)
     messages = [ModelRequest(parts=[UserPromptPart(content="Hello")])]
 
@@ -90,23 +94,28 @@ async def test_inject_bus_messages_multiple() -> None:
 
 @pytest.mark.asyncio
 async def test_inject_bus_messages_consumes() -> None:
-    """Test filter consumes messages after injection."""
+    """Test filter advances cursor after injection (messages remain in queue)."""
     bus = MessageBus()
-    bus.send("Hello", source="user")
+    bus.subscribe("main")
+    bus.send("Hello", source="user", target="main")
     ctx = create_mock_ctx(message_bus=bus)
     messages = [ModelRequest(parts=[UserPromptPart(content="Hello")])]
 
     assert len(bus) == 1
     await inject_bus_messages(ctx, messages)
-    assert len(bus) == 0
+    # Message still in queue (not deleted), but cursor advanced
+    assert len(bus) == 1
+    # No more pending for main (cursor advanced)
+    assert not bus.has_pending("main")
 
 
 @pytest.mark.asyncio
 async def test_inject_bus_messages_emits_event() -> None:
     """Test filter emits single event with all messages."""
     bus = MessageBus()
-    bus.send("First", source="user")
-    bus.send("Second", source="system", template="[SYSTEM] {{ content }}")
+    bus.subscribe("main")
+    bus.send("First", source="user", target="main")
+    bus.send("Second", source="system", target="main", template="[SYSTEM] {{ content }}")
     ctx = create_mock_ctx(message_bus=bus)
     messages = [ModelRequest(parts=[UserPromptPart(content="Hello")])]
 
@@ -129,6 +138,8 @@ async def test_inject_bus_messages_emits_event() -> None:
 async def test_inject_bus_messages_respects_target() -> None:
     """Test filter only consumes messages for current agent."""
     bus = MessageBus()
+    bus.subscribe("main")
+    bus.subscribe("other")
     bus.send("For main", source="user", target="main")
     bus.send("For other", source="user", target="other")
     ctx = create_mock_ctx(agent_id="main", message_bus=bus)
@@ -139,15 +150,17 @@ async def test_inject_bus_messages_respects_target() -> None:
     # Only "For main" should be injected
     assert len(result[0].parts) == 2
     assert "For main" in result[0].parts[1].content
-    # "For other" remains in bus
-    assert len(bus) == 1
+    # "For other" still pending for other agent
+    assert bus.has_pending("other")
+    assert not bus.has_pending("main")
 
 
 @pytest.mark.asyncio
 async def test_inject_bus_messages_skips_non_request() -> None:
     """Test filter skips when last message is not ModelRequest."""
     bus = MessageBus()
-    bus.send("Hello", source="user")
+    bus.subscribe("main")
+    bus.send("Hello", source="user", target="main")
     ctx = create_mock_ctx(message_bus=bus)
     messages = [
         ModelRequest(parts=[UserPromptPart(content="Hello")]),
@@ -158,18 +171,19 @@ async def test_inject_bus_messages_skips_non_request() -> None:
 
     # Not injected, messages unchanged
     assert result == messages
-    # Message still in bus (not consumed)
-    assert len(bus) == 1
+    # Message still pending (not consumed)
+    assert bus.has_pending("main")
 
 
 @pytest.mark.asyncio
 async def test_inject_bus_messages_empty_history() -> None:
     """Test filter handles empty message history."""
     bus = MessageBus()
-    bus.send("Hello", source="user")
+    bus.subscribe("main")
+    bus.send("Hello", source="user", target="main")
     ctx = create_mock_ctx(message_bus=bus)
 
     result = await inject_bus_messages(ctx, [])
 
     assert result == []
-    assert len(bus) == 1  # Not consumed
+    assert bus.has_pending("main")  # Not consumed

@@ -177,12 +177,15 @@ class TaskManager(BaseModel):
     When a task is completed, it is automatically removed from the blocked_by
     list of tasks it was blocking.
 
+    TaskManager is shared between parent and subagent contexts (shallow copy),
+    providing a unified view of task state across the agent hierarchy.
+
     Example:
         manager = TaskManager()
         task1 = manager.create("Implement API", "Create REST endpoints")
         task2 = manager.create("Write tests", "Unit tests for API")
-        manager.add_blocked_by(task2.id, [task1.id])  # task2 blocked by task1
-        manager.update_status(task1.id, TaskStatus.COMPLETED)  # task2 unblocked
+        manager.update(task2.id, add_blocked_by=[task1.id])  # task2 blocked by task1
+        manager.update(task1.id, status=TaskStatus.COMPLETED)  # task2 unblocked
     """
 
     tasks: dict[str, Task] = Field(default_factory=dict)
@@ -191,8 +194,14 @@ class TaskManager(BaseModel):
     _next_id: int = 1
     """Counter for generating sequential task IDs."""
 
+    model_config = {"arbitrary_types_allowed": True}
+
     def __init__(self, **data: Any) -> None:
-        """Initialize TaskManager."""
+        """Initialize TaskManager.
+
+        Args:
+            **data: Additional model fields.
+        """
         super().__init__(**data)
         # Sync _next_id with existing tasks
         if self.tasks:
@@ -336,7 +345,7 @@ class TaskManager(BaseModel):
         if task is None:
             return None
 
-        # Track if status changed to completed for dependency resolution
+        # Track completion for dependency resolution
         was_completed = status == TaskStatus.COMPLETED and task.status != TaskStatus.COMPLETED
 
         # Update simple fields
@@ -1473,11 +1482,19 @@ class AgentContext(BaseModel):
             self._entered = True
         self.start_at = datetime.now()
         self.tool_id_wrapper.clear()
+        # Subscribe to message bus for this agent
+        self.message_bus.subscribe(self._agent_id)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Exit the context and record end time."""
         self.end_at = datetime.now()
+        # For main agent: clear message bus on exit
+        # For subagents: unsubscribe to free cursor
+        if self._agent_id == "main":
+            self.message_bus.clear()
+        else:
+            self.message_bus.unsubscribe(self._agent_id)
         async with self._enter_lock:
             self._entered = False
 

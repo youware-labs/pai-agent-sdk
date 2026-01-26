@@ -135,7 +135,8 @@ class TestTUIContext:
     def test_message_bus_pending(self):
         """Test message bus pending check."""
         ctx = TUIContext()
-        ctx.send_message("Test message", source="user")
+        ctx.message_bus.subscribe("main")
+        ctx.send_message("Test message", source="user", target="main")
         assert ctx.message_bus.has_pending("main")
 
     def test_create_subagent_context_returns_agent_context(self):

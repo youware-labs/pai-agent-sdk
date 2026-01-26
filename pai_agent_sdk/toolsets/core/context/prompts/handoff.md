@@ -1,58 +1,88 @@
 <handoff-guidelines>
 
-<when-to-handoff>
-<scenario trigger="before-complex-task">
-Call handoff at the START of a new task when:
-- Context contains significant prior conversation history not relevant to new task
-- About to begin multi-step implementation benefiting from clean context
-- New task is substantially different from previous work
-</scenario>
+<overview>
+Handoff preserves essential context when conversation history becomes too large.
+It clears message history while injecting a structured summary into the new context.
+</overview>
 
-<scenario trigger="during-work">
-Call handoff proactively when:
-- Topic transition: user starts completely new unrelated task
-- Context limit warning: system-reminder indicates approaching handoff threshold
-- Major phase completion: significant task phase complete, starting new phase
-</scenario>
+<when-to-handoff>
+**Proactive triggers**:
+- System reminder indicates approaching context limit
+- Major task phase completed, starting new phase
+- Topic transition to completely unrelated work
+
+**Before complex tasks**:
+- Context contains irrelevant prior conversation
+- About to begin multi-step work benefiting from clean context
 </when-to-handoff>
 
 <when-not-to-handoff>
-- If context-handoff tag already exists in current conversation (handoff already occurred)
-- Current task is direct continuation of previous work with relevant context
+- Handoff already occurred in current conversation (context-handoff tag exists)
+- Current task is direct continuation with relevant context
+- Simple follow-up questions or minor adjustments
 </when-not-to-handoff>
 
-<content-format>
-The `content` field should include:
+<pre-handoff-checklist>
+Before calling handoff, ensure pending work is properly captured:
 
-1. **User Intent**: Original request and refined understanding
-2. **Current State**: What has been accomplished and current progress
-3. **Key Decisions**: Important technical choices and their rationale
-4. **Pending Tasks**: Explicitly list incomplete tasks
-5. **Next Step**: Immediate action to take after handoff
-6. **Important Context**: Key code snippets, configurations, or other critical information
+1. **Capture remaining work as tasks**:
+   - If tasks exist: call `task_list` to review current status
+   - If no tasks yet: use `task_create` to record remaining work items
+   - Update task status/description if needed with `task_update`
 
-Keep content concise but complete enough for seamless continuation.
-</content-format>
+2. **Identify key files**:
+   - Files being actively edited
+   - Configuration files critical to current work
+
+3. **Note important decisions**:
+   - Architecture choices made during conversation
+   - User preferences expressed
+
+Task states are automatically preserved across handoff. Creating tasks ensures
+the new context has a structured understanding of what needs to be done.
+</pre-handoff-checklist>
+
+<content-structure>
+The `content` field should be a concise but complete summary:
+
+```
+## User Intent
+[What the user is trying to accomplish]
+
+## Current State
+[What has been done, current progress]
+
+## Key Decisions
+- [Decision 1]: [Rationale]
+- [Decision 2]: [Rationale]
+
+## Next Step
+[Immediate action to take after handoff]
+```
+
+Note: Pending tasks are captured via task tools and auto-preserved.
+Only include task context in content if additional explanation is needed.
+</content-structure>
 
 <auto-load-files>
-Use `auto_load_files` to specify files that should be automatically loaded after handoff:
+Use `auto_load_files` for files that should be automatically read after handoff:
 
-**When to use**:
-- Source code files being actively edited
-- Key configuration files
+**Good candidates**:
+- Source files being actively edited
+- Key configuration files (package.json, pyproject.toml)
 - Important reference documents
 
-**Guidelines**:
-- Only include truly necessary files
-- Avoid loading large files (content is injected into context)
-- File content will be automatically injected on next request
+**Avoid**:
+- Large files (content is injected into context)
+- Files already fully described in content
+- Temporary or generated files
 </auto-load-files>
 
 <best-practices>
-- Include enough context for seamless continuation
-- If code snippets are essential, include them in content or use auto_load_files
-- Document key decisions with rationale
-- Avoid redundant information
+- Capture work structure in tasks, context in content
+- Be specific: include file paths, concrete details
+- Be actionable: next step should be clear and executable
+- Avoid redundancy: don't repeat what's in tasks or auto_load_files
 </best-practices>
 
 </handoff-guidelines>

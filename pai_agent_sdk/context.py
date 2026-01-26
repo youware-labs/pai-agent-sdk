@@ -101,6 +101,7 @@ from pydantic_ai.messages import (
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing_extensions import TypedDict
 
+from pai_agent_sdk.bus import BusMessage, MessageBus
 from pai_agent_sdk.events import AgentEvent
 from pai_agent_sdk.usage import ExtraUsageRecord, InternalUsage
 from pai_agent_sdk.utils import get_latest_request_usage
@@ -1040,6 +1041,20 @@ class AgentContext(BaseModel):
     task_manager: TaskManager = Field(default_factory=TaskManager)
     """Task manager for tracking tasks and dependencies within the session."""
 
+    message_bus: MessageBus = Field(default_factory=MessageBus)
+    """Message bus for inter-agent communication.
+
+    Enables real-time communication between user and agents, or between agents.
+    The inject_bus_messages filter consumes and injects pending messages
+    into the conversation.
+
+    The message_bus is shared between parent and child contexts to allow
+    bidirectional communication during subagent execution.
+
+    Example:
+        ctx.send_message("Please stop", source="user")
+    """
+
     _agent_id: str = "main"
     _entered: bool = False
     _enter_lock: asyncio.Lock = None  # type: ignore[assignment]  # Initialized in __init__
@@ -1330,6 +1345,7 @@ class AgentContext(BaseModel):
         """
         # Import filters here to avoid circular imports
         from pai_agent_sdk.filters.auto_load_files import process_auto_load_files
+        from pai_agent_sdk.filters.bus_message import inject_bus_messages
         from pai_agent_sdk.filters.capability import filter_by_capability
         from pai_agent_sdk.filters.handoff import process_handoff_message
         from pai_agent_sdk.filters.image import drop_extra_images, drop_extra_videos, drop_gif_images
@@ -1349,6 +1365,7 @@ class AgentContext(BaseModel):
             process_handoff_message,
             process_auto_load_files,
             filter_by_capability,
+            inject_bus_messages,  # Before runtime_instructions, after handoff/auto_load
             inject_runtime_instructions,
             dynamic_tool_id_wrapper,
         ]
@@ -1398,6 +1415,40 @@ class AgentContext(BaseModel):
         if not self._stream_queue_enabled:
             return
         await self.agent_stream_queues[self._agent_id].put(event)
+
+    def send_message(
+        self,
+        content: str,
+        *,
+        source: str,
+        target: str | None = None,
+        template: str | None = None,
+    ) -> BusMessage:
+        """Send a message to the message bus.
+
+        Convenience method for sending messages to the bus.
+
+        Args:
+            content: The message content (markdown text).
+            source: Who is sending the message (e.g., "user", agent_id).
+            target: Who should receive the message, or None for current active agent.
+            template: Template string for rendering. Use {content} placeholder. None means raw content.
+
+        Returns:
+            The created BusMessage.
+
+        Example::
+
+            # User sends message to main agent
+            ctx.send_message("Please stop the current task", source="user")
+
+            # Main agent sends message to subagent
+            ctx.send_message("Focus on security issues", source="main", target=subagent_id)
+
+            # With custom template
+            ctx.send_message("Stop now", source="user", template="[URGENT] {content}")
+        """
+        return self.message_bus.send(content, source=source, target=target, template=template)
 
     async def __aenter__(self):
         """Enter the context and start timing.

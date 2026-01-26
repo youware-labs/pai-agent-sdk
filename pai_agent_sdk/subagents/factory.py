@@ -116,6 +116,11 @@ def create_subagent_tool_from_config(
         name=config.name,
     )
 
+    # Attach message bus guard for pending message handling
+    from pai_agent_sdk.agents.guards import attach_message_bus_guard
+
+    attach_message_bus_guard(subagent)
+
     required_tools = config.tools
 
     def check_tools_available(ctx: RunContext[AgentContext]) -> bool:

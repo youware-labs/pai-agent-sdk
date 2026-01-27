@@ -10,7 +10,8 @@
 | [04-steering.md](./04-steering.md)                       | Steering mechanism and TUISession design          |
 | [05-browser-integration.md](./05-browser-integration.md) | Browser Use integration with CDP                  |
 | [06-ui-layout.md](./06-ui-layout.md)                     | TUI layout and user experience design             |
-| [07-design-review.md](./07-design-review.md)             | Final design decisions                            |
+| [07-logging.md](./07-logging.md)                         | Logging configuration                             |
+| [08-hitl.md](./08-hitl.md)                               | Human-in-the-loop approval workflow               |
 
 ## High-Level Architecture
 
@@ -63,68 +64,69 @@ graph TB
 
 ## Design Principles
 
-### 1. Event-Driven via output_queue
+### 1. Event-Driven via SDK Lifecycle Events
 
-所有 agent 活动通过 `stream_agent` 的 `output_queue` 传递:
+All agent activity flows through `stream_agent`'s event stream:
 
-- 通过 `pre_node_hook` 注入 `AgentPhaseEvent` (Generating/Executing 状态)
-- 无额外 EventBus,直接使用 SDK 机制
+- SDK automatically emits `ModelRequestStartEvent` / `ToolCallsStartEvent` lifecycle events
+- `post_node_hook` emits `ContextUpdateEvent` for token usage tracking
+- No additional EventBus needed; uses SDK mechanisms directly
 
 ### 2. Simplified Configuration
 
-配置主要通过环境变量,用户配置目录用于:
+Configuration primarily via environment variables. User config directory used for:
 
-- 自定义 subagents
-- MCP 服务器配置
+- Custom subagents
+- MCP server configuration
 
 ### 3. Dual-Mode Agents
 
-只有 PLAN 和 ACT 两个模式:
+Only PLAN and ACT modes:
 
-- **PLAN**: 只读工具,分析和规划
-- **ACT**: 完整工具集,执行和实现
+- **PLAN**: Read-only tools, analysis and planning
+- **ACT**: Full toolset, execution and implementation
 
-通过 `@agent.instructions` 注入模式指导。
+Mode guidance injected via `@agent.instructions`.
 
 ### 4. Composition over Inheritance
 
-TUISession 组合 AgentContext,而非继承:
+TUISession composes AgentContext rather than inheriting:
 
-- 保持 AgentContext 不变
-- Steering filter 通过闭包访问 manager
-- 子 agent 正常工作
+- Keeps AgentContext unchanged
+- Steering filter accesses manager via closure
+- Subagents work normally
 
 ### 5. ProcessManager as Resource
 
-ProcessManager 作为 Resource 注册到 ResourceRegistry:
+ProcessManager registered as Resource in ResourceRegistry:
 
-- 管理长时间运行的后台进程
-- TUI 退出时自动清理
+- Manages long-running background processes
+- Automatic cleanup on TUI exit
 
 ## Component Responsibilities
 
 ### TUI Application
 
-- 管理 prompt_toolkit Application 生命周期
-- 处理键盘绑定和输入路由
-- 协调布局组件 (output pane, status bar, input area)
+- Manages prompt_toolkit Application lifecycle
+- Handles keyboard bindings and input routing
+- Coordinates layout components (output pane, status bar, input area)
 
 ### TUISession
 
-- 持有 `AgentContext` (组合模式)
-- 管理 `SteeringManager` 实例
-- 跟踪 UI 状态 (IDLE/RUNNING) 和模式 (PLAN/ACT)
+- Holds `AgentContext` (composition pattern)
+- Manages `SteeringManager` instance
+- Tracks UI state (IDLE/RUNNING) and mode (PLAN/ACT)
 
 ### LocalEnvironment
 
-- SDK 标准环境,不修改
-- 通过 ResourceRegistry 管理 ProcessManager
+- Standard SDK environment, unmodified
+- ProcessManager managed via ResourceRegistry
 
 ### Plan/Act Agent
 
-- 两个独立的 AgentRuntime
-- 不同的工具集和 instructions
-- 模式切换时选择对应 runtime
+- Two independent AgentRuntime instances
+- Different toolsets and instructions
+- Mode switch selects corresponding runtime
 
 ## Key Data Flows
 
@@ -137,7 +139,8 @@ User Input -> TUI -> TUISession -> [Steering Buffer | Agent Prompt]
 ### 2. Agent Event Flow
 
 ```
-Agent Execution -> pre_node_hook -> output_queue -> TUI Renderer
+Agent Execution -> SDK lifecycle events -> stream_agent -> TUI Renderer
+                   (ModelRequestStartEvent, ToolCallsStartEvent, etc.)
 ```
 
 ### 3. Steering Injection Flow

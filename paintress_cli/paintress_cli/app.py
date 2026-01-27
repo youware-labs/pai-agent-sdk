@@ -65,17 +65,16 @@ from pai_agent_sdk.events import (
     HandoffFailedEvent,
     HandoffStartEvent,
     MessageReceivedEvent,
+    ModelRequestStartEvent,
     SubagentCompleteEvent,
     SubagentStartEvent,
+    ToolCallsStartEvent,
 )
 from pai_agent_sdk.utils import get_latest_request_usage
 from paintress_cli.browser import BrowserManager
 from paintress_cli.config import ConfigManager, PaintressConfig
 from paintress_cli.display import EventRenderer, RichRenderer, ToolMessage
-from paintress_cli.events import (
-    AgentPhaseEvent,
-    ContextUpdateEvent,
-)
+from paintress_cli.events import ContextUpdateEvent
 from paintress_cli.hooks import emit_context_update
 from paintress_cli.logging import configure_tui_logging, get_logger
 from paintress_cli.runtime import create_tui_runtime
@@ -148,6 +147,7 @@ class TUIApp:
     # Runtime state
     _mode: TUIMode = field(default=TUIMode.ACT, init=False)
     _state: TUIState = field(default=TUIState.IDLE, init=False)
+    _agent_phase: str = field(default="idle", init=False)  # "idle", "thinking", "tools"
 
     # Resources (initialized in __aenter__)
     _exit_stack: AsyncExitStack | None = field(default=None, init=False, repr=False)
@@ -623,10 +623,14 @@ class TUIApp:
                     ("class:status-bar", "Enter/Y: Approve | Text: Reject | Ctrl+C: Cancel"),
                 ]
             else:
+                # Show phase-specific status
+                phase_display = {"thinking": "Thinking...", "tools": "Running tools..."}.get(
+                    self._agent_phase, "Running..."
+                )
                 return [
                     (mode_style, f" {self._mode.value.upper()} "),
                     ("class:status-bar", " | "),
-                    ("class:status-bar", f"State: {state_text}"),
+                    ("class:status-bar", phase_display),
                     ("class:status-bar", " | "),
                     ("class:status-bar", f"Context: {context_pct}%"),
                     ("class:status-bar", " | "),
@@ -750,6 +754,7 @@ class TUIApp:
             # Exception was not caught in _run_agent - display it
             logger.error("Uncaught exception in agent task: %s: %s", type(exc).__name__, str(exc))
             self._append_error_output(exc)
+            self._agent_phase = "idle"
             self._state = TUIState.IDLE
             if self._app:
                 self._app.invalidate()
@@ -798,6 +803,7 @@ class TUIApp:
             self._finalize_streaming_thinking()
             # Reset all HITL state
             self._reset_hitl_state()
+            self._agent_phase = "idle"
             self._state = TUIState.IDLE
             if self._app:
                 self._app.invalidate()
@@ -1287,9 +1293,12 @@ class TUIApp:
             if message_event.context_window_size > 0:
                 self._context_window_size = message_event.context_window_size
 
-        elif isinstance(message_event, AgentPhaseEvent):
-            # Update status based on phase (handled by status bar)
-            pass
+        # Handle SDK lifecycle events for status bar
+        elif isinstance(message_event, ModelRequestStartEvent):
+            self._agent_phase = "thinking"
+
+        elif isinstance(message_event, ToolCallsStartEvent):
+            self._agent_phase = "tools"
 
         elif isinstance(message_event, MessageReceivedEvent):
             # Update UI status to acked for matched steering messages

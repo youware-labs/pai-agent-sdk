@@ -5,9 +5,12 @@
 TUIEnvironment extends `pai_agent_sdk`'s LocalEnvironment with capabilities specifically designed for TUI operation:
 
 1. **Subprocess Management**: Track and control long-running processes
-2. **Event Emission**: Report subprocess lifecycle to TUI
-3. **Browser Integration**: Optional headless browser sandbox
-4. **Resource Cleanup**: Ensure all resources are properly cleaned up
+2. **Browser Integration**: Optional headless browser sandbox (future)
+3. **Resource Cleanup**: Ensure all resources are properly cleaned up
+
+> **Note**: Event emission from ProcessManager (ProcessStartedEvent, ProcessOutputEvent, etc.)
+> is a planned feature not yet implemented. Currently, ProcessManager operates without
+> emitting events to the TUI event stream.
 
 ## Architecture
 

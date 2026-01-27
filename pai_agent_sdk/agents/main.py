@@ -44,9 +44,10 @@ from pai_agent_sdk.events import (
     AgentExecutionFailedEvent,
     AgentExecutionStartEvent,
     LifecycleEvent,
-    LoopStartEvent,
-    NodeCompleteEvent,
-    NodeStartEvent,
+    ModelRequestCompleteEvent,
+    ModelRequestStartEvent,
+    ToolCallsCompleteEvent,
+    ToolCallsStartEvent,
 )
 from pai_agent_sdk.filters.environment_instructions import create_environment_instructions_filter
 from pai_agent_sdk.filters.system_prompt import create_system_prompt_filter
@@ -854,25 +855,16 @@ async def stream_agent(  # noqa: C901
         loop_idx = tracker.loop_index
 
         await emit_lifecycle_event(
-            LoopStartEvent(event_id=ctx.run_id, loop_index=loop_idx, message_count=len(run.all_messages()))
+            ModelRequestStartEvent(event_id=ctx.run_id, loop_index=loop_idx, message_count=len(run.all_messages()))
         )
-        await emit_lifecycle_event(NodeStartEvent(event_id=ctx.run_id, node_type="model_request", loop_index=loop_idx))
 
         await process_node(node, run)
 
-        # Check if model response has tool calls (access internal state for debug info)
-        has_tool_calls = False
-        if graph_run := getattr(run, "_graph_run", None):
-            pending_nodes = getattr(graph_run, "_pending_nodes", [])
-            has_tool_calls = any(Agent.is_call_tools_node(n) for n in pending_nodes)
-
         await emit_lifecycle_event(
-            NodeCompleteEvent(
+            ModelRequestCompleteEvent(
                 event_id=ctx.run_id,
-                node_type="model_request",
                 loop_index=loop_idx,
                 duration_seconds=time.perf_counter() - node_start_time,
-                has_tool_calls=has_tool_calls,
             )
         )
         tracker.loop_index += 1
@@ -884,28 +876,13 @@ async def stream_agent(  # noqa: C901
     ) -> None:
         """Handle call_tools node with lifecycle events."""
         current_loop = tracker.loop_index - 1
-        await emit_lifecycle_event(NodeStartEvent(event_id=ctx.run_id, node_type="call_tools", loop_index=current_loop))
+        await emit_lifecycle_event(ToolCallsStartEvent(event_id=ctx.run_id, loop_index=current_loop))
 
         await process_node(node, run)
 
         await emit_lifecycle_event(
-            NodeCompleteEvent(
+            ToolCallsCompleteEvent(
                 event_id=ctx.run_id,
-                node_type="call_tools",
-                loop_index=current_loop,
-                duration_seconds=time.perf_counter() - node_start_time,
-            )
-        )
-
-    async def handle_end_node(run: AgentRun[AgentDepsT, OutputT], node_start_time: float) -> None:
-        """Handle end node with lifecycle events."""
-        current_loop = tracker.loop_index - 1 if tracker.loop_index > 0 else 0
-        await emit_lifecycle_event(NodeStartEvent(event_id=ctx.run_id, node_type="end", loop_index=current_loop))
-
-        await emit_lifecycle_event(
-            NodeCompleteEvent(
-                event_id=ctx.run_id,
-                node_type="end",
                 loop_index=current_loop,
                 duration_seconds=time.perf_counter() - node_start_time,
             )
@@ -916,15 +893,13 @@ async def stream_agent(  # noqa: C901
         async for node in run:
             node_start_time = time.perf_counter()
 
-            if Agent.is_user_prompt_node(node):
-                # Skip user_prompt node - info already in AgentExecutionStartEvent
+            if Agent.is_user_prompt_node(node) or Agent.is_end_node(node):
+                # Skip user_prompt and end nodes - their info is in AgentExecution events
                 continue
             elif Agent.is_model_request_node(node):
                 await handle_model_request_node(node, run, node_start_time)
             elif Agent.is_call_tools_node(node):
                 await handle_call_tools_node(node, run, node_start_time)
-            elif Agent.is_end_node(node):
-                await handle_end_node(run, node_start_time)
 
     async def run_agent_iteration(
         effective_user_prompt: UserPromptT | None,

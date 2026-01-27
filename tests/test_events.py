@@ -12,9 +12,10 @@ from pai_agent_sdk.events import (
     CompactCompleteEvent,
     CompactFailedEvent,
     CompactStartEvent,
-    LoopStartEvent,
-    NodeCompleteEvent,
-    NodeStartEvent,
+    ModelRequestCompleteEvent,
+    ModelRequestStartEvent,
+    ToolCallsCompleteEvent,
+    ToolCallsStartEvent,
 )
 
 # =============================================================================
@@ -313,13 +314,13 @@ def test_agent_execution_failed_event_defaults() -> None:
 
 
 # =============================================================================
-# Loop Events Tests
+# Model Request Events Tests
 # =============================================================================
 
 
-def test_loop_start_event() -> None:
-    """LoopStartEvent should capture loop iteration info."""
-    event = LoopStartEvent(
+def test_model_request_start_event() -> None:
+    """ModelRequestStartEvent should capture model request start info."""
+    event = ModelRequestStartEvent(
         event_id="exec-001",
         loop_index=2,
         message_count=15,
@@ -329,89 +330,70 @@ def test_loop_start_event() -> None:
     assert event.message_count == 15
 
 
-def test_loop_start_event_defaults() -> None:
-    """LoopStartEvent should have sensible defaults."""
-    event = LoopStartEvent(event_id="exec-001")
+def test_model_request_start_event_defaults() -> None:
+    """ModelRequestStartEvent should have sensible defaults."""
+    event = ModelRequestStartEvent(event_id="exec-001")
     assert event.loop_index == 0
     assert event.message_count == 0
 
 
-# =============================================================================
-# Node Events Tests
-# =============================================================================
-
-
-def test_node_start_event() -> None:
-    """NodeStartEvent should capture node start info."""
-    event = NodeStartEvent(
+def test_model_request_complete_event() -> None:
+    """ModelRequestCompleteEvent should capture model request completion info."""
+    event = ModelRequestCompleteEvent(
         event_id="exec-001",
-        node_type="model_request",
+        loop_index=0,
+        duration_seconds=2.5,
+    )
+    assert event.event_id == "exec-001"
+    assert event.loop_index == 0
+    assert event.duration_seconds == 2.5
+
+
+def test_model_request_complete_event_defaults() -> None:
+    """ModelRequestCompleteEvent should have sensible defaults."""
+    event = ModelRequestCompleteEvent(event_id="exec-001")
+    assert event.loop_index == 0
+    assert event.duration_seconds == 0.0
+
+
+# =============================================================================
+# Tool Calls Events Tests
+# =============================================================================
+
+
+def test_tool_calls_start_event() -> None:
+    """ToolCallsStartEvent should capture tool execution start info."""
+    event = ToolCallsStartEvent(
+        event_id="exec-001",
         loop_index=1,
     )
     assert event.event_id == "exec-001"
-    assert event.node_type == "model_request"
     assert event.loop_index == 1
 
 
-def test_node_start_event_user_prompt() -> None:
-    """NodeStartEvent for user_prompt should have None loop_index."""
-    event = NodeStartEvent(
-        event_id="exec-001",
-        node_type="user_prompt",
-        loop_index=None,
-    )
-    assert event.node_type == "user_prompt"
-    assert event.loop_index is None
-
-
-def test_node_complete_event_model_request() -> None:
-    """NodeCompleteEvent for model_request should capture has_tool_calls."""
-    event = NodeCompleteEvent(
-        event_id="exec-001",
-        node_type="model_request",
-        loop_index=0,
-        duration_seconds=2.5,
-        has_tool_calls=True,
-    )
-    assert event.node_type == "model_request"
+def test_tool_calls_start_event_defaults() -> None:
+    """ToolCallsStartEvent should have sensible defaults."""
+    event = ToolCallsStartEvent(event_id="exec-001")
     assert event.loop_index == 0
-    assert event.duration_seconds == 2.5
-    assert event.has_tool_calls is True
 
 
-def test_node_complete_event_call_tools() -> None:
-    """NodeCompleteEvent for call_tools should work."""
-    event = NodeCompleteEvent(
+def test_tool_calls_complete_event() -> None:
+    """ToolCallsCompleteEvent should capture tool execution completion info."""
+    event = ToolCallsCompleteEvent(
         event_id="exec-001",
-        node_type="call_tools",
         loop_index=0,
         duration_seconds=1.2,
     )
-    assert event.node_type == "call_tools"
+    assert event.event_id == "exec-001"
     assert event.loop_index == 0
     assert event.duration_seconds == 1.2
 
 
-def test_node_complete_event_end() -> None:
-    """NodeCompleteEvent for end should work."""
-    event = NodeCompleteEvent(
-        event_id="exec-001",
-        node_type="end",
-        loop_index=2,
-        duration_seconds=0.01,
-    )
-    assert event.node_type == "end"
-    assert event.loop_index == 2
-    assert event.duration_seconds == 0.01
-
-
-def test_node_complete_event_defaults() -> None:
-    """NodeCompleteEvent should have sensible defaults."""
-    event = NodeCompleteEvent(event_id="exec-001")
-    assert event.node_type == "model_request"
-    assert event.loop_index is None
+def test_tool_calls_complete_event_defaults() -> None:
+    """ToolCallsCompleteEvent should have sensible defaults."""
+    event = ToolCallsCompleteEvent(event_id="exec-001")
+    assert event.loop_index == 0
     assert event.duration_seconds == 0.0
-    assert event.has_tool_calls is False
 
 
 # =============================================================================
@@ -424,9 +406,11 @@ def test_lifecycle_event_correlation() -> None:
     event_id = "lifecycle-test-001"
 
     start = AgentExecutionStartEvent(event_id=event_id, user_prompt="Test")
-    loop_start = LoopStartEvent(event_id=event_id, loop_index=0)
-    node_start = NodeStartEvent(event_id=event_id, node_type="model_request", loop_index=0)
-    node_complete = NodeCompleteEvent(event_id=event_id, node_type="model_request", duration_seconds=1.0)
+    model_start = ModelRequestStartEvent(event_id=event_id, loop_index=0)
+    model_complete = ModelRequestCompleteEvent(event_id=event_id, loop_index=0, duration_seconds=1.0)
+    tool_start = ToolCallsStartEvent(event_id=event_id, loop_index=0)
+    tool_complete = ToolCallsCompleteEvent(event_id=event_id, loop_index=0, duration_seconds=0.5)
     complete = AgentExecutionCompleteEvent(event_id=event_id, total_loops=1)
 
-    assert start.event_id == loop_start.event_id == node_start.event_id == node_complete.event_id == complete.event_id
+    all_events = [start, model_start, model_complete, tool_start, tool_complete, complete]
+    assert all(e.event_id == event_id for e in all_events)

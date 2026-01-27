@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -208,9 +208,6 @@ class MessageReceivedEvent(AgentEvent):
 # Agent Lifecycle Events
 # =============================================================================
 
-# Node type for agent graph traversal
-NodeType = Literal["user_prompt", "model_request", "call_tools", "end"]
-
 
 @dataclass
 class AgentExecutionStartEvent(AgentEvent):
@@ -273,73 +270,85 @@ class AgentExecutionFailedEvent(AgentEvent):
 
 
 # =============================================================================
-# Loop Events
+# Model Request Events
 # =============================================================================
 
 
 @dataclass
-class LoopStartEvent(AgentEvent):
-    """Emitted when agent starts a new loop iteration.
+class ModelRequestStartEvent(AgentEvent):
+    """Emitted when agent starts a model request (thinking phase).
 
-    A "loop" is one model_request and its subsequent tool executions (if any).
-    Loop index increments each time a new model request begins.
+    A model request sends the current conversation to the LLM and waits for a response.
+    This marks the beginning of a "loop" - one model request plus optional tool executions.
 
     Use this event for:
-    - Displaying loop progress (e.g., "Loop 3/10")
+    - Displaying "Thinking..." status in UI
+    - Tracking loop iterations (e.g., "Loop 3/10")
     - Implementing client-side loop limits
-    - Debugging infinite loop scenarios
 
     Attributes:
         loop_index: Zero-based loop iteration number.
-        message_count: Number of messages in history at loop start.
+        message_count: Number of messages in history at request start.
     """
 
     loop_index: int = 0
     message_count: int = 0
 
 
-# =============================================================================
-# Node Events
-# =============================================================================
-
-
 @dataclass
-class NodeStartEvent(AgentEvent):
-    """Emitted when a graph node starts processing.
+class ModelRequestCompleteEvent(AgentEvent):
+    """Emitted when a model request completes (response received).
 
-    Use this event for:
-    - Displaying current phase (e.g., "Thinking..." vs "Running tools...")
-    - Fine-grained progress tracking
+    This marks the end of the thinking phase. If the model requested tool calls,
+    a ToolCallsStartEvent will follow.
 
     Attributes:
-        node_type: Type of node being processed.
-        loop_index: Current loop iteration number (None for user_prompt node).
+        loop_index: Current loop iteration number.
+        duration_seconds: Time spent waiting for model response.
     """
 
-    node_type: NodeType = "model_request"
-    loop_index: int | None = None
-
-
-@dataclass
-class NodeCompleteEvent(AgentEvent):
-    """Emitted when a graph node completes processing.
-
-    Contains node-specific details based on node_type:
-    - model_request: has_tool_calls
-
-    Attributes:
-        node_type: Type of node that completed.
-        loop_index: Current loop iteration number (None for user_prompt node).
-        duration_seconds: Time spent processing this node.
-        has_tool_calls: Whether model response contains tool calls (model_request only).
-    """
-
-    node_type: NodeType = "model_request"
-    loop_index: int | None = None
+    loop_index: int = 0
     duration_seconds: float = 0.0
 
-    # model_request specific
-    has_tool_calls: bool = False
+
+# =============================================================================
+# Tool Calls Events
+# =============================================================================
+
+
+@dataclass
+class ToolCallsStartEvent(AgentEvent):
+    """Emitted when agent starts executing tool calls.
+
+    This marks the transition from thinking to tool execution phase.
+    Tool calls are executed based on the model's response.
+
+    Use this event for:
+    - Displaying "Running tools..." status in UI
+    - Tracking tool execution phases
+
+    Attributes:
+        loop_index: Current loop iteration number.
+    """
+
+    loop_index: int = 0
+
+
+@dataclass
+class ToolCallsCompleteEvent(AgentEvent):
+    """Emitted when tool calls execution completes.
+
+    After this event, the agent will either:
+    - Start another model request (ModelRequestStartEvent)
+    - Complete execution (AgentExecutionCompleteEvent)
+
+    Attributes:
+        loop_index: Current loop iteration number.
+        duration_seconds: Time spent executing tools.
+    """
+
+    loop_index: int = 0
+    duration_seconds: float = 0.0
 
 
 # =============================================================================
@@ -351,7 +360,8 @@ LifecycleEvent = (
     AgentExecutionStartEvent
     | AgentExecutionCompleteEvent
     | AgentExecutionFailedEvent
-    | LoopStartEvent
-    | NodeStartEvent
-    | NodeCompleteEvent
+    | ModelRequestStartEvent
+    | ModelRequestCompleteEvent
+    | ToolCallsStartEvent
+    | ToolCallsCompleteEvent
 )

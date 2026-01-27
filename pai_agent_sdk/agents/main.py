@@ -7,6 +7,7 @@ with proper environment and context lifecycle management.
 from __future__ import annotations
 
 import asyncio
+import time
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass, field
@@ -38,6 +39,15 @@ from pai_agent_sdk.context import (
     ToolConfig,
 )
 from pai_agent_sdk.environment.local import LocalEnvironment
+from pai_agent_sdk.events import (
+    AgentExecutionCompleteEvent,
+    AgentExecutionFailedEvent,
+    AgentExecutionStartEvent,
+    LifecycleEvent,
+    LoopStartEvent,
+    NodeCompleteEvent,
+    NodeStartEvent,
+)
 from pai_agent_sdk.filters.environment_instructions import create_environment_instructions_filter
 from pai_agent_sdk.filters.system_prompt import create_system_prompt_filter
 from pai_agent_sdk.toolsets.core.base import BaseTool, GlobalHooks, Toolset
@@ -676,6 +686,8 @@ async def stream_agent(  # noqa: C901
     metadata: RunContextMetadata | None = None,
     # Error handling
     raise_on_error: bool = True,
+    # Lifecycle events
+    emit_lifecycle_events: bool = True,
 ) -> AsyncIterator[AgentStreamer[AgentDepsT, OutputT]]:
     """Stream agent execution with subagent event aggregation.
 
@@ -720,6 +732,10 @@ async def stream_agent(  # noqa: C901
         raise_on_error: If True (default), exceptions during streaming are re-raised
             immediately. If False, exceptions are captured in streamer.exception
             and can be checked after iteration via raise_if_exception().
+        emit_lifecycle_events: If True (default), emit built-in lifecycle events
+            (AgentExecutionStartEvent, LoopStartEvent, NodeStartEvent, etc.) to the
+            stream. Set to False to disable these events for cleaner output or
+            when implementing custom event handling via hooks.
 
     Yields:
         AgentStreamer that can be iterated for StreamEvent objects.
@@ -810,21 +826,167 @@ async def stream_agent(  # noqa: C901
                 NodeHookContext(agent_info=main_agent_info, node=node, run=run, output_queue=output_queue)
             )
 
+    @dataclass
+    class LifecycleTracker:
+        """Tracks lifecycle state during agent execution."""
+
+        loop_index: int = 0
+
+    tracker = LifecycleTracker()
+
+    async def emit_lifecycle_event(event: LifecycleEvent) -> None:
+        """Emit a lifecycle event if enabled."""
+        if emit_lifecycle_events:
+            await output_queue.put(
+                StreamEvent(
+                    agent_id=main_agent_info.agent_id,
+                    agent_name=main_agent_info.agent_name,
+                    event=event,
+                )
+            )
+
+    async def handle_model_request_node(
+        node: ModelRequestNode[AgentDepsT, OutputT],
+        run: AgentRun[AgentDepsT, OutputT],
+        node_start_time: float,
+    ) -> None:
+        """Handle model_request node with lifecycle events."""
+        loop_idx = tracker.loop_index
+
+        await emit_lifecycle_event(
+            LoopStartEvent(event_id=ctx.run_id, loop_index=loop_idx, message_count=len(run.all_messages()))
+        )
+        await emit_lifecycle_event(NodeStartEvent(event_id=ctx.run_id, node_type="model_request", loop_index=loop_idx))
+
+        await process_node(node, run)
+
+        # Check if model response has tool calls (access internal state for debug info)
+        has_tool_calls = False
+        if graph_run := getattr(run, "_graph_run", None):
+            pending_nodes = getattr(graph_run, "_pending_nodes", [])
+            has_tool_calls = any(Agent.is_call_tools_node(n) for n in pending_nodes)
+
+        await emit_lifecycle_event(
+            NodeCompleteEvent(
+                event_id=ctx.run_id,
+                node_type="model_request",
+                loop_index=loop_idx,
+                duration_seconds=time.perf_counter() - node_start_time,
+                has_tool_calls=has_tool_calls,
+            )
+        )
+        tracker.loop_index += 1
+
+    async def handle_call_tools_node(
+        node: CallToolsNode[AgentDepsT, OutputT],
+        run: AgentRun[AgentDepsT, OutputT],
+        node_start_time: float,
+    ) -> None:
+        """Handle call_tools node with lifecycle events."""
+        current_loop = tracker.loop_index - 1
+        await emit_lifecycle_event(NodeStartEvent(event_id=ctx.run_id, node_type="call_tools", loop_index=current_loop))
+
+        await process_node(node, run)
+
+        await emit_lifecycle_event(
+            NodeCompleteEvent(
+                event_id=ctx.run_id,
+                node_type="call_tools",
+                loop_index=current_loop,
+                duration_seconds=time.perf_counter() - node_start_time,
+            )
+        )
+
+    async def handle_end_node(run: AgentRun[AgentDepsT, OutputT], node_start_time: float) -> None:
+        """Handle end node with lifecycle events."""
+        current_loop = tracker.loop_index - 1 if tracker.loop_index > 0 else 0
+        await emit_lifecycle_event(NodeStartEvent(event_id=ctx.run_id, node_type="end", loop_index=current_loop))
+
+        await emit_lifecycle_event(
+            NodeCompleteEvent(
+                event_id=ctx.run_id,
+                node_type="end",
+                loop_index=current_loop,
+                duration_seconds=time.perf_counter() - node_start_time,
+            )
+        )
+
+    async def process_all_nodes(run: AgentRun[AgentDepsT, OutputT]) -> None:
+        """Process all nodes in the agent run with lifecycle events."""
+        async for node in run:
+            node_start_time = time.perf_counter()
+
+            if Agent.is_user_prompt_node(node):
+                # Skip user_prompt node - info already in AgentExecutionStartEvent
+                continue
+            elif Agent.is_model_request_node(node):
+                await handle_model_request_node(node, run, node_start_time)
+            elif Agent.is_call_tools_node(node):
+                await handle_call_tools_node(node, run, node_start_time)
+            elif Agent.is_end_node(node):
+                await handle_end_node(run, node_start_time)
+
+    async def run_agent_iteration(
+        effective_user_prompt: UserPromptT | None,
+        effective_deferred_tool_results: DeferredToolResults | None,
+        execution_start_time: float,
+    ) -> None:
+        """Run the agent iteration with hooks and lifecycle events."""
+        await emit_lifecycle_event(
+            AgentExecutionStartEvent(
+                event_id=ctx.run_id,
+                user_prompt=effective_user_prompt,
+                deferred_tool_results=effective_deferred_tool_results,
+                message_history_count=len(message_history) if message_history else 0,
+            )
+        )
+
+        async with agent.iter(
+            effective_user_prompt,
+            deps=ctx,
+            usage_limits=usage_limits,
+            message_history=message_history,
+            deferred_tool_results=effective_deferred_tool_results,
+            metadata=cast(dict[str, Any], metadata) if metadata else None,
+        ) as run:
+            streamer.run = run
+
+            if on_agent_start:
+                await on_agent_start(
+                    AgentStartContext(runtime=runtime, agent_info=main_agent_info, output_queue=output_queue, run=run)
+                )
+
+            await process_all_nodes(run)
+
+            if on_agent_complete:
+                await on_agent_complete(
+                    AgentCompleteContext(
+                        runtime=runtime, agent_info=main_agent_info, output_queue=output_queue, run=run
+                    )
+                )
+
+            await emit_lifecycle_event(
+                AgentExecutionCompleteEvent(
+                    event_id=ctx.run_id,
+                    total_loops=tracker.loop_index,
+                    total_duration_seconds=time.perf_counter() - execution_start_time,
+                    final_message_count=len(run.all_messages()),
+                )
+            )
+
     async def run_main() -> None:
         """Run the main agent and push events to output_queue."""
         logger.debug("Main agent task started")
 
-        # These may be modified by user_prompt_factory or on_runtime_ready hook
         effective_user_prompt = user_prompt
         effective_deferred_tool_results = deferred_tool_results
+        execution_start_time = time.perf_counter()
 
         try:
             async with runtime:
-                # User prompt factory - called first to generate prompt from runtime
                 if user_prompt_factory:
                     effective_user_prompt = await user_prompt_factory(runtime)
 
-                # Runtime ready hook - environment is open, agent not started yet
                 if on_runtime_ready:
                     ready_ctx = RuntimeReadyContext(
                         runtime=runtime,
@@ -834,54 +996,25 @@ async def stream_agent(  # noqa: C901
                         deferred_tool_results=effective_deferred_tool_results,
                     )
                     await on_runtime_ready(ready_ctx)
-                    # Use potentially modified values from hook
                     effective_user_prompt = ready_ctx.user_prompt
                     effective_deferred_tool_results = ready_ctx.deferred_tool_results
 
-                async with agent.iter(
-                    effective_user_prompt,
-                    deps=ctx,
-                    usage_limits=usage_limits,
-                    message_history=message_history,
-                    deferred_tool_results=effective_deferred_tool_results,
-                    metadata=cast(dict[str, Any], metadata) if metadata else None,
-                ) as run:
-                    streamer.run = run  # Expose run immediately
+                await run_agent_iteration(effective_user_prompt, effective_deferred_tool_results, execution_start_time)
 
-                    # Agent start hook - run object available
-                    if on_agent_start:
-                        await on_agent_start(
-                            AgentStartContext(
-                                runtime=runtime,
-                                agent_info=main_agent_info,
-                                output_queue=output_queue,
-                                run=run,
-                            )
-                        )
-
-                    async for node in run:
-                        if Agent.is_user_prompt_node(node) or Agent.is_end_node(node):
-                            continue
-
-                        if Agent.is_model_request_node(node) or Agent.is_call_tools_node(node):
-                            await process_node(node, run)
-
-                    # Agent complete hook - all nodes processed, result available
-                    if on_agent_complete:
-                        await on_agent_complete(
-                            AgentCompleteContext(
-                                runtime=runtime,
-                                agent_info=main_agent_info,
-                                output_queue=output_queue,
-                                run=run,
-                            )
-                        )
         except BaseException as e:
-            # Log all exceptions including CancelledError for debugging
             if isinstance(e, asyncio.CancelledError):
                 logger.debug("Main agent task cancelled")
             else:
                 logger.exception("Error in main agent task")
+                await emit_lifecycle_event(
+                    AgentExecutionFailedEvent(
+                        event_id=ctx.run_id,
+                        error=str(e),
+                        error_type=type(e).__name__,
+                        total_loops=tracker.loop_index,
+                        total_duration_seconds=time.perf_counter() - execution_start_time,
+                    )
+                )
             raise
         finally:
             logger.debug("Main agent task finished")

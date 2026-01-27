@@ -4,7 +4,18 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from pai_agent_sdk.context import AgentContext
-from pai_agent_sdk.events import AgentEvent, CompactCompleteEvent, CompactFailedEvent, CompactStartEvent
+from pai_agent_sdk.events import (
+    AgentEvent,
+    AgentExecutionCompleteEvent,
+    AgentExecutionFailedEvent,
+    AgentExecutionStartEvent,
+    CompactCompleteEvent,
+    CompactFailedEvent,
+    CompactStartEvent,
+    LoopStartEvent,
+    NodeCompleteEvent,
+    NodeStartEvent,
+)
 
 # =============================================================================
 # AgentEvent Tests
@@ -226,3 +237,196 @@ def test_custom_event_subclass() -> None:
     assert event.event_id == "custom-001"
     assert event.custom_field == "my value"
     assert isinstance(event.timestamp, datetime)
+
+
+# =============================================================================
+# Agent Lifecycle Events Tests
+# =============================================================================
+
+
+def test_agent_execution_start_event() -> None:
+    """AgentExecutionStartEvent should capture execution start info."""
+    event = AgentExecutionStartEvent(
+        event_id="exec-001",
+        user_prompt="Hello, how are you?",
+        message_history_count=5,
+    )
+    assert event.event_id == "exec-001"
+    assert event.user_prompt == "Hello, how are you?"
+    assert event.message_history_count == 5
+    assert event.deferred_tool_results is None
+
+
+def test_agent_execution_start_event_defaults() -> None:
+    """AgentExecutionStartEvent should have sensible defaults."""
+    event = AgentExecutionStartEvent(event_id="exec-001")
+    assert event.user_prompt is None
+    assert event.deferred_tool_results is None
+    assert event.message_history_count == 0
+
+
+def test_agent_execution_complete_event() -> None:
+    """AgentExecutionCompleteEvent should capture execution results."""
+    event = AgentExecutionCompleteEvent(
+        event_id="exec-001",
+        total_loops=3,
+        total_duration_seconds=12.5,
+        final_message_count=20,
+    )
+    assert event.event_id == "exec-001"
+    assert event.total_loops == 3
+    assert event.total_duration_seconds == 12.5
+    assert event.final_message_count == 20
+
+
+def test_agent_execution_complete_event_defaults() -> None:
+    """AgentExecutionCompleteEvent should have sensible defaults."""
+    event = AgentExecutionCompleteEvent(event_id="exec-001")
+    assert event.total_loops == 0
+    assert event.total_duration_seconds == 0.0
+    assert event.final_message_count == 0
+
+
+def test_agent_execution_failed_event() -> None:
+    """AgentExecutionFailedEvent should capture failure info."""
+    event = AgentExecutionFailedEvent(
+        event_id="exec-001",
+        error="Rate limit exceeded",
+        error_type="RateLimitError",
+        total_loops=2,
+        total_duration_seconds=5.3,
+    )
+    assert event.event_id == "exec-001"
+    assert event.error == "Rate limit exceeded"
+    assert event.error_type == "RateLimitError"
+    assert event.total_loops == 2
+    assert event.total_duration_seconds == 5.3
+
+
+def test_agent_execution_failed_event_defaults() -> None:
+    """AgentExecutionFailedEvent should have sensible defaults."""
+    event = AgentExecutionFailedEvent(event_id="exec-001")
+    assert event.error == ""
+    assert event.error_type == ""
+    assert event.total_loops == 0
+    assert event.total_duration_seconds == 0.0
+
+
+# =============================================================================
+# Loop Events Tests
+# =============================================================================
+
+
+def test_loop_start_event() -> None:
+    """LoopStartEvent should capture loop iteration info."""
+    event = LoopStartEvent(
+        event_id="exec-001",
+        loop_index=2,
+        message_count=15,
+    )
+    assert event.event_id == "exec-001"
+    assert event.loop_index == 2
+    assert event.message_count == 15
+
+
+def test_loop_start_event_defaults() -> None:
+    """LoopStartEvent should have sensible defaults."""
+    event = LoopStartEvent(event_id="exec-001")
+    assert event.loop_index == 0
+    assert event.message_count == 0
+
+
+# =============================================================================
+# Node Events Tests
+# =============================================================================
+
+
+def test_node_start_event() -> None:
+    """NodeStartEvent should capture node start info."""
+    event = NodeStartEvent(
+        event_id="exec-001",
+        node_type="model_request",
+        loop_index=1,
+    )
+    assert event.event_id == "exec-001"
+    assert event.node_type == "model_request"
+    assert event.loop_index == 1
+
+
+def test_node_start_event_user_prompt() -> None:
+    """NodeStartEvent for user_prompt should have None loop_index."""
+    event = NodeStartEvent(
+        event_id="exec-001",
+        node_type="user_prompt",
+        loop_index=None,
+    )
+    assert event.node_type == "user_prompt"
+    assert event.loop_index is None
+
+
+def test_node_complete_event_model_request() -> None:
+    """NodeCompleteEvent for model_request should capture has_tool_calls."""
+    event = NodeCompleteEvent(
+        event_id="exec-001",
+        node_type="model_request",
+        loop_index=0,
+        duration_seconds=2.5,
+        has_tool_calls=True,
+    )
+    assert event.node_type == "model_request"
+    assert event.loop_index == 0
+    assert event.duration_seconds == 2.5
+    assert event.has_tool_calls is True
+
+
+def test_node_complete_event_call_tools() -> None:
+    """NodeCompleteEvent for call_tools should work."""
+    event = NodeCompleteEvent(
+        event_id="exec-001",
+        node_type="call_tools",
+        loop_index=0,
+        duration_seconds=1.2,
+    )
+    assert event.node_type == "call_tools"
+    assert event.loop_index == 0
+    assert event.duration_seconds == 1.2
+
+
+def test_node_complete_event_end() -> None:
+    """NodeCompleteEvent for end should work."""
+    event = NodeCompleteEvent(
+        event_id="exec-001",
+        node_type="end",
+        loop_index=2,
+        duration_seconds=0.01,
+    )
+    assert event.node_type == "end"
+    assert event.loop_index == 2
+    assert event.duration_seconds == 0.01
+
+
+def test_node_complete_event_defaults() -> None:
+    """NodeCompleteEvent should have sensible defaults."""
+    event = NodeCompleteEvent(event_id="exec-001")
+    assert event.node_type == "model_request"
+    assert event.loop_index is None
+    assert event.duration_seconds == 0.0
+    assert event.has_tool_calls is False
+
+
+# =============================================================================
+# Lifecycle Event Correlation Tests
+# =============================================================================
+
+
+def test_lifecycle_event_correlation() -> None:
+    """Lifecycle events should be correlated by event_id."""
+    event_id = "lifecycle-test-001"
+
+    start = AgentExecutionStartEvent(event_id=event_id, user_prompt="Test")
+    loop_start = LoopStartEvent(event_id=event_id, loop_index=0)
+    node_start = NodeStartEvent(event_id=event_id, node_type="model_request", loop_index=0)
+    node_complete = NodeCompleteEvent(event_id=event_id, node_type="model_request", duration_seconds=1.0)
+    complete = AgentExecutionCompleteEvent(event_id=event_id, total_loops=1)
+
+    assert start.event_id == loop_start.event_id == node_start.event_id == node_complete.event_id == complete.event_id

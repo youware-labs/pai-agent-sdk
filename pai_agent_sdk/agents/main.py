@@ -85,6 +85,18 @@ OutputT = TypeVar("OutputT")
 
 
 # =============================================================================
+# Lifecycle Tracking
+# =============================================================================
+
+
+@dataclass
+class LifecycleTracker:
+    """Tracks lifecycle state during agent execution."""
+
+    loop_index: int = 0
+
+
+# =============================================================================
 # Agent Runtime
 # =============================================================================
 
@@ -827,12 +839,9 @@ async def stream_agent(  # noqa: C901
                 NodeHookContext(agent_info=main_agent_info, node=node, run=run, output_queue=output_queue)
             )
 
-    @dataclass
-    class LifecycleTracker:
-        """Tracks lifecycle state during agent execution."""
-
-        loop_index: int = 0
-
+    # Lifecycle tracker for loop counting.
+    # loop_index is set at the start of each ModelRequest and used by both
+    # ModelRequest and ToolCalls events within the same loop iteration.
     tracker = LifecycleTracker()
 
     async def emit_lifecycle_event(event: LifecycleEvent) -> None:
@@ -851,11 +860,16 @@ async def stream_agent(  # noqa: C901
         run: AgentRun[AgentDepsT, OutputT],
         node_start_time: float,
     ) -> None:
-        """Handle model_request node with lifecycle events."""
-        loop_idx = tracker.loop_index
+        """Handle model_request node with lifecycle events.
+
+        Each ModelRequestNode marks the start of a new loop iteration.
+        The loop_index is incremented here before processing.
+        """
+        current_loop = tracker.loop_index
+        tracker.loop_index += 1  # Increment for next loop
 
         await emit_lifecycle_event(
-            ModelRequestStartEvent(event_id=ctx.run_id, loop_index=loop_idx, message_count=len(run.all_messages()))
+            ModelRequestStartEvent(event_id=ctx.run_id, loop_index=current_loop, message_count=len(run.all_messages()))
         )
 
         await process_node(node, run)
@@ -863,18 +877,21 @@ async def stream_agent(  # noqa: C901
         await emit_lifecycle_event(
             ModelRequestCompleteEvent(
                 event_id=ctx.run_id,
-                loop_index=loop_idx,
+                loop_index=current_loop,
                 duration_seconds=time.perf_counter() - node_start_time,
             )
         )
-        tracker.loop_index += 1
 
     async def handle_call_tools_node(
         node: CallToolsNode[AgentDepsT, OutputT],
         run: AgentRun[AgentDepsT, OutputT],
         node_start_time: float,
     ) -> None:
-        """Handle call_tools node with lifecycle events."""
+        """Handle call_tools node with lifecycle events.
+
+        ToolCalls always follow a ModelRequest, so we use (loop_index - 1)
+        to reference the loop that just completed its model request phase.
+        """
         current_loop = tracker.loop_index - 1
         await emit_lifecycle_event(ToolCallsStartEvent(event_id=ctx.run_id, loop_index=current_loop))
 

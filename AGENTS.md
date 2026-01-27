@@ -162,6 +162,15 @@ See [docs/streaming.md](docs/streaming.md) for details:
 - Hook context classes: `RuntimeReadyContext`, `AgentStartContext`, `AgentCompleteContext`, `NodeHookContext`, `EventHookContext`
 - Interruption and error handling
 
+### Events
+
+See [docs/events.md](docs/events.md) for details:
+
+- Lifecycle events: `AgentExecutionStartEvent`, `ModelRequestStartEvent`, `ToolCallsStartEvent`, etc.
+- Sideband events: compact, handoff, subagent, message bus events
+- Event correlation via `event_id`
+- Creating custom events
+
 ### Toolset Architecture
 
 See [docs/toolset.md](docs/toolset.md) for details:

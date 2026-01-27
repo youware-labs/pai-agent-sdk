@@ -224,6 +224,75 @@ Available for each streamed event.
 | `run`          | `AgentRun[AgentDepsT, OutputT]`     | The running agent iteration      |
 | `output_queue` | `asyncio.Queue[StreamEvent]`        | Queue for emitting custom events |
 
+## Lifecycle Events
+
+`stream_agent` emits built-in lifecycle events to track execution progress. These events are emitted to the stream alongside model events.
+
+### Event Flow
+
+```mermaid
+flowchart TB
+    A[AgentExecutionStartEvent] --> B[ModelRequestStartEvent]
+    B --> |"thinking..."| C[ModelRequestCompleteEvent]
+    C --> |"has tool calls"| D[ToolCallsStartEvent]
+    D --> |"running tools..."| E[ToolCallsCompleteEvent]
+    E --> |"more requests"| B
+    C --> |"no tool calls"| F[AgentExecutionCompleteEvent]
+    E --> |"done"| F
+    A --> |"error"| G[AgentExecutionFailedEvent]
+    B --> |"error"| G
+    D --> |"error"| G
+```
+
+### Event Types
+
+| Event                         | When Emitted                    | Key Fields                              |
+| ----------------------------- | ------------------------------- | --------------------------------------- |
+| `AgentExecutionStartEvent`    | Agent execution begins          | `user_prompt`, `message_history_count`  |
+| `ModelRequestStartEvent`      | Model request starts (thinking) | `loop_index`, `message_count`           |
+| `ModelRequestCompleteEvent`   | Model response received         | `loop_index`, `duration_seconds`        |
+| `ToolCallsStartEvent`         | Tool execution starts           | `loop_index`                            |
+| `ToolCallsCompleteEvent`      | Tool execution completes        | `loop_index`, `duration_seconds`        |
+| `AgentExecutionCompleteEvent` | Agent execution completes       | `total_loops`, `total_duration_seconds` |
+| `AgentExecutionFailedEvent`   | Agent execution fails           | `error`, `error_type`, `total_loops`    |
+
+### Usage Example
+
+```python
+from pai_agent_sdk.events import (
+    ModelRequestStartEvent,
+    ModelRequestCompleteEvent,
+    ToolCallsStartEvent,
+    ToolCallsCompleteEvent,
+)
+
+async with stream_agent(runtime, "Hello") as streamer:
+    async for stream_event in streamer:
+        event = stream_event.event
+        if isinstance(event, ModelRequestStartEvent):
+            print(f"Loop {event.loop_index}: Thinking...")
+        elif isinstance(event, ModelRequestCompleteEvent):
+            print(f"  Response received in {event.duration_seconds:.2f}s")
+        elif isinstance(event, ToolCallsStartEvent):
+            print(f"  Running tools...")
+        elif isinstance(event, ToolCallsCompleteEvent):
+            print(f"  Tools completed in {event.duration_seconds:.2f}s")
+```
+
+### Disabling Lifecycle Events
+
+Set `emit_lifecycle_events=False` to disable built-in events (e.g., when implementing custom tracking via hooks):
+
+```python
+async with stream_agent(
+    runtime,
+    "Hello",
+    emit_lifecycle_events=False,
+) as streamer:
+    async for event in streamer:
+        pass  # Only model events, no lifecycle events
+```
+
 ## Interruption
 
 Interrupt streaming at any point:

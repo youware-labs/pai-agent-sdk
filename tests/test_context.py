@@ -612,9 +612,16 @@ async def test_export_and_with_state_with_data(env: LocalEnvironment) -> None:
         ctx.handoff_message = "Handoff summary"
         ctx.deferred_tool_metadata["tool-1"] = {"key": "value"}
 
+        # Default export does NOT include extra_usages
         state = ctx.export_state()
+        assert state.extra_usages == []
 
-    # Restore to new context
+        # Export with include_extra_usages=True includes extra_usages
+        state_with_usages = ctx.export_state(include_extra_usages=True)
+        assert len(state_with_usages.extra_usages) == 1
+        assert state_with_usages.extra_usages[0].uuid == "test-uuid"
+
+    # Restore to new context (default state without extra_usages)
     async with AgentContext(env=env) as new_ctx:
         new_ctx.with_state(state)
 
@@ -625,9 +632,8 @@ async def test_export_and_with_state_with_data(env: LocalEnvironment) -> None:
         assert isinstance(request_msg, ModelRequest)
         assert request_msg.parts[0].content == "Hello"
 
-        # Verify other fields
-        assert len(new_ctx.extra_usages) == 1
-        assert new_ctx.extra_usages[0].uuid == "test-uuid"
+        # Verify extra_usages is empty (not restored by default)
+        assert new_ctx.extra_usages == []
         assert new_ctx.user_prompts == "Test prompt"
         assert new_ctx.handoff_message == "Handoff summary"
         assert new_ctx.deferred_tool_metadata == {"tool-1": {"key": "value"}}
@@ -674,13 +680,17 @@ async def test_export_state_include_subagent_false(env: LocalEnvironment) -> Non
         assert state.subagent_history == {}
         assert state.agent_registry == {}
 
-        # Verify non-subagent fields are preserved
-        assert len(state.extra_usages) == 1
-        assert state.extra_usages[0].uuid == "test-uuid"
+        # Verify non-subagent fields are preserved (except extra_usages which defaults to not included)
+        assert state.extra_usages == []  # Default: not included
         assert state.user_prompts == "Test prompt"
         assert state.handoff_message == "Handoff summary"
         assert state.deferred_tool_metadata == {"tool-1": {"key": "value"}}
         assert state.need_user_approve_tools == ["shell", "edit"]
+
+        # Export with include_extra_usages=True
+        state_with_usages = ctx.export_state(include_subagent=False, include_extra_usages=True)
+        assert len(state_with_usages.extra_usages) == 1
+        assert state_with_usages.extra_usages[0].uuid == "test-uuid"
 
 
 async def test_export_state_include_subagent_true_default(env: LocalEnvironment) -> None:
@@ -763,7 +773,8 @@ async def test_resumable_state_json_serialization_with_extra_usages(env: LocalEn
             )
         )
 
-        state = ctx.export_state()
+        # Must use include_extra_usages=True to include extra_usages in state
+        state = ctx.export_state(include_extra_usages=True)
 
         # Serialize to JSON string
         json_str = state.model_dump_json()

@@ -98,6 +98,24 @@ state = ResumableState.model_validate_json(Path("session.json").read_text())
 runtime = create_agent("openai:gpt-4", state=state)
 ```
 
+### Export Options
+
+```python
+# Default: include subagent history, exclude extra_usages
+state = ctx.export_state()
+
+# Exclude subagent history (smaller state)
+state = ctx.export_state(include_subagent=False)
+
+# Include extra_usages for crash recovery scenarios
+state = ctx.export_state(include_extra_usages=True)
+```
+
+**Note on extra_usages**: By default, `extra_usages` is not included in exported state.
+This is because `extra_usages` is per-run billing data that callers typically handle
+after each run. Set `include_extra_usages=True` only for crash recovery scenarios
+where you need to preserve usage data from an interrupted run.
+
 The `with_state` method accepts `None` for conditional restoration:
 
 ```python

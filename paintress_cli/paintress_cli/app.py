@@ -883,11 +883,10 @@ class TUIApp:
                 for record in ctx.extra_usages:
                     self._session_usage.add(record.agent, record.model_id, record.usage)
 
-                # Auto-save session after each run (before clearing extra_usages)
+                # Auto-save session after each run
+                # Note: export_state() defaults to include_extra_usages=False,
+                # so next restore won't have stale usage data
                 self._auto_save_history()
-
-                # Clear extra_usages after saving to avoid double counting on next run
-                ctx.extra_usages.clear()
 
             return stream.run.result if stream.run else None
 

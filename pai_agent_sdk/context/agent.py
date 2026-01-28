@@ -1259,7 +1259,12 @@ class AgentContext(BaseModel):
         async with self._enter_lock:
             self._entered = False
 
-    def export_state(self, *, include_subagent: bool = True) -> ResumableState:
+    def export_state(
+        self,
+        *,
+        include_subagent: bool = True,
+        include_extra_usages: bool = False,
+    ) -> ResumableState:
         """Export resumable session state.
 
         Creates a ResumableState containing all session data that can be
@@ -1269,17 +1274,24 @@ class AgentContext(BaseModel):
             include_subagent: Whether to include subagent history and registry.
                 Defaults to True. Set to False to exclude subagent data,
                 which can reduce state size for main agent-only persistence.
+            include_extra_usages: Whether to include extra_usages in the state.
+                Defaults to False. extra_usages is per-run data for billing tracking.
+                Set to True only for crash recovery scenarios where you need to
+                preserve usage data from an interrupted run.
 
         Returns:
             ResumableState instance ready for serialization.
 
         Example::
 
-            # Save full state including subagent history
+            # Save full state including subagent history (default, no extra_usages)
             state = ctx.export_state()
 
             # Save state without subagent data
             state = ctx.export_state(include_subagent=False)
+
+            # Save state with extra_usages for crash recovery
+            state = ctx.export_state(include_extra_usages=True)
 
             with open("session.json", "w") as f:
                 f.write(state.model_dump_json(indent=2))
@@ -1305,7 +1317,7 @@ class AgentContext(BaseModel):
 
         return ResumableState(
             subagent_history=serialized_history,
-            extra_usages=list(self.extra_usages),
+            extra_usages=list(self.extra_usages) if include_extra_usages else [],
             user_prompts=self.user_prompts,
             handoff_message=self.handoff_message,
             deferred_tool_metadata=dict(self.deferred_tool_metadata),

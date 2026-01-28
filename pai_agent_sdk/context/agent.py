@@ -1345,3 +1345,14 @@ class AgentContext(BaseModel):
             return self
         state.restore(self)
         return self
+
+
+# =============================================================================
+# FORWARD REFERENCE RESOLUTION
+# =============================================================================
+
+# Resolve forward references now that all classes are defined.
+# This is required because MediaToUrlHook references "AgentContext" which
+# is defined after ToolConfig. Without this, subclassing ToolConfig fails
+# with PydanticUserError.
+ToolConfig.model_rebuild()

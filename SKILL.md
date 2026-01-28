@@ -44,13 +44,19 @@ pip install pai-agent-sdk[all]
 
 ## Core Concepts
 
-| Concept      | Purpose                                   | Reference                                  |
-| ------------ | ----------------------------------------- | ------------------------------------------ |
-| AgentContext | Session state, model config, tool config  | [docs/context.md](docs/context.md)         |
-| Toolset      | Tool management with hooks and HITL       | [docs/toolset.md](docs/toolset.md)         |
-| Subagent     | Hierarchical agent delegation             | [docs/subagent.md](docs/subagent.md)       |
-| Environment  | File/shell operations, resource lifecycle | [docs/environment.md](docs/environment.md) |
-| Model        | Provider configuration, gateway mode      | [docs/model.md](docs/model.md)             |
+| Concept           | Purpose                                        | Reference                                                  |
+| ----------------- | ---------------------------------------------- | ---------------------------------------------------------- |
+| AgentContext      | Session state, model config, tool config       | [docs/context.md](docs/context.md)                         |
+| Streaming & Hooks | Real-time events, lifecycle hooks              | [docs/streaming.md](docs/streaming.md)                     |
+| Events            | Lifecycle and sideband event types             | [docs/events.md](docs/events.md)                           |
+| Toolset           | Tool management with hooks and HITL            | [docs/toolset.md](docs/toolset.md)                         |
+| Subagent          | Hierarchical agent delegation                  | [docs/subagent.md](docs/subagent.md)                       |
+| Environment       | File/shell operations, resource lifecycle      | [docs/environment.md](docs/environment.md)                 |
+| Resources         | Resumable resource state export/restore        | [docs/resumable-resources.md](docs/resumable-resources.md) |
+| Model             | Provider configuration, gateway mode           | [docs/model.md](docs/model.md)                             |
+| Skills            | Markdown-based instruction files               | [docs/skills.md](docs/skills.md)                           |
+| Message Bus       | Inter-agent communication, user steering       | [docs/message-bus.md](docs/message-bus.md)                 |
+| Logging           | Configurable logging with module-level control | [docs/logging.md](docs/logging.md)                         |
 
 ## Task Guide
 
@@ -71,7 +77,7 @@ class MyTool(BaseTool):
         return f"Result: {arg}"
 ```
 
-Full guide: [docs/toolset.md#creating-tools](docs/toolset.md)
+Full guide: [docs/toolset.md](docs/toolset.md)
 
 ### Session Persistence
 
@@ -92,7 +98,7 @@ async with create_agent("openai:gpt-4o", state=state) as runtime:
     ...
 ```
 
-Full guide: [docs/context.md#resumable-sessions](docs/context.md)
+Full guide: [docs/context.md](docs/context.md)
 
 ### Human-in-the-Loop (HITL)
 
@@ -107,7 +113,7 @@ async with create_agent(
     ...
 ```
 
-Full guide: [docs/toolset.md#human-in-the-loop-hitl-approval](docs/toolset.md)
+Full guide: [docs/toolset.md](docs/toolset.md)
 
 ### Subagents
 
@@ -146,6 +152,44 @@ from pai_agent_sdk.toolsets.browser_use import BrowserUseToolset
 ```
 
 Full example: [examples/browser_use.py](examples/browser_use.py)
+
+### Streaming Events
+
+Handle real-time events with lifecycle hooks:
+
+```python
+from pai_agent_sdk.agents import stream_agent
+from pai_agent_sdk.stream import AgentStartContext, AgentCompleteContext
+
+async def on_start(ctx: AgentStartContext):
+    print(f"Agent started with prompt: {ctx.user_prompt}")
+
+async def on_complete(ctx: AgentCompleteContext):
+    print(f"Agent completed in {ctx.duration_ms}ms")
+
+async with stream_agent(
+    runtime.agent, "Hello", runtime.ctx,
+    on_agent_start=on_start,
+    on_agent_complete=on_complete,
+) as stream:
+    async for event in stream:
+        pass
+```
+
+Full guide: [docs/streaming.md](docs/streaming.md)
+
+### Message Bus
+
+Inter-agent communication and user steering:
+
+```python
+# Send message from external code
+await ctx.bus.send("user", "Please focus on security issues")
+
+# Agent can read messages via bus tools
+```
+
+Full guide: [docs/message-bus.md](docs/message-bus.md)
 
 ## Complete Examples
 

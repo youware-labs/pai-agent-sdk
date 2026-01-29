@@ -13,6 +13,8 @@ from uuid import uuid4
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
+    ModelResponse,
+    ToolCallPart,
     ToolReturnPart,
     UserPromptPart,
 )
@@ -84,24 +86,47 @@ async def process_handoff_message(
 
         # Append handoff summary after user's current request
         handoff_part = UserPromptPart(
-            content=f"""{handoff_content}
-
----
-
-**System Reminder**: Handoff done, continue the task and do not repeat the handoff.""",
+            content=f"""<handoff-content>{handoff_content}</handoff-content>
+<system-reminder>Handoff done, continue the task and do not repeat the handoff.</system-reminder>""",
         )
         last_user_request.parts = [
-            UserPromptPart(content="**Previous User Request**:"),
+            UserPromptPart(content="<previous-user-request>"),
             *last_user_request.parts,
-            UserPromptPart(content="---"),
+            UserPromptPart(content="</previous-user-request>"),
             handoff_part,
         ]
         # Clear handoff state
         ctx.deps.handoff_message = None
 
-        # Return truncated history with handoff marker
+        # Virtual tool call ID for the handoff acknowledgment
+        virtual_tool_call_id = f"handoff-ack-{event_id}"
+
+        # Return truncated history with:
+        # 1. User request with handoff content
+        # 2. Virtual handoff tool call (so model knows it already called handoff)
+        # 3. Virtual tool return (completes the tool call sequence)
         result: list[ModelMessage] = [
             last_user_request,
+            # Virtual ModelResponse: model "already" called handoff
+            ModelResponse(
+                parts=[
+                    ToolCallPart(
+                        tool_name="handoff",
+                        args={"message": {"content": "[handoff summary above]"}},
+                        tool_call_id=virtual_tool_call_id,
+                    )
+                ]
+            ),
+            # Virtual ModelRequest: tool return acknowledging handoff
+            ModelRequest(
+                parts=[
+                    ToolReturnPart(
+                        tool_name="handoff",
+                        content="Handoff acknowledged. Context restored. Continue with the task.",
+                        tool_call_id=virtual_tool_call_id,
+                    )
+                ]
+            ),
         ]
 
         # Emit complete event with the actual handoff content

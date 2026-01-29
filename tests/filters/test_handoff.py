@@ -39,7 +39,7 @@ async def test_process_handoff_no_handoff_message(tmp_path: Path) -> None:
 
 
 async def test_process_handoff_with_handoff_message(tmp_path: Path) -> None:
-    """Should inject handoff summary and truncate history when handoff message is set."""
+    """Should inject handoff summary and include virtual tool call to prevent repeat handoff."""
     async with LocalEnvironment(
         allowed_paths=[tmp_path],
         default_path=tmp_path,
@@ -56,19 +56,37 @@ async def test_process_handoff_with_handoff_message(tmp_path: Path) -> None:
 
             result = await process_handoff_message(mock_ctx, history)
 
-            # Should return truncated history with 1 message
-            assert len(result) == 1
+            # Should return 3 messages: user request, virtual tool call, virtual tool return
+            assert len(result) == 3
 
-            # First message should be the user request with handoff appended
+            # First message: user request with handoff content
             first_msg = result[0]
             assert isinstance(first_msg, ModelRequest)
-            # 4 parts: prefix, original, separator, handoff
+            # 4 parts: prefix, original, suffix, handoff
             assert len(first_msg.parts) == 4
             assert isinstance(first_msg.parts[0], UserPromptPart)
-            assert "Previous User Request" in first_msg.parts[0].content
+            assert "previous-user-request" in first_msg.parts[0].content
             assert isinstance(first_msg.parts[3], UserPromptPart)
             assert "Previous context summary here" in first_msg.parts[3].content
-            assert "System Reminder" in first_msg.parts[3].content
+            assert "system-reminder" in first_msg.parts[3].content
+
+            # Second message: virtual handoff tool call
+            second_msg = result[1]
+            assert isinstance(second_msg, ModelResponse)
+            assert len(second_msg.parts) == 1
+            assert isinstance(second_msg.parts[0], ToolCallPart)
+            assert second_msg.parts[0].tool_name == "handoff"
+
+            # Third message: virtual tool return
+            third_msg = result[2]
+            assert isinstance(third_msg, ModelRequest)
+            assert len(third_msg.parts) == 1
+            assert isinstance(third_msg.parts[0], ToolReturnPart)
+            assert third_msg.parts[0].tool_name == "handoff"
+            assert "acknowledged" in third_msg.parts[0].content.lower()
+
+            # Tool call IDs should match
+            assert second_msg.parts[0].tool_call_id == third_msg.parts[0].tool_call_id
 
             # Handoff message should be cleared
             assert ctx.handoff_message is None
@@ -119,10 +137,12 @@ async def test_process_handoff_finds_last_user_request(tmp_path: Path) -> None:
 
             result = await process_handoff_message(mock_ctx, history)
 
-            # Should inject into final_user (last true user request)
-            assert len(result) == 1
+            # Should return 3 messages: user request, virtual tool call, virtual tool return
+            assert len(result) == 3
+
+            # First message: modified user request with handoff content
             assert isinstance(result[0], ModelRequest)
-            # 4 parts: prefix, original, separator, handoff
+            # 4 parts: prefix, original, suffix, handoff
             assert len(result[0].parts) == 4
             # The second part should be the original user prompt
             assert isinstance(result[0].parts[1], UserPromptPart)
@@ -130,6 +150,14 @@ async def test_process_handoff_finds_last_user_request(tmp_path: Path) -> None:
             # The last part should be the handoff
             assert isinstance(result[0].parts[3], UserPromptPart)
             assert "Context summary" in result[0].parts[3].content
+
+            # Second message: virtual handoff tool call
+            assert isinstance(result[1], ModelResponse)
+            assert result[1].parts[0].tool_name == "handoff"
+
+            # Third message: virtual tool return
+            assert isinstance(result[2], ModelRequest)
+            assert isinstance(result[2].parts[0], ToolReturnPart)
 
 
 async def test_process_handoff_skips_tool_return_only_request(tmp_path: Path) -> None:
@@ -154,16 +182,22 @@ async def test_process_handoff_skips_tool_return_only_request(tmp_path: Path) ->
 
             result = await process_handoff_message(mock_ctx, history)
 
-            # Should inject into user_request (skipping tool_return)
-            assert len(result) == 1
+            # Should return 3 messages: user request, virtual tool call, virtual tool return
+            assert len(result) == 3
+
+            # First message: modified user request
             first_msg = result[0]
             assert isinstance(first_msg, ModelRequest)
-            # 4 parts: prefix, original, separator, handoff
+            # 4 parts: prefix, original, suffix, handoff
             assert len(first_msg.parts) == 4
             assert isinstance(first_msg.parts[1], UserPromptPart)
             assert first_msg.parts[1].content == "Start"
             assert isinstance(first_msg.parts[3], UserPromptPart)
             assert "Summary" in first_msg.parts[3].content
+
+            # Second and third messages: virtual handoff tool call and return
+            assert isinstance(result[1], ModelResponse)
+            assert isinstance(result[2], ModelRequest)
 
 
 async def test_process_handoff_emits_events(tmp_path: Path) -> None:
@@ -187,8 +221,8 @@ async def test_process_handoff_emits_events(tmp_path: Path) -> None:
 
             result = await process_handoff_message(mock_ctx, history)
 
-            # Verify result
-            assert len(result) == 1
+            # Verify result: 3 messages (user request, virtual tool call, virtual tool return)
+            assert len(result) == 3
 
             # Collect events from queue
             events = []
@@ -231,8 +265,8 @@ async def test_process_handoff_no_events_when_streaming_disabled(tmp_path: Path)
 
             result = await process_handoff_message(mock_ctx, history)
 
-            # Should still work correctly
-            assert len(result) == 1
+            # Should return 3 messages
+            assert len(result) == 3
 
             # Queue should be empty since streaming is disabled
             assert ctx.agent_stream_queues[ctx._agent_id].empty()

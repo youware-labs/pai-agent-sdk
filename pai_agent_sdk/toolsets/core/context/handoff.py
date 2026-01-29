@@ -99,6 +99,7 @@ before resetting. The handoff message will be injected into the new context auto
         # Store rendered message for history processor to pick up
         rendered = message.render()
         ctx.deps.handoff_message = rendered
-        # Set auto_load_files for the auto_load_files filter to process
-        ctx.deps.auto_load_files = message.auto_load_files
+        # Append auto_load_files for the auto_load_files filter to process
+        # Use extend instead of assignment to preserve any files set by external callers
+        ctx.deps.auto_load_files.extend(message.auto_load_files)
         return f"Handoff complete. Summary:\n\n{rendered}"

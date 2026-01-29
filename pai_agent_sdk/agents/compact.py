@@ -349,8 +349,9 @@ def create_compact_filter(
 
             condense_result: CondenseResult = result.output
 
-            # Set auto_load_files for the auto_load_files filter to process
-            agent_ctx.auto_load_files = condense_result.auto_load_files
+            # Append auto_load_files for the auto_load_files filter to process
+            # Use extend instead of assignment to preserve any files set by external callers
+            agent_ctx.auto_load_files.extend(condense_result.auto_load_files)
 
             # Build summary with condense result and user prompts
             condense_markdown = condense_result_to_markdown(condense_result)

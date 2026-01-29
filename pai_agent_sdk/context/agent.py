@@ -160,7 +160,7 @@ Example::
 
     runtime = create_agent(
         "openai:gpt-4",
-        extra_context_kwargs={"model_wrapper": my_wrapper},
+        model_wrapper=my_wrapper,
     )
 """
 
@@ -901,7 +901,7 @@ class AgentContext(BaseModel):
 
         runtime = create_agent(
             "openai:gpt-4",
-            extra_context_kwargs={"model_wrapper": my_wrapper},
+            model_wrapper=my_wrapper,
         )
     """
 
@@ -919,8 +919,8 @@ class AgentContext(BaseModel):
 
         runtime = create_agent(
             "openai:gpt-4",
+            model_wrapper=my_wrapper,
             extra_context_kwargs={
-                "model_wrapper": my_wrapper,
                 "wrapper_context": {
                     "trace_id": "abc123",
                     "user_id": "user_456",

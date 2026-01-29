@@ -175,8 +175,8 @@ def my_wrapper(model: Model, agent_name: str, context: dict[str, Any]) -> Model:
 # Usage with custom wrapper_context
 runtime = create_agent(
     "openai:gpt-4",
+    model_wrapper=my_wrapper,
     extra_context_kwargs={
-        "model_wrapper": my_wrapper,
         "wrapper_context": {
             "user_id": "user_456",
             "tags": ["production"],

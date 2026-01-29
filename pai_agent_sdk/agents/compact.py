@@ -329,8 +329,8 @@ def create_compact_filter(
         # Apply model wrapper if configured
         original_model = agent.model
         if agent_ctx.model_wrapper is not None:
-            wrapper_context = agent_ctx.get_wrapper_context()
-            wrapped = agent_ctx.model_wrapper(cast(Model, original_model), AGENT_NAME, wrapper_context)
+            wrapper_metadata = agent_ctx.get_wrapper_metadata()
+            wrapped = agent_ctx.model_wrapper(cast(Model, original_model), AGENT_NAME, wrapper_metadata)
             agent.model = await wrapped if isawaitable(wrapped) else wrapped
 
         try:

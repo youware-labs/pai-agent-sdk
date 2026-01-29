@@ -442,8 +442,8 @@ def create_agent(
     base_model = infer_model(model) if isinstance(model, str) else model
     effective_model: Model | None = base_model
     if base_model is not None and ctx.model_wrapper is not None:
-        wrapper_context = ctx.get_wrapper_context()
-        wrapped = ctx.model_wrapper(base_model, agent_name, wrapper_context)
+        wrapper_metadata = ctx.get_wrapper_metadata()
+        wrapped = ctx.model_wrapper(base_model, agent_name, wrapper_metadata)
         if inspect.isawaitable(wrapped):
             raise TypeError(
                 "Async model_wrapper cannot be used in create_agent (sync context). "

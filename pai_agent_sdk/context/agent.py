@@ -888,7 +888,7 @@ class AgentContext(BaseModel):
     - Compact filter models
 
     The wrapper receives the model, agent name, and context dict from
-    get_wrapper_context(), allowing customized instrumentation per agent type.
+    get_wrapper_metadata(), allowing customized instrumentation per agent type.
 
     Note:
         This field is excluded from serialization (not resumable).
@@ -905,8 +905,8 @@ class AgentContext(BaseModel):
         )
     """
 
-    wrapper_context: dict[str, Any] = Field(default_factory=dict, exclude=True)
-    """Additional context passed to model_wrapper via get_wrapper_context().
+    wrapper_metadata: dict[str, Any] = Field(default_factory=dict, exclude=True)
+    """Additional context passed to model_wrapper via get_wrapper_metadata().
 
     These fields are merged with built-in fields (run_id) when calling the wrapper.
     User-defined fields take precedence over built-in fields.
@@ -921,7 +921,7 @@ class AgentContext(BaseModel):
             "openai:gpt-4",
             model_wrapper=my_wrapper,
             extra_context_kwargs={
-                "wrapper_context": {
+                "wrapper_metadata": {
                     "trace_id": "abc123",
                     "user_id": "user_456",
                     "tags": ["production"],
@@ -930,7 +930,7 @@ class AgentContext(BaseModel):
         )
 
         # Runtime modification
-        ctx.wrapper_context["request_id"] = current_request.id
+        ctx.wrapper_metadata["request_id"] = current_request.id
     """
 
     _agent_id: str = "main"
@@ -984,12 +984,12 @@ class AgentContext(BaseModel):
         end = self.end_at if self.end_at else datetime.now()
         return end - self.start_at
 
-    def get_wrapper_context(self) -> dict[str, Any]:
+    def get_wrapper_metadata(self) -> dict[str, Any]:
         """Return context dict for model wrapper.
 
         This method provides the context dictionary passed to model_wrapper
         as its third argument. Default implementation returns built-in fields
-        merged with the wrapper_context field, with user-defined fields taking precedence.
+        merged with the wrapper_metadata field, with user-defined fields taking precedence.
 
         Built-in fields:
             - run_id: Current session identifier
@@ -1003,16 +1003,16 @@ class AgentContext(BaseModel):
 
         Example::
 
-            # Simple: set wrapper_context field
-            ctx.wrapper_context = {"trace_id": "abc", "user_id": "123"}
+            # Simple: set wrapper_metadata field
+            ctx.wrapper_metadata = {"trace_id": "abc", "user_id": "123"}
 
             # Advanced: override for dynamic context
             class MyContext(AgentContext):
                 session_metadata: dict = Field(default_factory=dict)
 
-                def get_wrapper_context(self) -> dict[str, Any]:
+                def get_wrapper_metadata(self) -> dict[str, Any]:
                     return {
-                        **super().get_wrapper_context(),
+                        **super().get_wrapper_metadata(),
                         "timestamp": datetime.now().isoformat(),
                         "session": self.session_metadata,
                     }
@@ -1021,7 +1021,7 @@ class AgentContext(BaseModel):
             "run_id": self.run_id,
             "agent_id": self._agent_id,
             "parent_run_id": self.parent_run_id,
-            **self.wrapper_context,
+            **self.wrapper_metadata,
         }
 
     def get_current_time(self) -> datetime:

@@ -263,8 +263,8 @@ def create_subagent_call_func(
             # Apply model wrapper if configured
             original_model = agent.model
             if deps.model_wrapper is not None:
-                wrapper_context = deps.get_wrapper_context()
-                wrapped = deps.model_wrapper(cast(Model, original_model), agent_name, wrapper_context)
+                wrapper_metadata = deps.get_wrapper_metadata()
+                wrapped = deps.model_wrapper(cast(Model, original_model), agent_name, wrapper_metadata)
                 agent.model = await wrapped if isawaitable(wrapped) else wrapped
 
             try:

@@ -1,4 +1,4 @@
-"""Tests for model_wrapper and wrapper_context functionality."""
+"""Tests for model_wrapper and wrapper_metadata functionality."""
 
 from inspect import isawaitable
 from typing import Any
@@ -36,7 +36,7 @@ async def test_context_without_wrapper(env: LocalEnvironment) -> None:
     """Context without wrapper should have model_wrapper as None."""
     async with AgentContext(env=env) as ctx:
         assert ctx.model_wrapper is None
-        assert ctx.wrapper_context == {}
+        assert ctx.wrapper_metadata == {}
 
 
 async def test_context_with_sync_wrapper(env: LocalEnvironment) -> None:
@@ -52,9 +52,9 @@ async def test_context_with_sync_wrapper(env: LocalEnvironment) -> None:
 
     async with AgentContext(env=env, model_wrapper=my_wrapper) as ctx:
         original_model = MagicMock(spec=Model)
-        wrapper_context = ctx.get_wrapper_context()
+        wrapper_metadata = ctx.get_wrapper_metadata()
 
-        result = ctx.model_wrapper(original_model, "test-agent", wrapper_context)
+        result = ctx.model_wrapper(original_model, "test-agent", wrapper_metadata)
 
         assert result is wrapped_model
         assert call_args["model"] is original_model
@@ -71,9 +71,9 @@ async def test_context_with_async_wrapper(env: LocalEnvironment) -> None:
 
     async with AgentContext(env=env, model_wrapper=async_wrapper) as ctx:
         original_model = MagicMock(spec=Model)
-        wrapper_context = ctx.get_wrapper_context()
+        wrapper_metadata = ctx.get_wrapper_metadata()
 
-        result = ctx.model_wrapper(original_model, "test-agent", wrapper_context)
+        result = ctx.model_wrapper(original_model, "test-agent", wrapper_metadata)
 
         # Result should be awaitable
         assert isawaitable(result)
@@ -82,7 +82,7 @@ async def test_context_with_async_wrapper(env: LocalEnvironment) -> None:
 
 
 async def test_model_wrapper_not_serialized(env: LocalEnvironment) -> None:
-    """model_wrapper and wrapper_context should be excluded from serialization."""
+    """model_wrapper and wrapper_metadata should be excluded from serialization."""
 
     def my_wrapper(model: Model, agent_name: str, context: dict[str, Any]) -> Model:
         return model
@@ -90,18 +90,18 @@ async def test_model_wrapper_not_serialized(env: LocalEnvironment) -> None:
     async with AgentContext(
         env=env,
         model_wrapper=my_wrapper,
-        wrapper_context={"trace_id": "abc123"},
+        wrapper_metadata={"trace_id": "abc123"},
     ) as ctx:
         state = ctx.export_state()
         state_dict = state.model_dump()
 
-        # model_wrapper and wrapper_context should not appear in exported state
+        # model_wrapper and wrapper_metadata should not appear in exported state
         assert "model_wrapper" not in state_dict
-        assert "wrapper_context" not in state_dict
+        assert "wrapper_metadata" not in state_dict
 
 
 async def test_model_wrapper_inherited_in_subagent_context(env: LocalEnvironment) -> None:
-    """model_wrapper and wrapper_context should be inherited when creating subagent context."""
+    """model_wrapper and wrapper_metadata should be inherited when creating subagent context."""
 
     def my_wrapper(model: Model, agent_name: str, context: dict[str, Any]) -> Model:
         return model
@@ -109,41 +109,41 @@ async def test_model_wrapper_inherited_in_subagent_context(env: LocalEnvironment
     async with AgentContext(
         env=env,
         model_wrapper=my_wrapper,
-        wrapper_context={"trace_id": "abc123", "user_id": "user_456"},
+        wrapper_metadata={"trace_id": "abc123", "user_id": "user_456"},
     ) as ctx:
         async with ctx.create_subagent_context("test-subagent") as sub_ctx:
             # Subagent context should inherit model_wrapper
             assert sub_ctx.model_wrapper is my_wrapper
-            # Subagent context should inherit wrapper_context
-            assert sub_ctx.wrapper_context == {"trace_id": "abc123", "user_id": "user_456"}
+            # Subagent context should inherit wrapper_metadata
+            assert sub_ctx.wrapper_metadata == {"trace_id": "abc123", "user_id": "user_456"}
 
 
 # =============================================================================
-# Tests for get_wrapper_context
+# Tests for get_wrapper_metadata
 # =============================================================================
 
 
-async def test_get_wrapper_context_default(env: LocalEnvironment) -> None:
-    """get_wrapper_context should return built-in fields by default."""
+async def test_get_wrapper_metadata_default(env: LocalEnvironment) -> None:
+    """get_wrapper_metadata should return built-in fields by default."""
     async with AgentContext(env=env) as ctx:
-        wrapper_context = ctx.get_wrapper_context()
+        wrapper_metadata = ctx.get_wrapper_metadata()
 
-        assert wrapper_context == {
+        assert wrapper_metadata == {
             "run_id": ctx.run_id,
             "agent_id": "main",
             "parent_run_id": None,
         }
 
 
-async def test_get_wrapper_context_with_custom_fields(env: LocalEnvironment) -> None:
-    """get_wrapper_context should merge wrapper_context field with built-in fields."""
+async def test_get_wrapper_metadata_with_custom_fields(env: LocalEnvironment) -> None:
+    """get_wrapper_metadata should merge wrapper_metadata field with built-in fields."""
     async with AgentContext(
         env=env,
-        wrapper_context={"trace_id": "abc123", "tags": ["production"]},
+        wrapper_metadata={"trace_id": "abc123", "tags": ["production"]},
     ) as ctx:
-        wrapper_context = ctx.get_wrapper_context()
+        wrapper_metadata = ctx.get_wrapper_metadata()
 
-        assert wrapper_context == {
+        assert wrapper_metadata == {
             "run_id": ctx.run_id,
             "agent_id": "main",
             "parent_run_id": None,
@@ -152,31 +152,31 @@ async def test_get_wrapper_context_with_custom_fields(env: LocalEnvironment) -> 
         }
 
 
-async def test_get_wrapper_context_user_fields_override(env: LocalEnvironment) -> None:
-    """User-defined fields in wrapper_context should override built-in fields."""
+async def test_get_wrapper_metadata_user_fields_override(env: LocalEnvironment) -> None:
+    """User-defined fields in wrapper_metadata should override built-in fields."""
     custom_run_id = "custom-run-id-123"
     async with AgentContext(
         env=env,
-        wrapper_context={"run_id": custom_run_id},
+        wrapper_metadata={"run_id": custom_run_id},
     ) as ctx:
-        wrapper_context = ctx.get_wrapper_context()
+        wrapper_metadata = ctx.get_wrapper_metadata()
 
         # User-defined run_id should take precedence
-        assert wrapper_context["run_id"] == custom_run_id
+        assert wrapper_metadata["run_id"] == custom_run_id
 
 
-async def test_wrapper_context_runtime_modification(env: LocalEnvironment) -> None:
-    """wrapper_context should be modifiable at runtime."""
+async def test_wrapper_metadata_runtime_modification(env: LocalEnvironment) -> None:
+    """wrapper_metadata should be modifiable at runtime."""
     async with AgentContext(env=env) as ctx:
         # Initially empty
-        assert ctx.wrapper_context == {}
+        assert ctx.wrapper_metadata == {}
 
         # Modify at runtime
-        ctx.wrapper_context["request_id"] = "req-123"
-        ctx.wrapper_context["session_id"] = "sess-456"
+        ctx.wrapper_metadata["request_id"] = "req-123"
+        ctx.wrapper_metadata["session_id"] = "sess-456"
 
-        wrapper_context = ctx.get_wrapper_context()
-        assert wrapper_context == {
+        wrapper_metadata = ctx.get_wrapper_metadata()
+        assert wrapper_metadata == {
             "run_id": ctx.run_id,
             "agent_id": "main",
             "parent_run_id": None,
@@ -185,23 +185,23 @@ async def test_wrapper_context_runtime_modification(env: LocalEnvironment) -> No
         }
 
 
-async def test_get_wrapper_context_override_in_subclass(env: LocalEnvironment) -> None:
-    """Subclasses can override get_wrapper_context for dynamic context."""
+async def test_get_wrapper_metadata_override_in_subclass(env: LocalEnvironment) -> None:
+    """Subclasses can override get_wrapper_metadata for dynamic context."""
 
     class MyContext(AgentContext):
         custom_field: str = Field(default="custom_value")
 
-        def get_wrapper_context(self) -> dict[str, Any]:
+        def get_wrapper_metadata(self) -> dict[str, Any]:
             return {
-                **super().get_wrapper_context(),
+                **super().get_wrapper_metadata(),
                 "custom_field": self.custom_field,
                 "dynamic_value": "computed",
             }
 
     async with MyContext(env=env, custom_field="my_value") as ctx:
-        wrapper_context = ctx.get_wrapper_context()
+        wrapper_metadata = ctx.get_wrapper_metadata()
 
-        assert wrapper_context == {
+        assert wrapper_metadata == {
             "run_id": ctx.run_id,
             "agent_id": "main",
             "parent_run_id": None,
@@ -210,17 +210,17 @@ async def test_get_wrapper_context_override_in_subclass(env: LocalEnvironment) -
         }
 
 
-async def test_subagent_wrapper_context_has_different_run_id(env: LocalEnvironment) -> None:
-    """Subagent's get_wrapper_context should return its own run_id and agent_id."""
+async def test_subagent_wrapper_metadata_has_different_run_id(env: LocalEnvironment) -> None:
+    """Subagent's get_wrapper_metadata should return its own run_id and agent_id."""
     async with AgentContext(
         env=env,
-        wrapper_context={"trace_id": "shared-trace"},
+        wrapper_metadata={"trace_id": "shared-trace"},
     ) as ctx:
         async with ctx.create_subagent_context("test-subagent") as sub_ctx:
-            parent_context = ctx.get_wrapper_context()
-            sub_context = sub_ctx.get_wrapper_context()
+            parent_context = ctx.get_wrapper_metadata()
+            sub_context = sub_ctx.get_wrapper_metadata()
 
-            # Both should have shared wrapper_context fields
+            # Both should have shared wrapper_metadata fields
             assert parent_context["trace_id"] == "shared-trace"
             assert sub_context["trace_id"] == "shared-trace"
 

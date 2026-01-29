@@ -236,7 +236,7 @@ async def get_image_description(
     model_settings: ModelSettings | None = None,
     max_image_size: int = DEFAULT_MAX_IMAGE_SIZE,
     model_wrapper: Callable[[Model, str, dict[str, Any]], Model | Awaitable[Model]] | None = None,
-    wrapper_context: dict[str, Any] | None = None,
+    wrapper_metadata: dict[str, Any] | None = None,
 ) -> tuple[str, InternalUsage]:
     """Analyze an image and get a structured description.
 
@@ -249,7 +249,7 @@ async def get_image_description(
         model_settings: Optional model settings dict.
         max_image_size: Maximum allowed size for image_data in bytes.
         model_wrapper: Optional wrapper for model instrumentation.
-        wrapper_context: Context dict passed to model_wrapper (e.g., from ctx.get_wrapper_context()).
+        wrapper_metadata: Context dict passed to model_wrapper (e.g., from ctx.get_wrapper_metadata()).
 
     Returns:
         Tuple of (description string, InternalUsage with model_id and usage).
@@ -271,7 +271,7 @@ async def get_image_description(
 
     # Apply model wrapper if configured
     if model_wrapper is not None:
-        effective_context = wrapper_context or {}
+        effective_context = wrapper_metadata or {}
         wrapped = model_wrapper(cast(Model, agent.model), AGENT_NAME, effective_context)
         agent.model = await wrapped if isawaitable(wrapped) else wrapped
 

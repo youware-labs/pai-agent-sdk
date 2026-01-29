@@ -220,7 +220,7 @@ class ViewTool(BaseTool):
                     model=model,
                     model_settings=model_settings,
                     model_wrapper=ctx.deps.model_wrapper,
-                    wrapper_context=ctx.deps.get_wrapper_context(),
+                    wrapper_metadata=ctx.deps.get_wrapper_metadata(),
                 )
 
                 # Store usage in extra_usages

@@ -34,6 +34,7 @@ from pai_agent_sdk.context import (
     AgentInfo,
     AgentStreamEvent,
     ModelConfig,
+    ModelWrapper,
     ResumableState,
     RunContextMetadata,
     StreamEvent,
@@ -217,6 +218,7 @@ def create_agent(
     *,
     # --- Model Configuration ---
     model_settings: ModelSettings | None = None,
+    model_wrapper: ModelWrapper | None = None,
     output_type: OutputSpec[OutputT] = str,  # type: ignore[assignment]
     # --- Environment ---
     env: Environment | type[Environment] = LocalEnvironment,
@@ -268,6 +270,7 @@ def create_agent(
         model: Model string (e.g., "openai:gpt-4") or Model instance.
 
         model_settings: Optional model settings for inference configuration.
+        model_wrapper: Optional wrapper for model instrumentation (observability, caching).
         output_type: Expected output type for the agent. Defaults to str.
 
         env: Environment instance or class. Defaults to LocalEnvironment.
@@ -363,6 +366,7 @@ def create_agent(
         env=actual_env,
         model_cfg=effective_model_cfg,
         tool_config=effective_tool_config,
+        model_wrapper=model_wrapper,
         need_user_approve_tools=list(need_user_approve_tools) if need_user_approve_tools else [],
         need_user_approve_mcps=list(need_user_approve_mcps) if need_user_approve_mcps else [],
         **(extra_context_kwargs or {}),

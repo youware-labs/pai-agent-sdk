@@ -144,6 +144,93 @@ ToolConfig(
 )
 ```
 
+### Model Wrapper
+
+The `model_wrapper` field enables instrumentation of all LLM calls for observability,
+caching, rate limiting, or cost tracking. The `wrapper_context` field and
+`get_wrapper_context()` method allow customizing the context passed to the wrapper.
+
+```python
+from pai_agent_sdk.context import AgentContext, ModelWrapper
+from pydantic_ai.models import Model
+
+# Sync wrapper (recommended for create_agent)
+def my_wrapper(model: Model, agent_name: str, context: dict[str, Any]) -> Model:
+    """Wrap model with custom instrumentation.
+
+    Args:
+        model: The pydantic-ai Model to wrap.
+        agent_name: Identifier ('main', 'debugger', 'video-understanding', etc.)
+        context: From ctx.get_wrapper_context(). Contains built-in + custom fields.
+    """
+    return LangfuseModel(
+        model,
+        name=agent_name,
+        trace_id=context.get("run_id"),
+        span_id=context.get("agent_id"),
+        parent_span_id=context.get("parent_run_id"),
+        user_id=context.get("user_id"),
+    )
+
+# Usage with custom wrapper_context
+runtime = create_agent(
+    "openai:gpt-4",
+    extra_context_kwargs={
+        "model_wrapper": my_wrapper,
+        "wrapper_context": {
+            "user_id": "user_456",
+            "tags": ["production"],
+        },
+    },
+)
+
+# Runtime modification
+ctx.wrapper_context["request_id"] = current_request.id
+```
+
+**Built-in context fields from `get_wrapper_context()`:**
+
+| Field           | Description                                          |
+| --------------- | ---------------------------------------------------- |
+| `run_id`        | Current session identifier                           |
+| `agent_id`      | Current agent identifier ("main" or "debugger-a7b9") |
+| `parent_run_id` | Parent session ID (None for main, set for subagents) |
+
+**Customizing wrapper context:**
+
+```python
+# Option 1: Set wrapper_context field (simple)
+ctx.wrapper_context = {"trace_id": "abc", "user_id": "123"}
+
+# Option 2: Override get_wrapper_context (advanced)
+class MyContext(AgentContext):
+    session_metadata: dict = Field(default_factory=dict)
+
+    def get_wrapper_context(self) -> dict[str, Any]:
+        return {
+            **super().get_wrapper_context(),
+            "timestamp": datetime.now().isoformat(),
+            "session": self.session_metadata,
+        }
+```
+
+**Agent name conventions:**
+
+| Context             | agent_name                                 |
+| ------------------- | ------------------------------------------ |
+| Main agent          | `"main"` or user-specified                 |
+| Subagents           | Subagent name (`"debugger"`, `"searcher"`) |
+| Video understanding | `"video-understanding"`                    |
+| Image understanding | `"image-understanding"`                    |
+| Compact filter      | `"compact"`                                |
+
+**Notes:**
+
+- `model_wrapper` and `wrapper_context` are excluded from serialization (not resumable)
+- In `create_agent` (sync), only sync wrappers are supported
+- In async contexts (compact, subagent, video/image), both sync and async wrappers work
+- Subagent contexts inherit `wrapper_context` but have their own `run_id` and `agent_id`
+
 ## Extending ModelConfig and ToolConfig
 
 Both `ModelConfig` and `ToolConfig` support extension for custom settings.

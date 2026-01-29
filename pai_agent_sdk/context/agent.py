@@ -98,6 +98,7 @@ from pydantic_ai.messages import (
     ToolCallPart,
     ToolReturnPart,
 )
+from pydantic_ai.models import Model
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing_extensions import TypedDict
 
@@ -110,6 +111,58 @@ from .tasks import TaskManager, TaskStatus
 
 if TYPE_CHECKING:
     from typing import Self
+
+
+# =============================================================================
+# Model Wrapper Type
+# =============================================================================
+
+
+ModelWrapper = Callable[[Model, str, dict[str, Any]], Model | Awaitable[Model]]
+"""Type alias for model wrapper functions.
+
+A model wrapper receives a pydantic-ai Model, an agent name, and a context dict,
+and returns a wrapped Model. The wrapper can be sync or async.
+
+Use cases include observability (Langfuse/DataDog), caching, rate limiting,
+and cost tracking.
+
+Args:
+    model: The pydantic-ai Model to wrap.
+    agent_name: Identifier for the agent using this model.
+        Convention: 'main', 'debugger', 'video-understanding', etc.
+    context: Additional context. May contain:
+        - run_id (str): Current session identifier
+        - (future fields will be documented as added)
+
+Returns:
+    Wrapped model (or original if no wrapping needed).
+    Can return Model directly (sync) or Awaitable[Model] (async).
+
+Example::
+
+    # Sync wrapper
+    def my_wrapper(
+        model: Model,
+        agent_name: str,
+        context: dict[str, Any],
+    ) -> Model:
+        return LangfuseModel(model, name=agent_name, trace_id=context.get("run_id"))
+
+    # Async wrapper
+    async def async_wrapper(
+        model: Model,
+        agent_name: str,
+        context: dict[str, Any],
+    ) -> Model:
+        await some_async_setup()
+        return LangfuseModel(model, name=agent_name)
+
+    runtime = create_agent(
+        "openai:gpt-4",
+        extra_context_kwargs={"model_wrapper": my_wrapper},
+    )
+"""
 
 
 # =============================================================================
@@ -825,6 +878,61 @@ class AgentContext(BaseModel):
         ctx.send_message("Please stop", source="user")
     """
 
+    model_wrapper: ModelWrapper | None = Field(default=None, exclude=True)
+    """Optional wrapper applied to all models created within this context.
+
+    When set, the SDK will call this wrapper for:
+    - Main agent model
+    - Subagent models
+    - Video/image understanding models
+    - Compact filter models
+
+    The wrapper receives the model, agent name, and context dict from
+    get_wrapper_context(), allowing customized instrumentation per agent type.
+
+    Note:
+        This field is excluded from serialization (not resumable).
+        Wrappers must be re-configured when restoring sessions.
+
+    Example::
+
+        def my_wrapper(model: Model, agent_name: str, context: dict[str, Any]) -> Model:
+            return traced_model(model, name=agent_name, trace_id=context.get("run_id"))
+
+        runtime = create_agent(
+            "openai:gpt-4",
+            extra_context_kwargs={"model_wrapper": my_wrapper},
+        )
+    """
+
+    wrapper_context: dict[str, Any] = Field(default_factory=dict, exclude=True)
+    """Additional context passed to model_wrapper via get_wrapper_context().
+
+    These fields are merged with built-in fields (run_id) when calling the wrapper.
+    User-defined fields take precedence over built-in fields.
+
+    Note:
+        This field is excluded from serialization (not resumable).
+        Context must be re-configured when restoring sessions.
+
+    Example::
+
+        runtime = create_agent(
+            "openai:gpt-4",
+            extra_context_kwargs={
+                "model_wrapper": my_wrapper,
+                "wrapper_context": {
+                    "trace_id": "abc123",
+                    "user_id": "user_456",
+                    "tags": ["production"],
+                },
+            },
+        )
+
+        # Runtime modification
+        ctx.wrapper_context["request_id"] = current_request.id
+    """
+
     _agent_id: str = "main"
     _entered: bool = False
     _enter_lock: asyncio.Lock = None  # type: ignore[assignment]  # Initialized in __init__
@@ -875,6 +983,46 @@ class AgentContext(BaseModel):
             return None
         end = self.end_at if self.end_at else datetime.now()
         return end - self.start_at
+
+    def get_wrapper_context(self) -> dict[str, Any]:
+        """Return context dict for model wrapper.
+
+        This method provides the context dictionary passed to model_wrapper
+        as its third argument. Default implementation returns built-in fields
+        merged with the wrapper_context field, with user-defined fields taking precedence.
+
+        Built-in fields:
+            - run_id: Current session identifier
+            - agent_id: Current agent identifier ("main" or "debugger-a7b9")
+            - parent_run_id: Parent session ID (None for main, set for subagents)
+
+        Override this method for dynamic context generation based on runtime state.
+
+        Returns:
+            Context dict passed as third argument to model_wrapper.
+
+        Example::
+
+            # Simple: set wrapper_context field
+            ctx.wrapper_context = {"trace_id": "abc", "user_id": "123"}
+
+            # Advanced: override for dynamic context
+            class MyContext(AgentContext):
+                session_metadata: dict = Field(default_factory=dict)
+
+                def get_wrapper_context(self) -> dict[str, Any]:
+                    return {
+                        **super().get_wrapper_context(),
+                        "timestamp": datetime.now().isoformat(),
+                        "session": self.session_metadata,
+                    }
+        """
+        return {
+            "run_id": self.run_id,
+            "agent_id": self._agent_id,
+            "parent_run_id": self.parent_run_id,
+            **self.wrapper_context,
+        }
 
     def get_current_time(self) -> datetime:
         """Return current time with timezone information.

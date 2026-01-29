@@ -8,6 +8,7 @@ the conversation.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Sequence
+from inspect import isawaitable
 from pathlib import Path
 from typing import cast
 from uuid import uuid4
@@ -325,6 +326,13 @@ def create_compact_filter(
         # Generate event_id to correlate start/complete events
         event_id = uuid4().hex[:8]
 
+        # Apply model wrapper if configured
+        original_model = agent.model
+        if agent_ctx.model_wrapper is not None:
+            wrapper_context = agent_ctx.get_wrapper_context()
+            wrapped = agent_ctx.model_wrapper(cast(Model, original_model), AGENT_NAME, wrapper_context)
+            agent.model = await wrapped if isawaitable(wrapped) else wrapped
+
         try:
             # Emit start event
             await agent_ctx.emit_event(CompactStartEvent(event_id=event_id, message_count=len(message_history)))
@@ -385,5 +393,9 @@ def create_compact_filter(
             )
             # On error, return original history
             return message_history
+
+        finally:
+            # Restore original model to avoid side effects on shared agent
+            agent.model = original_model
 
     return compact_filter

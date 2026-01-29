@@ -7,6 +7,7 @@ with proper environment and context lifecycle management.
 from __future__ import annotations
 
 import asyncio
+import inspect
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from contextlib import AsyncExitStack, asynccontextmanager
@@ -433,11 +434,24 @@ def create_agent(
     # --- System Prompt ---
     effective_system_prompt = _load_system_prompt(system_prompt, system_prompt_template_vars)
 
+    # --- Create Model with Wrapper ---
+    base_model = infer_model(model) if isinstance(model, str) else model
+    effective_model: Model | None = base_model
+    if base_model is not None and ctx.model_wrapper is not None:
+        wrapper_context = ctx.get_wrapper_context()
+        wrapped = ctx.model_wrapper(base_model, agent_name, wrapper_context)
+        if inspect.isawaitable(wrapped):
+            raise TypeError(
+                "Async model_wrapper cannot be used in create_agent (sync context). "
+                "Use a sync wrapper or wrap the model manually after agent creation."
+            )
+        effective_model = wrapped
+
     # --- Create Agent ---
     logger.debug("Creating agent with model=%s, output_type=%s", model, output_type)
     agent: Agent[AgentDepsT, OutputT] = add_toolset_instructions(
         Agent(
-            model=infer_model(model) if isinstance(model, str) else model,
+            model=effective_model,
             system_prompt=effective_system_prompt,
             model_settings=model_settings,
             deps_type=context_type,

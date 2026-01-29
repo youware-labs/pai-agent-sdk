@@ -6,8 +6,10 @@ screen recordings and general video content, returning structured descriptions.
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
+from inspect import isawaitable
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field
@@ -223,6 +225,8 @@ async def get_video_description(
     model: str | Model | None = None,
     model_settings: ModelSettings | None = None,
     max_video_size: int = DEFAULT_MAX_VIDEO_SIZE,
+    model_wrapper: Callable[[Model, str, dict[str, Any]], Model | Awaitable[Model]] | None = None,
+    wrapper_context: dict[str, Any] | None = None,
 ) -> tuple[str, InternalUsage]:
     """Analyze a video and get a structured description.
 
@@ -234,6 +238,8 @@ async def get_video_description(
         model: Model string or Model instance.
         model_settings: Optional model settings dict.
         max_video_size: Maximum allowed size for video_data in bytes.
+        model_wrapper: Optional wrapper for model instrumentation.
+        wrapper_context: Context dict passed to model_wrapper (e.g., from ctx.get_wrapper_context()).
 
     Returns:
         Tuple of (description string, InternalUsage with model_id and usage).
@@ -252,6 +258,12 @@ async def get_video_description(
     )
 
     agent = get_video_understanding_agent(model=model, model_settings=model_settings)
+
+    # Apply model wrapper if configured
+    if model_wrapper is not None:
+        effective_context = wrapper_context or {}
+        wrapped = model_wrapper(cast(Model, agent.model), AGENT_NAME, effective_context)
+        agent.model = await wrapped if isawaitable(wrapped) else wrapped
 
     try:
         result = await agent.run(

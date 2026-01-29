@@ -62,6 +62,8 @@ class ReadImageTool(BaseTool):
             image_url=url,
             model=model,
             model_settings=model_settings,
+            model_wrapper=agent_ctx.model_wrapper,
+            wrapper_context=agent_ctx.get_wrapper_context(),
         )
 
         # Store usage in extra_usages with tool_call_id

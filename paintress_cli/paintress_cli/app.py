@@ -158,6 +158,12 @@ class TUIApp:
     _app: Application[None] | None = field(default=None, init=False, repr=False)
     _output_lines: list[str] = field(default_factory=list, init=False)
     _max_output_lines: int = field(default=500, init=False)  # Overridden from config.display
+
+    # Output cache for performance (avoid re-joining and re-parsing on every render)
+    _output_cache: str = field(default="", init=False)
+    _output_ansi_cache: ANSI | None = field(default=None, init=False)  # Cached ANSI object
+    _output_cache_valid: bool = field(default=True, init=False)
+    _total_line_count: int = field(default=0, init=False)  # Cached line count
     _renderer: RichRenderer = field(default_factory=RichRenderer, init=False)
     _event_renderer: EventRenderer = field(default_factory=EventRenderer, init=False)
 
@@ -337,13 +343,30 @@ class TUIApp:
             self._last_invalidate_time = now
             self._app.invalidate()
 
+    def _invalidate_output_cache(self) -> None:
+        """Mark output cache as invalid (must be called after modifying _output_lines)."""
+        self._output_cache_valid = False
+        # Recalculate line count
+        self._total_line_count = sum(line.count("\n") + 1 for line in self._output_lines)
+
     def _append_output(self, text: str) -> None:
         """Append text to output buffer with auto-scroll when running."""
+        # Update line count incrementally (avoid full recalculation)
+        new_lines = text.count("\n") + 1
+        self._total_line_count += new_lines
         self._output_lines.append(text)
+
         # Trim old lines to prevent memory issues
         if len(self._output_lines) > self._max_output_lines:
             trim_count = len(self._output_lines) - self._max_output_lines
+            # Subtract line counts of removed lines
+            for i in range(trim_count):
+                self._total_line_count -= self._output_lines[i].count("\n") + 1
             self._output_lines = self._output_lines[trim_count:]
+
+        # Invalidate cache (content changed)
+        self._output_cache_valid = False
+
         # Auto-scroll to bottom when agent is running
         if self._state == TUIState.RUNNING:
             self._scroll_to_bottom()
@@ -353,15 +376,13 @@ class TUIApp:
     def _scroll_to_bottom(self) -> None:
         """Scroll output pane to bottom.
 
-        Calculates actual content height and scrolls to show bottom content.
+        Uses cached line count for performance.
         """
         if not self._output_window:
             return
         try:
-            # Count total lines in output content
-            total_lines = 0
-            for line in self._output_lines:
-                total_lines += line.count("\n") + 1
+            # Use cached line count
+            total_lines = self._total_line_count
 
             # Get visible height from terminal
             if self._app and self._app.output:
@@ -382,18 +403,28 @@ class TUIApp:
             pass
 
     def _get_output_text(self) -> ANSI:
-        """Get formatted output for display."""
-        return ANSI("\n".join(self._output_lines))
+        """Get formatted output for display.
+
+        Uses cached ANSI object to avoid O(n) join and ANSI parsing on every UI render.
+        This is critical for performance since prompt_toolkit calls this on every redraw.
+        """
+        if not self._output_cache_valid or self._output_ansi_cache is None:
+            self._output_cache = "\n".join(self._output_lines)
+            self._output_ansi_cache = ANSI(self._output_cache)
+            self._output_cache_valid = True
+        return self._output_ansi_cache
 
     def _get_max_scroll(self) -> int:
-        """Calculate maximum scroll position."""
-        total_lines = sum(line.count("\n") + 1 for line in self._output_lines)
+        """Calculate maximum scroll position.
+
+        Uses cached line count for performance.
+        """
         if self._app and self._app.output:
             terminal_size = self._app.output.get_size()
             visible_height = max(5, terminal_size.rows - 10)
         else:
             visible_height = 20
-        return max(0, total_lines - visible_height)
+        return max(0, self._total_line_count - visible_height)
 
     def _get_terminal_width(self) -> int:
         """Get current terminal width for Rich rendering."""
@@ -412,6 +443,7 @@ class TUIApp:
         self._streaming_line_index = len(self._output_lines)
         # Add placeholder that will be updated
         self._output_lines.append(initial_content)
+        self._invalidate_output_cache()
 
     def _update_streaming_text(self, delta: str) -> None:
         """Update the current streaming text block with delta."""
@@ -424,6 +456,7 @@ class TUIApp:
                 width=self._get_terminal_width(),
             ).rstrip("\n")
             self._output_lines[self._streaming_line_index] = rendered
+            self._invalidate_output_cache()
             if self._state == TUIState.RUNNING:
                 self._scroll_to_bottom()
             self._throttled_invalidate()
@@ -439,6 +472,7 @@ class TUIApp:
             ).rstrip("\n")
             if self._streaming_line_index < len(self._output_lines):
                 self._output_lines[self._streaming_line_index] = rendered
+                self._invalidate_output_cache()
         self._streaming_text = ""
         self._streaming_line_index = None
 
@@ -449,6 +483,7 @@ class TUIApp:
         # Render initial content with thinking style
         rendered = self._event_renderer.render_thinking(initial_content, width=self._get_terminal_width()).rstrip("\n")
         self._output_lines.append(rendered)
+        self._invalidate_output_cache()
         self._throttled_invalidate()
 
     def _update_streaming_thinking(self, delta: str) -> None:
@@ -463,6 +498,7 @@ class TUIApp:
                 width=self._get_terminal_width(),
             ).rstrip("\n")
             self._output_lines[self._streaming_thinking_line_index] = rendered
+            self._invalidate_output_cache()
             if self._state == TUIState.RUNNING:
                 self._scroll_to_bottom()
             self._throttled_invalidate()
@@ -477,6 +513,7 @@ class TUIApp:
             ).rstrip("\n")
             if self._streaming_thinking_line_index < len(self._output_lines):
                 self._output_lines[self._streaming_thinking_line_index] = rendered
+                self._invalidate_output_cache()
         self._streaming_thinking = ""
         self._streaming_thinking_line_index = None
 
@@ -1075,6 +1112,7 @@ class TUIApp:
             "agent_name": agent_name,
         }
         self._output_lines.append(rendered.rstrip())
+        self._invalidate_output_cache()
         self._throttled_invalidate()
 
     def _handle_subagent_complete(self, event: SubagentCompleteEvent) -> None:
@@ -1130,6 +1168,7 @@ class TUIApp:
         # Update the line in place
         if line_index < len(self._output_lines):
             self._output_lines[line_index] = rendered.rstrip()
+            self._invalidate_output_cache()
 
         # Clean up state
         del self._subagent_states[agent_id]
@@ -1163,6 +1202,7 @@ class TUIApp:
         # Update the line in place
         if line_index < len(self._output_lines):
             self._output_lines[line_index] = rendered.rstrip()
+            self._invalidate_output_cache()
             self._throttled_invalidate()
 
     def _handle_stream_event(self, event: StreamEvent) -> None:
@@ -1743,6 +1783,11 @@ class TUIApp:
         - Session usage (token/cost tracking)
         """
         self._output_lines.clear()
+        # Reset cache
+        self._output_cache = ""
+        self._output_ansi_cache = None
+        self._output_cache_valid = True
+        self._total_line_count = 0
         # Reset streaming state
         self._streaming_text = ""
         self._streaming_line_index = None

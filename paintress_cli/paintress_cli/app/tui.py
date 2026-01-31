@@ -71,6 +71,9 @@ from pai_agent_sdk.events import (
     ToolCallsStartEvent,
 )
 from pai_agent_sdk.utils import get_latest_request_usage
+
+# Import state management from app.state (re-export TUIMode, TUIState for backward compatibility)
+from paintress_cli.app.state import TUIMode
 from paintress_cli.browser import BrowserManager
 from paintress_cli.config import ConfigManager, PaintressConfig
 from paintress_cli.display import EventRenderer, RichRenderer, ToolMessage
@@ -102,20 +105,9 @@ and adjust your work accordingly while continuing toward the goal.
 </system-reminder>"""
 
 
-# =============================================================================
-# Enums
-# =============================================================================
-
-
-class TUIMode(str, Enum):
-    """Agent operating mode."""
-
-    ACT = "act"
-    PLAN = "plan"
-
-
+# TUIState kept for backward compatibility (used in tests and status bar)
 class TUIState(str, Enum):
-    """TUI application state."""
+    """TUI application state (legacy, use TUIStateMachine for new code)."""
 
     IDLE = "idle"
     RUNNING = "running"

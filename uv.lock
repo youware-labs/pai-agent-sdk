@@ -30,7 +30,7 @@ wheels = [
 
 [[package]]
 name = "agent-environment"
-version = "0.2.0"
+version = "0.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -38,9 +38,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6c/cc/f998139b299cdf32b7dfb8f72aa8365ab980d9d2af6e721948544e4e02d0/agent_environment-0.2.0.tar.gz", hash = "sha256:c8d1137e55a00179f42e40eb82ce9742352cfebba704cbb938ecfd88c47f9751", size = 78339, upload-time = "2026-02-01T01:55:30.407Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3f/02/18603bdbdd437a6854a668074bb67a4be4885d499238847f6016f81ef5f7/agent_environment-0.4.0.tar.gz", hash = "sha256:84ef44a2522d8b2c668bcd6382996bf12c5a99ed87b355c551f20ac135bf63ed", size = 78583, upload-time = "2026-02-01T02:19:35.662Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f0/21/8c54c0d3e867e5ece34410b27535a0f54dfa05c0f75dcf577f9b90926642/agent_environment-0.2.0-py3-none-any.whl", hash = "sha256:cf951a4abd912c8d676e40a058c277a7eda8022429864bb17f20307ce29dc46c", size = 24401, upload-time = "2026-02-01T01:55:29.081Z" },
+    { url = "https://files.pythonhosted.org/packages/00/b5/37a82b532be804bc6e1212e19d426bacf535ab4d281df5c3f6f6cf9bad49/agent_environment-0.4.0-py3-none-any.whl", hash = "sha256:a9dc24197d886f75f88b57cc543daa765f7f1f7679757b638d40276fc911605a", size = 24462, upload-time = "2026-02-01T02:19:34.399Z" },
 ]
 
 [[package]]
@@ -2380,7 +2380,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "agent-environment", specifier = "==0.2.0" },
+    { name = "agent-environment", specifier = "==0.4.0" },
     { name = "anyio", specifier = ">=4.12.0" },
     { name = "cdp-use", specifier = ">=1.4.4,<2.0.0" },
     { name = "docker", marker = "extra == 'all'", specifier = ">=7.0.0" },

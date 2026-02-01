@@ -28,7 +28,7 @@ import os
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from xml.etree.ElementTree import Element, SubElement, indent, tostring
 
 from agent_environment import BaseResource, Environment
@@ -199,6 +199,13 @@ class ProcessManager(BaseResource):
     async def close(self) -> None:
         """Close the resource by killing all processes."""
         await self.kill_all()
+
+    def get_toolsets(self) -> list[Any]:
+        """Return process management toolset."""
+        from pai_agent_sdk.toolsets.core.base import Toolset
+        from paintress_cli.toolsets.process import process_tools
+
+        return [Toolset(tools=process_tools, toolset_id="process")]
 
     async def _cleanup_expired(self) -> None:
         """Remove exited processes that have exceeded the TTL."""

@@ -9,6 +9,7 @@ Export and restore resource states across process restarts via async factories.
 - **Resource**: Protocol requiring `close()` method
 - **ResumableResource**: Protocol adding `export_state()`/`restore_state()`
 - **InstructableResource**: Protocol adding `get_context_instructions()`
+- **ToolableResource**: Protocol adding `get_toolsets()` for resource-provided tools
 - **BaseResource**: Abstract base class implementing all protocols with defaults
 - **ResourceFactory**: Async callable that creates resources
 - **ResourceRegistryState**: Serializable state container
@@ -59,6 +60,10 @@ class BrowserSession(BaseResource):
 
     async def get_context_instructions(self) -> str | None:
         return "Browser session is active. Use browser tools for web navigation."
+
+    def get_toolsets(self) -> list[Any]:
+        """Provide browser-related tools."""
+        return [BrowserToolset(self._browser)]
 ```
 
 For resources that don't need state persistence, just implement `close()`:
@@ -68,6 +73,66 @@ class DatabasePool(BaseResource):
     async def close(self) -> None:
         await self._pool.close()
     # export_state/restore_state use defaults (empty dict / no-op)
+```
+
+## Resource Lifecycle: setup()
+
+`BaseResource.setup()` is called by `ResourceRegistry` after factory creation, before `restore_state()`. Use it for async initialization:
+
+```python
+class ProcessManager(BaseResource):
+    def __init__(self):
+        self._processes: dict[str, Process] = {}
+
+    async def setup(self) -> None:
+        """Called after factory creation, before restore_state()."""
+        # Perform async initialization here
+        await self._initialize_process_pool()
+
+    async def close(self) -> None:
+        await self._cleanup_all_processes()
+```
+
+Lifecycle order:
+
+1. Factory creates resource instance (`__init__`)
+2. `setup()` called for async initialization
+3. `restore_state()` called if restoring from saved state
+4. Resource is ready for use
+5. `close()` called on cleanup
+
+## Resource-Provided Toolsets
+
+Resources can provide toolsets via `get_toolsets()`. This enables encapsulation where a resource owns both its state and the tools that operate on it:
+
+```python
+class ProcessManager(BaseResource):
+    def get_toolsets(self) -> list[Any]:
+        """Return process management tools."""
+        from my_app.toolsets import ProcessToolset
+        return [ProcessToolset(self)]
+
+    async def get_context_instructions(self) -> str | None:
+        """Report running processes to agent."""
+        if not self._processes:
+            return None
+        return f"<processes count='{len(self._processes)}'>...</processes>"
+```
+
+Collect all resource toolsets via `ResourceRegistry`:
+
+```python
+async with LocalEnvironment() as env:
+    env.resources.register_factory("process_manager", create_process_manager)
+    await env.resources.get_or_create("process_manager")
+
+    # Aggregate toolsets from all resources
+    resource_toolsets = env.resources.get_toolsets()
+
+    agent = Agent(
+        ...,
+        toolsets=[*core_toolsets, *env.get_toolsets()],
+    )
 ```
 
 ## Implementing ResumableResource Protocol
@@ -146,6 +211,9 @@ state = await registry.export_state()
 count = await registry.restore_all()
 restored = await registry.restore_one("key")
 
+# Toolset collection (aggregates from all resources)
+toolsets = registry.get_toolsets()
+
 # Existing API (preserved)
 registry.set("key", resource)
 registry.get("key")
@@ -159,6 +227,7 @@ registry.get_typed("key", MyResource)
 - **Lazy restoration**: Use `restore_one()` to restore on demand
 - **Automatic restore**: `Environment.__aenter__` calls `restore_all()` after `_setup()`
 - **Context instructions**: Resources with `get_context_instructions()` contribute to `Environment.get_context_instructions()`
+- **Toolset aggregation**: Resources with `get_toolsets()` contribute tools via `ResourceRegistry.get_toolsets()`
 
 ## See Also
 

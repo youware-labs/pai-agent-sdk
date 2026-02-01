@@ -59,6 +59,9 @@ registry.set("browser", browser)  # Must implement Resource protocol (close())
 # Access resources
 browser = registry.get_typed("browser", Browser)
 
+# Collect toolsets from all resources
+toolsets = await registry.get_toolsets()
+
 # Cleanup (called automatically by Environment)
 await registry.close_all()
 ```
@@ -113,7 +116,7 @@ DockerEnvironment(
 
 ## Environment Toolsets
 
-Environments can provide pydantic-ai toolsets via the `toolsets` property:
+Environments can provide pydantic-ai toolsets via the `get_toolsets()` method:
 
 ```python
 class ContainerEnvironment(Environment):
@@ -128,7 +131,42 @@ class ContainerEnvironment(Environment):
         self._toolsets = [container_toolset]
 ```
 
-`create_agent` automatically includes `env.toolsets`.
+`create_agent` automatically includes `env.get_toolsets()`.
+
+## Resource-Provided Toolsets
+
+Resources can provide their own toolsets via `get_toolsets()`. This enables better encapsulation where a resource owns both its state and the tools that operate on it:
+
+```python
+from agent_environment import BaseResource
+
+class ProcessManager(BaseResource):
+    async def setup(self) -> None:
+        """Async initialization after factory creation."""
+        self._processes = {}
+
+    def get_toolsets(self) -> list[Any]:
+        """Return tools for managing processes."""
+        return [ProcessToolset(self)]
+
+    async def close(self) -> None:
+        await self._kill_all_processes()
+```
+
+Collect toolsets from all resources via `ResourceRegistry.get_toolsets()`:
+
+```python
+async with LocalEnvironment() as env:
+    # Register and create resource
+    env.resources.register_factory("process_manager", create_pm)
+    await env.resources.get_or_create("process_manager")
+
+    # Get toolsets from all resources
+    resource_toolsets = env.resources.get_toolsets()
+
+    # Combine with environment toolsets (includes resource toolsets)
+    all_toolsets = [*core_toolsets, *env.get_toolsets()]
+```
 
 ## Resumable Resources
 
@@ -145,6 +183,10 @@ class BrowserSession(BaseResource):
     def __init__(self, browser: Browser):
         self._browser = browser
 
+    async def setup(self) -> None:
+        """Async initialization (called after factory, before restore_state)."""
+        await self._browser.connect()
+
     async def close(self) -> None:
         await self._browser.close()
 
@@ -153,6 +195,10 @@ class BrowserSession(BaseResource):
 
     async def restore_state(self, state: dict[str, Any]) -> None:
         await self._browser.set_cookies(state.get("cookies", []))
+
+    def get_toolsets(self) -> list[Any]:
+        """Provide browser tools."""
+        return [BrowserToolset(self._browser)]
 ```
 
 ### Using Factories

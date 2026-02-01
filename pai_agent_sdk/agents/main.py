@@ -432,8 +432,8 @@ def create_agent(
     if toolsets:
         all_toolsets.extend(toolsets)
 
-    # Add environment toolsets (will be available after env enters)
-    all_toolsets.extend(actual_env.toolsets)
+    # Add environment toolsets (includes both env._toolsets and resource toolsets)
+    all_toolsets.extend(actual_env.get_toolsets())
 
     # --- System Prompt ---
     effective_system_prompt = _load_system_prompt(system_prompt, system_prompt_template_vars)

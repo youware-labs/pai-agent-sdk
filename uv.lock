@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.11, <3.14"
 resolution-markers = [
     "python_full_version >= '3.13' and sys_platform == 'win32'",
@@ -30,7 +30,7 @@ wheels = [
 
 [[package]]
 name = "agent-environment"
-version = "0.1.0"
+version = "0.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -38,9 +38,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/15/ef/64b5f6114bb26b861c6f82a0e0d6e501e2ef10b748742999eac2e3022a7d/agent_environment-0.1.0.tar.gz", hash = "sha256:4e2ed82eeb6933b38678e89b604e06c2dd5e236d107bfae20f569cd1f35721e0", size = 72883, upload-time = "2026-01-13T13:36:51.185Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6c/cc/f998139b299cdf32b7dfb8f72aa8365ab980d9d2af6e721948544e4e02d0/agent_environment-0.2.0.tar.gz", hash = "sha256:c8d1137e55a00179f42e40eb82ce9742352cfebba704cbb938ecfd88c47f9751", size = 78339, upload-time = "2026-02-01T01:55:30.407Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/89/ea/d57404894d77cbcbc6cff3497b1f578d90fa9d1862218014f80c1afb58be/agent_environment-0.1.0-py3-none-any.whl", hash = "sha256:a98bafa6849c285cf8c3f60011ac6ab5f21b0c2a7bd3469a909dbee4775ccdd3", size = 22066, upload-time = "2026-01-13T13:36:49.831Z" },
+    { url = "https://files.pythonhosted.org/packages/f0/21/8c54c0d3e867e5ece34410b27535a0f54dfa05c0f75dcf577f9b90926642/agent_environment-0.2.0-py3-none-any.whl", hash = "sha256:cf951a4abd912c8d676e40a058c277a7eda8022429864bb17f20307ce29dc46c", size = 24401, upload-time = "2026-02-01T01:55:29.081Z" },
 ]
 
 [[package]]
@@ -2380,7 +2380,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "agent-environment", specifier = "==0.1.0" },
+    { name = "agent-environment", specifier = "==0.2.0" },
     { name = "anyio", specifier = ">=4.12.0" },
     { name = "cdp-use", specifier = ">=1.4.4,<2.0.0" },
     { name = "docker", marker = "extra == 'all'", specifier = ">=7.0.0" },

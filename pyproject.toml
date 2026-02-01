@@ -93,7 +93,7 @@ pai-agent-sdk = { workspace = true }
 
 [tool.pyright]
 include = ["pai_agent_sdk", "paintress_cli"]
-exclude = ["paintress_cli/paintress_cli/skills"]
+exclude = ["paintress_cli/paintress_cli/skills", "paintress_cli/tests", "tests", "examples", "skills/examples"]
 pythonVersion = "3.11"
 typeCheckingMode = "standard"
 reportTypedDictNotRequiredAccess = false

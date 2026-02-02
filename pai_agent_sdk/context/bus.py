@@ -36,7 +36,7 @@ import uuid
 from datetime import datetime
 
 from jinja2 import Template
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 def render_template(content: str, template: str | None) -> str:
@@ -103,6 +103,14 @@ class BusMessage(BaseModel):
 
     timestamp: datetime = Field(default_factory=datetime.now)
     """When the message was created."""
+
+    @field_validator("id")
+    @classmethod
+    def validate_id(cls, value: str) -> str:
+        """Ensure id is non-empty."""
+        if not value or not value.strip():
+            raise ValueError("id must be non-empty")
+        return value
 
     def render(self) -> str:
         """Render the message using its Jinja2 template, or return raw content if no template."""

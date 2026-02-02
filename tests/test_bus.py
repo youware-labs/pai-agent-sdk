@@ -43,6 +43,17 @@ def test_bus_message_render_with_template() -> None:
     assert msg.render() == "[URGENT] Stop"
 
 
+def test_bus_message_empty_id_rejected() -> None:
+    """Test that empty id is rejected."""
+    import pytest
+
+    with pytest.raises(ValueError, match="id must be non-empty"):
+        BusMessage(id="", content="Hello", source="user")
+
+    with pytest.raises(ValueError, match="id must be non-empty"):
+        BusMessage(id="   ", content="Hello", source="user")
+
+
 # =============================================================================
 # MessageBus Subscribe/Unsubscribe Tests
 # =============================================================================

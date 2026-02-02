@@ -77,6 +77,7 @@ from paintress_cli.app.state import TUIMode
 from paintress_cli.browser import BrowserManager
 from paintress_cli.config import ConfigManager, PaintressConfig
 from paintress_cli.display import EventRenderer, RichRenderer, ToolMessage
+from paintress_cli.environment import TUIEnvironment
 from paintress_cli.events import ContextUpdateEvent
 from paintress_cli.hooks import emit_context_update
 from paintress_cli.logging import configure_tui_logging, get_logger
@@ -144,7 +145,9 @@ class TUIApp:
     # Resources (initialized in __aenter__)
     _exit_stack: AsyncExitStack | None = field(default=None, init=False, repr=False)
     _browser: BrowserManager | None = field(default=None, init=False)
-    _runtime: AgentRuntime[TUIContext, str | DeferredToolRequests] | None = field(default=None, init=False)
+    _runtime: AgentRuntime[TUIContext, str | DeferredToolRequests, TUIEnvironment] | None = field(
+        default=None, init=False
+    )
 
     # UI components
     _app: Application[None] | None = field(default=None, init=False, repr=False)
@@ -231,7 +234,7 @@ class TUIApp:
         return self._state
 
     @property
-    def runtime(self) -> AgentRuntime[TUIContext, str | DeferredToolRequests]:
+    def runtime(self) -> AgentRuntime[TUIContext, str | DeferredToolRequests, TUIEnvironment]:
         """Get agent runtime (must be entered first)."""
         if self._runtime is None:
             raise RuntimeError("TUIApp not entered. Use 'async with app:' first.")

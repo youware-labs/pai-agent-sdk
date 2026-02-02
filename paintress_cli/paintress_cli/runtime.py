@@ -170,7 +170,7 @@ def create_tui_runtime(
     *,
     working_dir: Path | None = None,
     system_prompt: str | None = None,
-) -> AgentRuntime[TUIContext, str | DeferredToolRequests]:
+) -> AgentRuntime[TUIContext, str | DeferredToolRequests, TUIEnvironment]:
     """Create AgentRuntime configured for TUI.
 
     This function wraps the SDK's create_agent() with TUI-specific

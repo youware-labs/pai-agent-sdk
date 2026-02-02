@@ -498,7 +498,7 @@ def create_agent(
 
 
 @dataclass
-class RuntimeReadyContext(Generic[AgentDepsT, OutputT]):
+class RuntimeReadyContext(Generic[AgentDepsT, OutputT, EnvT]):
     """Context passed to runtime ready hook (after runtime enter, before agent.iter).
 
     This hook is called after the runtime (env, ctx, agent) has been entered but
@@ -516,7 +516,7 @@ class RuntimeReadyContext(Generic[AgentDepsT, OutputT]):
         deferred_tool_results: Results from deferred tool calls. Can be modified by hook.
     """
 
-    runtime: AgentRuntime[AgentDepsT, OutputT]
+    runtime: AgentRuntime[AgentDepsT, OutputT, EnvT]
     agent_info: AgentInfo
     output_queue: asyncio.Queue[StreamEvent]
     user_prompt: str | Sequence[UserContent] | None
@@ -524,7 +524,7 @@ class RuntimeReadyContext(Generic[AgentDepsT, OutputT]):
 
 
 @dataclass
-class AgentStartContext(Generic[AgentDepsT, OutputT]):
+class AgentStartContext(Generic[AgentDepsT, OutputT, EnvT]):
     """Context passed to agent start hook (after agent.iter starts, before first node).
 
     This hook is called after agent.iter() has started and the run object is available,
@@ -540,14 +540,14 @@ class AgentStartContext(Generic[AgentDepsT, OutputT]):
         run: The AgentRun instance from agent.iter().
     """
 
-    runtime: AgentRuntime[AgentDepsT, OutputT]
+    runtime: AgentRuntime[AgentDepsT, OutputT, EnvT]
     agent_info: AgentInfo
     output_queue: asyncio.Queue[StreamEvent]
     run: AgentRun[AgentDepsT, OutputT]
 
 
 @dataclass
-class AgentCompleteContext(Generic[AgentDepsT, OutputT]):
+class AgentCompleteContext(Generic[AgentDepsT, OutputT, EnvT]):
     """Context passed to agent complete hook (after all nodes processed, before agent.iter exits).
 
     This hook is called after all nodes have been processed but before the agent.iter()
@@ -563,7 +563,7 @@ class AgentCompleteContext(Generic[AgentDepsT, OutputT]):
         run: The AgentRun instance with result available.
     """
 
-    runtime: AgentRuntime[AgentDepsT, OutputT]
+    runtime: AgentRuntime[AgentDepsT, OutputT, EnvT]
     agent_info: AgentInfo
     output_queue: asyncio.Queue[StreamEvent]
     run: AgentRun[AgentDepsT, OutputT]
@@ -609,12 +609,12 @@ class EventHookContext(Generic[AgentDepsT, OutputT]):
 UserPromptT = str | Sequence[UserContent]
 
 # Hook type aliases
-RuntimeReadyHook = Callable[[RuntimeReadyContext[AgentDepsT, OutputT]], Awaitable[None]]
-AgentStartHook = Callable[[AgentStartContext[AgentDepsT, OutputT]], Awaitable[None]]
-AgentCompleteHook = Callable[[AgentCompleteContext[AgentDepsT, OutputT]], Awaitable[None]]
+RuntimeReadyHook = Callable[[RuntimeReadyContext[AgentDepsT, OutputT, EnvT]], Awaitable[None]]
+AgentStartHook = Callable[[AgentStartContext[AgentDepsT, OutputT, EnvT]], Awaitable[None]]
+AgentCompleteHook = Callable[[AgentCompleteContext[AgentDepsT, OutputT, EnvT]], Awaitable[None]]
 NodeHook = Callable[[NodeHookContext[AgentDepsT, OutputT]], Awaitable[None]]
 EventHook = Callable[[EventHookContext[AgentDepsT, OutputT]], Awaitable[None]]
-UserPromptFactory = Callable[[AgentRuntime[AgentDepsT, OutputT]], Awaitable[UserPromptT]]
+UserPromptFactory = Callable[[AgentRuntime[AgentDepsT, OutputT, EnvT]], Awaitable[UserPromptT]]
 
 
 # =============================================================================
@@ -704,17 +704,17 @@ class AgentStreamer(Generic[AgentDepsT, OutputT]):
 
 @asynccontextmanager
 async def stream_agent(  # noqa: C901
-    runtime: AgentRuntime[AgentDepsT, OutputT],
+    runtime: AgentRuntime[AgentDepsT, OutputT, EnvT],
     user_prompt: UserPromptT | None = None,
     *,
-    user_prompt_factory: UserPromptFactory[AgentDepsT, OutputT] | None = None,
+    user_prompt_factory: UserPromptFactory[AgentDepsT, OutputT, EnvT] | None = None,
     message_history: Sequence[ModelMessage] | None = None,
     deferred_tool_results: DeferredToolResults | None = None,
     usage_limits: UsageLimits | None = None,
     # Hooks
-    on_runtime_ready: RuntimeReadyHook[AgentDepsT, OutputT] | None = None,
-    on_agent_start: AgentStartHook[AgentDepsT, OutputT] | None = None,
-    on_agent_complete: AgentCompleteHook[AgentDepsT, OutputT] | None = None,
+    on_runtime_ready: RuntimeReadyHook[AgentDepsT, OutputT, EnvT] | None = None,
+    on_agent_start: AgentStartHook[AgentDepsT, OutputT, EnvT] | None = None,
+    on_agent_complete: AgentCompleteHook[AgentDepsT, OutputT, EnvT] | None = None,
     pre_node_hook: NodeHook[AgentDepsT, OutputT] | None = None,
     post_node_hook: NodeHook[AgentDepsT, OutputT] | None = None,
     pre_event_hook: EventHook[AgentDepsT, OutputT] | None = None,

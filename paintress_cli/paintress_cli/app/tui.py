@@ -893,7 +893,7 @@ class TUIApp:
             deferred_results = prompt
 
         async with stream_agent(
-            self.runtime,  # type: ignore[arg-type]
+            self.runtime,  # type: ignore[arg-type] # TUIContext is subclass of AgentContext
             user_prompt=user_prompt if user_prompt else None,
             message_history=self._message_history,
             deferred_tool_results=deferred_results,

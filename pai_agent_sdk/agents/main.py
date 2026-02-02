@@ -54,7 +54,7 @@ from pai_agent_sdk.events import (
 from pai_agent_sdk.filters.environment_instructions import create_environment_instructions_filter
 from pai_agent_sdk.filters.system_prompt import create_system_prompt_filter
 from pai_agent_sdk.toolsets.core.base import BaseTool, GlobalHooks, Toolset
-from pai_agent_sdk.utils import AgentDepsT, add_toolset_instructions
+from pai_agent_sdk.utils import AgentDepsT, EnvT, add_toolset_instructions
 
 if TYPE_CHECKING:
     from pydantic_ai import ModelSettings
@@ -104,13 +104,18 @@ class LifecycleTracker:
 
 
 @dataclass
-class AgentRuntime(Generic[AgentDepsT, OutputT]):
+class AgentRuntime(Generic[AgentDepsT, OutputT, EnvT]):
     """Container for agent runtime components with lifecycle management.
 
     This dataclass holds all the components needed to run an agent,
     providing a clean interface for accessing the environment, context,
     and agent instance. It also acts as an async context manager to
     manage the lifecycle of env, ctx, and agent.
+
+    Type Parameters:
+        AgentDepsT: The context type (subclass of AgentContext).
+        OutputT: The output type from the agent.
+        EnvT: The environment type (subclass of Environment). Defaults to Environment.
 
     Attributes:
         env: The environment instance managing resources.
@@ -131,13 +136,13 @@ class AgentRuntime(Generic[AgentDepsT, OutputT]):
                 result = await runtime.agent.run("Hello", deps=runtime.ctx)
     """
 
-    env: Environment
+    env: EnvT
     ctx: AgentDepsT
     agent: Agent[AgentDepsT, OutputT]
     core_toolset: Toolset[AgentDepsT] | None
     _exit_stack: AsyncExitStack | None = field(default=None, repr=False)
 
-    async def __aenter__(self) -> AgentRuntime[AgentDepsT, OutputT]:
+    async def __aenter__(self) -> AgentRuntime[AgentDepsT, OutputT, EnvT]:
         """Enter the runtime, managing env/ctx/agent lifecycles.
 
         Only enters components that are not already entered (checked via _entered flag).
@@ -220,12 +225,12 @@ def create_agent(
     model_settings: ModelSettings | None = None,
     model_wrapper: ModelWrapper | None = None,
     output_type: OutputSpec[OutputT] = str,  # type: ignore[assignment]
-    # --- Environment ---
-    env: Environment | type[Environment] = LocalEnvironment,
-    env_kwargs: dict[str, Any] | None = None,
     # --- Context ---
     context_type: type[AgentDepsT] = AgentContext,  # type: ignore[assignment]
     model_cfg: ModelConfig | None = None,
+    # --- Environment ---
+    env: EnvT | type[EnvT] = LocalEnvironment,  # type: ignore[assignment]
+    env_kwargs: dict[str, Any] | None = None,
     tool_config: ToolConfig | None = None,
     extra_context_kwargs: dict[str, Any] | None = None,
     state: ResumableState | None = None,
@@ -259,7 +264,7 @@ def create_agent(
     defer_model_check: bool = False,
     end_strategy: str = "exhaustive",
     metadata: RunContextMetadata | None = None,
-) -> AgentRuntime[AgentDepsT, OutputT]:
+) -> AgentRuntime[AgentDepsT, OutputT, EnvT]:
     """Create and configure an agent runtime.
 
     This function creates an AgentRuntime containing Environment, AgentContext,
@@ -484,7 +489,7 @@ def create_agent(
         len(all_toolsets) if all_toolsets else 0,
         len(all_processors) if all_processors else 0,
     )
-    return AgentRuntime(env=actual_env, ctx=ctx, agent=agent, core_toolset=core_toolset)
+    return AgentRuntime[AgentDepsT, OutputT, EnvT](env=actual_env, ctx=ctx, agent=agent, core_toolset=core_toolset)
 
 
 # =============================================================================

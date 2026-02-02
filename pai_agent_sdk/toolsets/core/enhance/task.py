@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from pydantic_ai import RunContext
 
 from pai_agent_sdk._logger import get_logger
-from pai_agent_sdk.context import AgentContext, TaskStatus
+from pai_agent_sdk.context import AgentContext, BusMessage, TaskStatus
 from pai_agent_sdk.toolsets.base import Instruction
 from pai_agent_sdk.toolsets.core.base import BaseTool
 
@@ -130,7 +130,7 @@ class TaskUpdateTool(BaseTool):
         if ctx.deps.agent_id == "main":
             return
         msg = f"Task '{task.subject}' (#{task.id}) updated: {update_summary}"
-        ctx.deps.message_bus.send(msg, source=ctx.deps.agent_id, target=None)
+        ctx.deps.message_bus.send(BusMessage(content=msg, source=ctx.deps.agent_id))
 
     def _build_update_summary(
         self,

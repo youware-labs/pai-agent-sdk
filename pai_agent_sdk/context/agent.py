@@ -875,7 +875,7 @@ class AgentContext(BaseModel):
     bidirectional communication during subagent execution.
 
     Example:
-        ctx.send_message("Please stop", source="user")
+        ctx.send_message(BusMessage(content="Please stop", source="user"))
     """
 
     model_wrapper: ModelWrapper | None = Field(default=None, exclude=True)
@@ -1342,39 +1342,66 @@ class AgentContext(BaseModel):
             return
         await self.agent_stream_queues[self._agent_id].put(event)
 
-    def send_message(
-        self,
-        content: str,
-        *,
-        source: str,
-        target: str | None = None,
-        template: str | None = None,
-    ) -> BusMessage:
+    def send_message(self, message: BusMessage) -> BusMessage:
         """Send a message to the message bus.
 
-        Convenience method for sending messages to the bus.
+        This operation is idempotent: if a message with the same id already
+        exists, the existing message is returned.
 
         Args:
-            content: The message content (markdown text).
-            source: Who is sending the message (e.g., "user", agent_id).
-            target: Who should receive the message, or None for broadcast to all subscribers.
-            template: Jinja2 template string for rendering. Use {{ content }} placeholder. None means raw content.
+            message: The message to send.
 
         Returns:
-            The created BusMessage.
+            The sent message, or existing message if id already exists.
 
         Example::
 
+            from pai_agent_sdk.context import BusMessage
+
             # User sends message to main agent
-            ctx.send_message("Please stop the current task", source="user")
+            ctx.send_message(BusMessage(content="Please stop", source="user"))
 
-            # Main agent sends message to subagent
-            ctx.send_message("Focus on security issues", source="main", target=subagent_id)
+            # Targeted message to subagent
+            ctx.send_message(BusMessage(
+                content="Focus on security",
+                source="main",
+                target=subagent_id,
+            ))
 
-            # With custom template
-            ctx.send_message("Stop now", source="user", template="[URGENT] {{ content }}")
+            # With explicit id for idempotent send
+            ctx.send_message(BusMessage(
+                id="unique-id-123",
+                content="Important",
+                source="user",
+            ))
         """
-        return self.message_bus.send(content, source=source, target=target, template=template)
+        return self.message_bus.send(message)
+
+    def consume_messages(self) -> list[BusMessage]:
+        """Consume pending messages for this agent (idempotent).
+
+        Returns messages that:
+        1. Are pending for this agent (targeted or broadcast)
+        2. Have not been consumed before (tracked by message ID)
+
+        This method is idempotent: each message is returned only once,
+        even if called multiple times. This ensures messages are not
+        duplicated on LLM retries.
+
+        Returns:
+            List of new messages, in FIFO order (oldest first).
+
+        Example::
+
+            # First call returns pending messages
+            messages = ctx.consume_messages()
+            # [BusMessage(id="abc", content="Hello"), ...]
+
+            # Second call returns empty (already consumed)
+            messages = ctx.consume_messages()
+            # []
+        """
+        return self.message_bus.consume(self._agent_id)
 
     async def __aenter__(self):
         """Enter the context and start timing.

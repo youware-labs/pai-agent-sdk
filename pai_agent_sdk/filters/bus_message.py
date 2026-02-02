@@ -8,6 +8,7 @@ between user and agents, or between agents.
 from __future__ import annotations
 
 import uuid
+from html import escape
 
 from pydantic_ai import RunContext
 from pydantic_ai.messages import ModelMessage, ModelRequest, UserPromptPart
@@ -24,7 +25,11 @@ async def inject_bus_messages(
 
     This filter consumes pending messages from the message bus
     and injects them as user prompt parts into the last ModelRequest.
-    Messages are consumed (removed from bus) after injection.
+
+    Idempotency:
+        Uses ctx.deps.consume_messages() which tracks consumed message IDs.
+        Even if this filter runs multiple times (e.g., on LLM retry),
+        each message is only injected once.
 
     Injection:
         Messages are rendered using their template and appended
@@ -44,17 +49,19 @@ async def inject_bus_messages(
     if not messages or not isinstance(messages[-1], ModelRequest):
         return messages
 
-    # Consume messages for current agent
-    agent_id = ctx.deps.agent_id
-    pending = ctx.deps.message_bus.consume(agent_id)
+    # Consume messages idempotently (each message only returned once)
+    pending = ctx.deps.consume_messages()
 
     if not pending:
         return messages
 
-    # Render messages with structured format
+    # Pre-render messages once for both injection and event
+    rendered_messages = [(msg, msg.render()) for msg in pending]
+
+    # Render messages with structured format (escape source for XML safety)
     parts = [
-        UserPromptPart(content=f'<bus-message source="{msg.source}">\n{msg.render()}\n</bus-message>')
-        for msg in pending
+        UserPromptPart(content=f'<bus-message source="{escape(msg.source)}">\n{rendered}\n</bus-message>')
+        for msg, rendered in rendered_messages
     ]
 
     # Emit single event with all messages
@@ -63,11 +70,11 @@ async def inject_bus_messages(
         messages=[
             BusMessageInfo(
                 content=msg.content,
-                rendered_content=msg.render(),
+                rendered_content=rendered,
                 source=msg.source,
                 target=msg.target,
             )
-            for msg in pending
+            for msg, rendered in rendered_messages
         ],
     )
     await ctx.deps.emit_event(event)

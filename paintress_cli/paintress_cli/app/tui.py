@@ -56,7 +56,7 @@ from pydantic_ai.models import Model
 from rich.text import Text
 
 from pai_agent_sdk.agents.main import AgentRuntime, stream_agent
-from pai_agent_sdk.context import ResumableState, StreamEvent
+from pai_agent_sdk.context import BusMessage, ResumableState, StreamEvent
 from pai_agent_sdk.events import (
     CompactCompleteEvent,
     CompactFailedEvent,
@@ -602,7 +602,14 @@ class TUIApp:
     def _send_steering_message(self, message: str) -> None:
         """Send steering message to the message bus with TUI formatting."""
         try:
-            self.runtime.ctx.send_message(message, source="user", target="main", template=STEERING_TEMPLATE)
+            self.runtime.ctx.send_message(
+                BusMessage(
+                    content=message,
+                    source="user",
+                    target="main",
+                    template=STEERING_TEMPLATE,
+                )
+            )
             logger.debug("Steering message sent: %s", message[:50])
         except Exception:
             logger.exception("Failed to send steering message")

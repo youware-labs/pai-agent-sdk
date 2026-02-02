@@ -5,7 +5,7 @@ from __future__ import annotations
 from paintress_cli.events import ContextUpdateEvent
 from paintress_cli.session import TUIContext
 
-from pai_agent_sdk.context import AgentContext
+from pai_agent_sdk.context import AgentContext, BusMessage
 from pai_agent_sdk.events import BusMessageInfo, MessageReceivedEvent
 
 # =============================================================================
@@ -67,7 +67,7 @@ def test_tui_context_has_message_bus():
 def test_tui_context_send_message():
     """Test sending message via TUIContext."""
     ctx = TUIContext()
-    msg = ctx.send_message("Focus on performance", source="user")
+    msg = ctx.send_message(BusMessage(content="Focus on performance", source="user"))
     assert msg.content == "Focus on performance"
     assert msg.source == "user"
 
@@ -76,7 +76,7 @@ def test_tui_context_message_bus_pending():
     """Test message bus pending check."""
     ctx = TUIContext()
     ctx.message_bus.subscribe("main")
-    ctx.send_message("Test message", source="user", target="main")
+    ctx.send_message(BusMessage(content="Test message", source="user", target="main"))
     assert ctx.message_bus.has_pending("main")
 
 

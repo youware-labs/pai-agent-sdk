@@ -24,7 +24,11 @@ async def inject_bus_messages(
 
     This filter consumes pending messages from the message bus
     and injects them as user prompt parts into the last ModelRequest.
-    Messages are consumed (removed from bus) after injection.
+
+    Idempotency:
+        Uses ctx.deps.consume_messages() which tracks consumed message IDs.
+        Even if this filter runs multiple times (e.g., on LLM retry),
+        each message is only injected once.
 
     Injection:
         Messages are rendered using their template and appended
@@ -44,9 +48,8 @@ async def inject_bus_messages(
     if not messages or not isinstance(messages[-1], ModelRequest):
         return messages
 
-    # Consume messages for current agent
-    agent_id = ctx.deps.agent_id
-    pending = ctx.deps.message_bus.consume(agent_id)
+    # Consume messages idempotently (each message only returned once)
+    pending = ctx.deps.consume_messages()
 
     if not pending:
         return messages

@@ -7,7 +7,7 @@ from pydantic_ai import Agent, RunContext
 from pydantic_ai.exceptions import ModelRetry
 
 from pai_agent_sdk.agents.guards import attach_message_bus_guard, message_bus_guard
-from pai_agent_sdk.context import AgentContext, MessageBus
+from pai_agent_sdk.context import AgentContext, BusMessage, MessageBus
 
 
 def create_mock_ctx(agent_id: str = "main", message_bus: MessageBus | None = None) -> RunContext[AgentContext]:
@@ -37,7 +37,7 @@ async def test_message_bus_guard_with_pending() -> None:
     """Test guard raises ModelRetry when messages pending."""
     bus = MessageBus()
     bus.subscribe("main")
-    bus.send("Please focus", source="user", target="main")
+    bus.send(BusMessage(content="Please focus", source="user", target="main"))
     ctx = create_mock_ctx(message_bus=bus)
 
     with pytest.raises(ModelRetry) as exc_info:
@@ -51,7 +51,7 @@ async def test_message_bus_guard_different_target() -> None:
     bus = MessageBus()
     bus.subscribe("main")
     bus.subscribe("other-agent")
-    bus.send("For other", source="user", target="other-agent")
+    bus.send(BusMessage(content="For other", source="user", target="other-agent"))
     ctx = create_mock_ctx(agent_id="main", message_bus=bus)
 
     result = await message_bus_guard(ctx, "output text")
@@ -63,7 +63,7 @@ async def test_message_bus_guard_broadcast() -> None:
     """Test guard triggers on broadcast messages."""
     bus = MessageBus()
     bus.subscribe("main")
-    bus.send("Broadcast", source="user")  # No target = broadcast
+    bus.send(BusMessage(content="Broadcast", source="user"))  # No target = broadcast
     ctx = create_mock_ctx(message_bus=bus)
 
     with pytest.raises(ModelRetry):
@@ -89,7 +89,7 @@ async def test_message_bus_guard_subagent() -> None:
     """Test guard works for subagent context."""
     bus = MessageBus()
     bus.subscribe("subagent-123")
-    bus.send("For subagent", source="main", target="subagent-123")
+    bus.send(BusMessage(content="For subagent", source="main", target="subagent-123"))
     ctx = create_mock_ctx(agent_id="subagent-123", message_bus=bus)
 
     with pytest.raises(ModelRetry):
@@ -99,7 +99,7 @@ async def test_message_bus_guard_subagent() -> None:
 async def test_message_bus_guard_unsubscribed() -> None:
     """Test guard passes when agent not subscribed (no pending)."""
     bus = MessageBus()
-    bus.send("Hello", source="user", target="main")
+    bus.send(BusMessage(content="Hello", source="user", target="main"))
     ctx = create_mock_ctx(message_bus=bus)
 
     # Not subscribed, so has_pending returns False

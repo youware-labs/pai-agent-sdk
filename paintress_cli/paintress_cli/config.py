@@ -185,13 +185,13 @@ class S3Config(BaseModel):
     region: str = "us-east-1"
     """AWS region."""
 
-    access_key_id: str = ""
-    """AWS access key ID. Leave empty to use default credential chain."""
+    access_key_id: str | None = None
+    """AWS access key ID. None uses default credential chain."""
 
-    secret_access_key: str = ""
-    """AWS secret access key. Leave empty to use default credential chain."""
+    secret_access_key: str | None = None
+    """AWS secret access key. None uses default credential chain."""
 
-    endpoint_url: str = ""
+    endpoint_url: str | None = None
     """Custom S3 endpoint URL for S3-compatible services (MinIO, R2, Ceph, etc.)."""
 
     prefix: str = ""
@@ -200,7 +200,7 @@ class S3Config(BaseModel):
     url_mode: Literal["cdn", "presign"] = "presign"
     """URL generation mode: 'cdn' for CDN mapping, 'presign' for presigned URLs."""
 
-    cdn_base_url: str = ""
+    cdn_base_url: str | None = None
     """CDN base URL (required if url_mode='cdn'). e.g., 'https://cdn.example.com'"""
 
     presign_expires_seconds: int = 3600

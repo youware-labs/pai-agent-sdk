@@ -247,12 +247,12 @@ def create_tui_runtime(
             s3_config = S3MediaConfig(
                 bucket=config.media.s3.bucket,
                 region=config.media.s3.region,
-                access_key_id=config.media.s3.access_key_id or None,
-                secret_access_key=config.media.s3.secret_access_key or None,
-                endpoint_url=config.media.s3.endpoint_url or None,
+                access_key_id=config.media.s3.access_key_id,
+                secret_access_key=config.media.s3.secret_access_key,
+                endpoint_url=config.media.s3.endpoint_url,
                 prefix=config.media.s3.prefix,
                 url_mode=config.media.s3.url_mode,
-                cdn_base_url=config.media.s3.cdn_base_url or None,
+                cdn_base_url=config.media.s3.cdn_base_url,
                 presign_expires_seconds=config.media.s3.presign_expires_seconds,
                 force_path_style=config.media.s3.force_path_style,
             )

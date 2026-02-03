@@ -157,8 +157,13 @@ class S3MediaConfig(BaseModel):
     """Use path-style URLs instead of virtual-hosted style. Required for some S3-compatible services."""
 
     @model_validator(mode="after")
-    def _normalize_prefix(self) -> S3MediaConfig:
-        """Ensure prefix ends with '/' if not empty."""
+    def _validate_config(self) -> S3MediaConfig:
+        """Validate config and normalize prefix."""
+        # Validate CDN mode requires cdn_base_url
+        if self.url_mode == "cdn" and not self.cdn_base_url:
+            raise ValueError("cdn_base_url is required when url_mode='cdn'")
+
+        # Ensure prefix ends with '/' if not empty
         if self.prefix and not self.prefix.endswith("/"):
             object.__setattr__(self, "prefix", self.prefix + "/")
         return self

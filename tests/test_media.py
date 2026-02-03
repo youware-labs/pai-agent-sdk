@@ -31,6 +31,20 @@ def test_s3_media_config_defaults():
     assert config.presign_expires_seconds == 3600
 
 
+def test_s3_media_config_cdn_requires_base_url():
+    """Test that CDN mode requires cdn_base_url."""
+    with pytest.raises(ValueError, match="cdn_base_url is required when url_mode='cdn'"):
+        S3MediaConfig(bucket="test", url_mode="cdn")
+
+    with pytest.raises(ValueError, match="cdn_base_url is required when url_mode='cdn'"):
+        S3MediaConfig(bucket="test", url_mode="cdn", cdn_base_url=None)
+
+    # Should work with cdn_base_url
+    config = S3MediaConfig(bucket="test", url_mode="cdn", cdn_base_url="https://cdn.example.com")
+    assert config.url_mode == "cdn"
+    assert config.cdn_base_url == "https://cdn.example.com"
+
+
 def test_s3_media_config_prefix_normalization():
     """Test that prefix is normalized to end with /."""
     # No trailing slash - should be added

@@ -73,6 +73,15 @@ def mock_ctx_without_url_caps():
     return ctx
 
 
+@pytest.fixture
+def mock_ctx_without_model_cfg():
+    """Create mock context with model_cfg=None."""
+    ctx = MagicMock()
+    ctx.deps = MagicMock(spec=AgentContext)
+    ctx.deps.model_cfg = None
+    return ctx
+
+
 @pytest.mark.asyncio
 async def test_upload_image_with_capability(mock_ctx_with_image_url):
     """Test that images are uploaded when IMAGE_URL capability is present."""
@@ -278,3 +287,22 @@ async def test_skip_already_url_content(mock_ctx_with_image_url):
     content = part.content
     assert isinstance(content[0], ImageUrl)
     assert content[0].url == "https://existing.com/image.png"
+
+
+@pytest.mark.asyncio
+async def test_no_upload_when_model_cfg_is_none(mock_ctx_without_model_cfg):
+    """Test that media is not uploaded when model_cfg is None."""
+    uploader = MockUploader()
+    filter_fn = create_media_upload_filter(uploader)
+
+    original_content = BinaryContent(data=b"image_data", media_type="image/png")
+    messages = [ModelRequest(parts=[UserPromptPart(content=[original_content])])]
+
+    result = await filter_fn(mock_ctx_without_model_cfg, messages)
+
+    # Should not upload since no capabilities are available
+    assert uploader.upload_count == 0
+    part = result[0].parts[0]
+    assert isinstance(part, UserPromptPart)
+    # Content should be unchanged
+    assert part.content[0] is original_content

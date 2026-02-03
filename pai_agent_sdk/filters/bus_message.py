@@ -58,6 +58,11 @@ async def inject_bus_messages(
     # Pre-render messages once for both injection and event
     rendered_messages = [(msg, msg.render()) for msg in pending]
 
+    # Accumulate user steering messages for compact
+    for msg, rendered in rendered_messages:
+        if msg.source == "user":
+            ctx.deps.steering_messages.append(rendered)
+
     # Render messages with structured format (escape source for XML safety)
     parts = [
         UserPromptPart(content=f'<bus-message source="{escape(msg.source)}">\n{rendered}\n</bus-message>')

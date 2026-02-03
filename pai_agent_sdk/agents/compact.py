@@ -229,12 +229,17 @@ def _need_compact(ctx: AgentContext, message_history: list[ModelMessage]) -> boo
     return current_tokens >= threshold_tokens
 
 
-def _build_compacted_messages(summary: str, original_prompt: str | Sequence[UserContent]) -> list[ModelMessage]:
+def _build_compacted_messages(
+    summary: str,
+    original_prompt: str | Sequence[UserContent],
+    steering_messages: list[str] | None = None,
+) -> list[ModelMessage]:
     """Build compacted message history.
 
     Args:
         summary: The compacted summary content.
-        system_prompt: Optional system prompt to include.
+        original_prompt: The initial user prompt.
+        steering_messages: Additional steering messages from user during execution.
 
     Returns:
         List of ModelMessage representing the compacted history.
@@ -247,15 +252,21 @@ def _build_compacted_messages(summary: str, original_prompt: str | Sequence[User
             "and I'll resume the conversation."
         ),
     ]
+
+    # Build final request parts with original prompt and steering messages
+    final_parts: list[UserPromptPart] = [UserPromptPart(content=original_prompt)]
+
+    # Append steering messages if any
+    if steering_messages:
+        for steering in steering_messages:
+            final_parts.append(UserPromptPart(content=f"[User Steering] {steering}"))
+
+    final_parts.append(UserPromptPart(content="<compact-complete>Context compacted. Resume task.</compact-complete>"))
+
     return [
         ModelRequest(parts=request_parts),
         ModelResponse(parts=[TextPart(content=summary)]),
-        ModelRequest(
-            parts=[
-                UserPromptPart(content=original_prompt),
-                UserPromptPart(content="<compact-complete>Context compacted. Resume task.</compact-complete>"),
-            ]
-        ),
+        ModelRequest(parts=final_parts),
     ]
 
 
@@ -369,7 +380,9 @@ def create_compact_filter(
             # user_prompts is set by main agent from actual user input, while original_prompt
             # is extracted by LLM from conversation history and may be less accurate
             compacted = _build_compacted_messages(
-                condense_markdown, agent_ctx.user_prompts or condense_result.original_prompt
+                condense_markdown,
+                agent_ctx.user_prompts or condense_result.original_prompt,
+                agent_ctx.steering_messages or None,
             )
 
             # Emit complete event with summary
@@ -381,6 +394,9 @@ def create_compact_filter(
                     compacted_message_count=len(compacted),
                 )
             )
+
+            # Clear steering_messages after successful compact (content is now in summary)
+            agent_ctx.steering_messages.clear()
 
             logger.info(f"Compacted history from {len(message_history)} messages to {len(compacted)} messages")
             return compacted

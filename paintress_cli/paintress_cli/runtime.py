@@ -237,8 +237,42 @@ def create_tui_runtime(
     if model_settings:
         logger.debug(f"Using model settings: {config.general.model_settings} -> {model_settings}")
 
-    # Tool configuration
-    tool_config = ToolConfig()
+    # Tool configuration - setup media hooks if S3 is configured
+    tool_config_kwargs: dict[str, Any] = {}
+
+    if config.media.s3.enabled and config.media.s3.bucket:
+        try:
+            from pai_agent_sdk.media import S3MediaConfig, create_s3_media_hook
+
+            s3_config = S3MediaConfig(
+                bucket=config.media.s3.bucket,
+                region=config.media.s3.region,
+                access_key_id=config.media.s3.access_key_id or None,
+                secret_access_key=config.media.s3.secret_access_key or None,
+                endpoint_url=config.media.s3.endpoint_url or None,
+                prefix=config.media.s3.prefix,
+                url_mode=config.media.s3.url_mode,
+                cdn_base_url=config.media.s3.cdn_base_url or None,
+                presign_expires_seconds=config.media.s3.presign_expires_seconds,
+                force_path_style=config.media.s3.force_path_style,
+            )
+            hook = create_s3_media_hook(s3_config)
+
+            # Bedrock does not support image url, and our image processing is better than vendor
+            # TODO: Maybe we can upload after processing in history_processor?
+            # tool_config_kwargs["image_to_url_hook"] = hook
+
+            # Use url hook for video, prevent too large requests
+            tool_config_kwargs["video_to_url_hook"] = hook
+            logger.info(
+                "S3 media upload enabled: bucket=%s, url_mode=%s",
+                config.media.s3.bucket,
+                config.media.s3.url_mode,
+            )
+        except ImportError:
+            logger.warning("S3 media upload requires boto3. Install with: pip install pai-agent-sdk[s3]")
+
+    tool_config = ToolConfig(**tool_config_kwargs)
     if config.tools.need_approval:
         logger.debug("Tools requiring approval: %s", config.tools.need_approval)
     if config.tools.need_approval_mcps:

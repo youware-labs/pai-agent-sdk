@@ -173,6 +173,50 @@ class MCPConfig(BaseModel):
     """MCP server configurations."""
 
 
+class S3Config(BaseModel):
+    """S3 configuration for media upload."""
+
+    enabled: bool = False
+    """Enable S3 media upload."""
+
+    bucket: str = ""
+    """S3 bucket name."""
+
+    region: str = "us-east-1"
+    """AWS region."""
+
+    access_key_id: str = ""
+    """AWS access key ID. Leave empty to use default credential chain."""
+
+    secret_access_key: str = ""
+    """AWS secret access key. Leave empty to use default credential chain."""
+
+    endpoint_url: str = ""
+    """Custom S3 endpoint URL for S3-compatible services (MinIO, R2, Ceph, etc.)."""
+
+    prefix: str = ""
+    """Object key prefix for uploaded files. e.g., 'uploads/' or 'uploads'"""
+
+    url_mode: Literal["cdn", "presign"] = "presign"
+    """URL generation mode: 'cdn' for CDN mapping, 'presign' for presigned URLs."""
+
+    cdn_base_url: str = ""
+    """CDN base URL (required if url_mode='cdn'). e.g., 'https://cdn.example.com'"""
+
+    presign_expires_seconds: int = 3600
+    """Presigned URL expiration time in seconds (default: 1 hour)."""
+
+    force_path_style: bool = False
+    """Use path-style URLs. Required for some S3-compatible services (MinIO, Ceph, etc.)."""
+
+
+class MediaConfig(BaseModel):
+    """Media handling configuration."""
+
+    s3: S3Config = Field(default_factory=S3Config)
+    """S3 configuration for media upload."""
+
+
 class PaintressConfig(BaseModel):
     """Complete paintress-cli configuration."""
 
@@ -181,6 +225,8 @@ class PaintressConfig(BaseModel):
     display: DisplayConfig = Field(default_factory=DisplayConfig)
     browser: BrowserConfig = Field(default_factory=BrowserConfig)
     subagents: SubagentsConfig = Field(default_factory=SubagentsConfig)
+    media: MediaConfig = Field(default_factory=MediaConfig)
+    """Media handling configuration (S3 upload, etc.)."""
     env: dict[str, str] = Field(default_factory=dict)
     """Environment variable overrides (e.g., API keys)."""
     # From project config

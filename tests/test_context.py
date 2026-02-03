@@ -89,6 +89,22 @@ async def test_agent_context_create_subagent_context_with_override(env: LocalEnv
         assert child.deferred_tool_metadata == {"key": {}}
 
 
+async def test_agent_context_create_subagent_context_resets_prompts(env: LocalEnvironment) -> None:
+    """Should reset user_prompts and steering_messages for subagent context."""
+    parent = AgentContext(env=env)
+    parent.user_prompts = "Parent prompt"
+    parent.steering_messages = ["Parent steering 1", "Parent steering 2"]
+
+    async with parent.create_subagent_context("search") as child:
+        # Subagent should have independent prompt tracking
+        assert child.user_prompts is None  # Reset, to be set by subagent caller
+        assert child.steering_messages == []  # Fresh queue for subagent
+
+        # Parent's prompts should be unaffected
+        assert parent.user_prompts == "Parent prompt"
+        assert parent.steering_messages == ["Parent steering 1", "Parent steering 2"]
+
+
 async def test_agent_context_async_context_manager(env: LocalEnvironment) -> None:
     """Should set start/end times in async context."""
     ctx = AgentContext(env=env)
@@ -576,6 +592,7 @@ async def test_export_and_with_state_empty(env: LocalEnvironment) -> None:
         assert state.subagent_history == {}
         assert state.extra_usages == []
         assert state.user_prompts is None
+        assert state.steering_messages == []
         assert state.handoff_message is None
         assert state.deferred_tool_metadata == {}
 
@@ -585,6 +602,7 @@ async def test_export_and_with_state_empty(env: LocalEnvironment) -> None:
 
         assert new_ctx.subagent_history == {}
         assert new_ctx.extra_usages == []
+        assert new_ctx.steering_messages == []
 
 
 async def test_export_and_with_state_with_data(env: LocalEnvironment) -> None:
@@ -609,6 +627,7 @@ async def test_export_and_with_state_with_data(env: LocalEnvironment) -> None:
             )
         )
         ctx.user_prompts = "Test prompt"
+        ctx.steering_messages = ["Steering 1", "Steering 2"]
         ctx.handoff_message = "Handoff summary"
         ctx.deferred_tool_metadata["tool-1"] = {"key": "value"}
 
@@ -635,6 +654,7 @@ async def test_export_and_with_state_with_data(env: LocalEnvironment) -> None:
         # Verify extra_usages is empty (not restored by default)
         assert new_ctx.extra_usages == []
         assert new_ctx.user_prompts == "Test prompt"
+        assert new_ctx.steering_messages == ["Steering 1", "Steering 2"]
         assert new_ctx.handoff_message == "Handoff summary"
         assert new_ctx.deferred_tool_metadata == {"tool-1": {"key": "value"}}
 

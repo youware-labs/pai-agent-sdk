@@ -249,6 +249,9 @@ def create_subagent_call_func(
         request_count = 0
 
         async with deps.create_subagent_context(agent_name, agent_id=agent_id, **override_kwargs) as sub_ctx:
+            # Set the subagent's initial prompt for compact
+            sub_ctx.user_prompts = prompt
+
             # Emit start event to subagent's queue (inside context so sub_ctx.start_at is set)
             prompt_preview = prompt[:100] + "..." if len(prompt) > 100 else prompt
             await sub_ctx.emit_event(

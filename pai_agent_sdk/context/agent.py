@@ -656,6 +656,9 @@ class ResumableState(BaseModel):
     user_prompts: str | Sequence[UserContent] | None = None
     """User prompts collected during the session."""
 
+    steering_messages: list[str] = Field(default_factory=list)
+    """Accumulated user steering messages for compact."""
+
     handoff_message: str | None = None
     """Rendered handoff message."""
 
@@ -709,6 +712,7 @@ class ResumableState(BaseModel):
         ctx.subagent_history = self.to_subagent_history()
         ctx.extra_usages = list(self.extra_usages)
         ctx.user_prompts = self.user_prompts
+        ctx.steering_messages = list(self.steering_messages)
         ctx.handoff_message = self.handoff_message
         ctx.deferred_tool_metadata = dict(self.deferred_tool_metadata)
         # Restore agent_registry from serialized format
@@ -815,6 +819,16 @@ class AgentContext(BaseModel):
 
     user_prompts: str | Sequence[UserContent] | None = None
     """User prompts collected during the session for compact."""
+
+    steering_messages: list[str] = Field(default_factory=list)
+    """Accumulated user steering messages received via message bus.
+
+    When messages with source="user" are injected via inject_bus_messages filter,
+    they are also appended here. This ensures steering messages are preserved
+    for compact even if the agent is interrupted and resumed.
+
+    Cleared after compact to avoid duplication (steering content is summarized).
+    """
 
     tool_id_wrapper: ToolIdWrapper = Field(default_factory=ToolIdWrapper)
     """Tool ID wrapper for normalizing tool call IDs across providers."""
@@ -1240,6 +1254,8 @@ class AgentContext(BaseModel):
             "start_at": None,  # Will be set by __aenter__
             "end_at": None,  # Will be set by __aexit__
             "handoff_message": None,  # Subagents don't inherit handoff state
+            "user_prompts": None,  # Subagent has its own initial prompt (set by caller)
+            "steering_messages": [],  # Subagent has its own steering queue
             "tool_id_wrapper": ToolIdWrapper(),  # Fresh wrapper for subagent
             # env is inherited via model_copy (shares parent's env reference)
             **override,
@@ -1494,6 +1510,7 @@ class AgentContext(BaseModel):
             subagent_history=serialized_history,
             extra_usages=list(self.extra_usages) if include_extra_usages else [],
             user_prompts=self.user_prompts,
+            steering_messages=list(self.steering_messages),
             handoff_message=self.handoff_message,
             deferred_tool_metadata=dict(self.deferred_tool_metadata),
             agent_registry=serialized_registry,

@@ -23,6 +23,7 @@ def create_mock_ctx(agent_id: str = "main", message_bus: MessageBus | None = Non
     mock_deps.message_bus = bus
     mock_deps.emit_event = AsyncMock()
     mock_deps.consume_messages = consume_messages
+    mock_deps.steering_messages = []  # Add steering_messages list
 
     mock_run_ctx = MagicMock(spec=RunContext)
     mock_run_ctx.deps = mock_deps
@@ -213,3 +214,38 @@ async def test_inject_bus_messages_idempotent() -> None:
     messages2 = [ModelRequest(parts=[UserPromptPart(content="Hello")])]
     result2 = await inject_bus_messages(ctx, messages2)
     assert len(result2[0].parts) == 1  # No new parts added
+
+
+@pytest.mark.asyncio
+async def test_inject_bus_messages_accumulates_user_steering() -> None:
+    """Test filter accumulates user steering messages for compact."""
+    bus = MessageBus()
+    bus.subscribe("main")
+    bus.send(BusMessage(content="User steering 1", source="user", target="main"))
+    bus.send(BusMessage(content="System message", source="system", target="main"))
+    bus.send(BusMessage(content="User steering 2", source="user", target="main"))
+    ctx = create_mock_ctx(message_bus=bus)
+    messages = [ModelRequest(parts=[UserPromptPart(content="Hello")])]
+
+    await inject_bus_messages(ctx, messages)
+
+    # Only user messages should be accumulated
+    assert len(ctx.deps.steering_messages) == 2
+    assert ctx.deps.steering_messages[0] == "User steering 1"
+    assert ctx.deps.steering_messages[1] == "User steering 2"
+
+
+@pytest.mark.asyncio
+async def test_inject_bus_messages_accumulates_rendered_content() -> None:
+    """Test filter accumulates rendered (with template) content for steering."""
+    bus = MessageBus()
+    bus.subscribe("main")
+    bus.send(BusMessage(content="Stop task", source="user", target="main", template="[URGENT] {{ content }}"))
+    ctx = create_mock_ctx(message_bus=bus)
+    messages = [ModelRequest(parts=[UserPromptPart(content="Hello")])]
+
+    await inject_bus_messages(ctx, messages)
+
+    # Rendered content (with template) should be accumulated
+    assert len(ctx.deps.steering_messages) == 1
+    assert ctx.deps.steering_messages[0] == "[URGENT] Stop task"

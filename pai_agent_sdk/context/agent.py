@@ -182,6 +182,12 @@ class ModelCapability(str, Enum):
     document_understanding = "document_understanding"
     """Model can process and understand documents (PDF, etc.)."""
 
+    image_url = "image_url"
+    """Model supports receiving images via URL (not just base64)."""
+
+    video_url = "video_url"
+    """Model supports receiving videos via URL."""
+
 
 # =============================================================================
 # Tool Settings

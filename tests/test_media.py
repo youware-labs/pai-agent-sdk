@@ -6,7 +6,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from pai_agent_sdk.media import S3MediaConfig, S3MediaUploader, create_s3_media_hook
+from pai_agent_sdk.media import MediaUploader, S3MediaConfig, S3MediaUploader, create_s3_media_hook
+
+
+def test_media_uploader_protocol():
+    """Test that S3MediaUploader implements MediaUploader protocol."""
+    config = S3MediaConfig(bucket="test")
+    uploader = S3MediaUploader(config)
+    assert isinstance(uploader, MediaUploader)
 
 
 def test_s3_media_config_defaults():

@@ -27,7 +27,7 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Awaitable, Callable
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, ClassVar, Literal
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, Protocol, runtime_checkable
 
 import anyio
 import anyio.to_thread
@@ -41,9 +41,65 @@ if TYPE_CHECKING:
 
     from pai_agent_sdk.context import AgentContext
 
-__all__ = ["S3MediaConfig", "S3MediaUploader", "create_s3_media_hook"]
+__all__ = [
+    "MediaUploader",
+    "S3MediaConfig",
+    "S3MediaUploader",
+    "create_s3_media_hook",
+]
 
 logger = get_logger(__name__)
+
+
+# =============================================================================
+# MediaUploader Protocol
+# =============================================================================
+
+
+@runtime_checkable
+class MediaUploader(Protocol):
+    """Protocol for media upload services.
+
+    Implement this protocol to support different storage backends:
+    - S3 (AWS, MinIO, Ceph, R2)
+    - Azure Blob Storage
+    - Google Cloud Storage
+    - Local file server with public URL
+    - imgbb, imgur, etc.
+
+    Example::
+
+        class LocalFileUploader:
+            def __init__(self, base_dir: Path, base_url: str):
+                self.base_dir = base_dir
+                self.base_url = base_url
+
+            async def upload(self, data: bytes, media_type: str) -> str:
+                ext = media_type.split("/")[-1]
+                filename = f"{uuid4()}.{ext}"
+                (self.base_dir / filename).write_bytes(data)
+                return f"{self.base_url}/{filename}"
+    """
+
+    async def upload(self, data: bytes, media_type: str) -> str:
+        """Upload media data and return public URL.
+
+        Args:
+            data: Raw media bytes.
+            media_type: MIME type (e.g., 'image/png', 'video/mp4').
+
+        Returns:
+            Public URL to access the uploaded media.
+
+        Raises:
+            Exception: If upload fails.
+        """
+        ...
+
+
+# =============================================================================
+# S3 Implementation
+# =============================================================================
 
 
 class S3MediaConfig(BaseModel):

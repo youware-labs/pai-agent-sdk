@@ -42,7 +42,8 @@ examples = ["pydantic-ai",
 docker = ["docker>=7.0.0"]
 web = ["tavily-python>=0.7.0", "firecrawl-py>=4.0.0", "markitdown[all]>=0.1.2"]
 document = ["pymupdf>=1.26.6", "pymupdf4llm>=0.2.8", "markitdown[all]>=0.1.2", "pymupdf-layout>=1.26.6"]
-all = ["pai-agent-sdk[docker,web,document,examples]"]
+s3 = ["boto3>=1.34"]
+all = ["pai-agent-sdk[docker,web,document,s3,examples]"]
 
 [dependency-groups]
 dev = [
@@ -64,6 +65,9 @@ dev = [
     "pymupdf>=1.26.6",
     "pymupdf4llm>=0.2.8",
     "pymupdf-layout>=1.26.6",
+    # S3 support
+    "boto3>=1.34",
+    "boto3-stubs[s3]>=1.34",
     # For examples
     "pydantic-ai",
     "python-dotenv",
@@ -166,7 +170,7 @@ preview = true
 # anthropic is a transitive dependency from pydantic-ai-slim
 # pai-agent-sdk is self-reference in optional dependencies
 ignore = ["DEP001", "DEP002"]
-per_rule_ignores = { DEP001 = ["anthropic"], DEP002 = ["pai-agent-sdk"], DEP003 = ["anthropic", "paintress_cli"], DEP004 = ["pytest"]}
+per_rule_ignores = { DEP001 = ["anthropic"], DEP002 = ["pai-agent-sdk"], DEP003 = ["anthropic", "paintress_cli", "botocore"], DEP004 = ["pytest"]}
 
 [tool.coverage.report]
 skip_empty = true

@@ -218,6 +218,9 @@ class ToolSettings(BaseSettings):
     tavily_api_key: str | None = None
     """Tavily API key for web search."""
 
+    brave_search_api_key: str | None = None
+    """Brave Search API key."""
+
     # Image search API keys
     pixabay_api_key: str | None = None
     """Pixabay API key for stock image search."""
@@ -457,6 +460,9 @@ class ToolConfig(BaseModel):
 
     tavily_api_key: str | None = Field(default_factory=lambda: _get_tool_settings().tavily_api_key)
     """Tavily API key for web search."""
+
+    brave_search_api_key: str | None = Field(default_factory=lambda: _get_tool_settings().brave_search_api_key)
+    """Brave Search API key."""
 
     # Image search API keys
     pixabay_api_key: str | None = Field(default_factory=lambda: _get_tool_settings().pixabay_api_key)

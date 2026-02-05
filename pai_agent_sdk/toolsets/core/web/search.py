@@ -49,17 +49,18 @@ def _is_tavily_available() -> bool:
 
 
 class SearchTool(BaseTool):
-    """Web search tool using Google or Tavily."""
+    """Web search tool using Google, Brave, or Tavily."""
 
     name = "search"
     description = "Search the web for information using search APIs."
 
     def is_available(self, ctx: RunContext[AgentContext]) -> bool:
-        """Available if Google or Tavily API keys are configured (and tavily package installed)."""
+        """Available if Google, Brave, or Tavily API keys are configured."""
         cfg = ctx.deps.tool_config
         has_google = bool(cfg.google_search_api_key and cfg.google_search_cx)
+        has_brave = bool(cfg.brave_search_api_key)
         has_tavily = bool(cfg.tavily_api_key) and _is_tavily_available()
-        return has_google or has_tavily
+        return has_google or has_brave or has_tavily
 
     def get_instruction(self, ctx: RunContext[AgentContext]) -> str | None:
         if not self.is_available(ctx):
@@ -74,15 +75,21 @@ class SearchTool(BaseTool):
     ) -> list[dict[str, Any]] | dict[str, Any]:
         """Execute web search."""
         cfg = ctx.deps.tool_config
+        has_brave = bool(cfg.brave_search_api_key)
         has_tavily = bool(cfg.tavily_api_key) and _is_tavily_available()
 
-        # Prefer Google if available
+        # Priority: Google > Brave > Tavily
         if cfg.google_search_api_key and cfg.google_search_cx:
             result = await self._search_google(query, num, cfg.google_search_api_key, cfg.google_search_cx)
-            # Check if Google search failed and fallback to Tavily if available
-            if isinstance(result, dict) and result.get("success") is False and has_tavily:
-                return await self._search_tavily(query, cfg.tavily_api_key)  # type: ignore[arg-type]
+            if isinstance(result, dict) and result.get("success") is False:
+                # Fallback to Brave or Tavily
+                if has_brave:
+                    return await self._search_brave(query, num, cfg.brave_search_api_key)  # type: ignore[arg-type]
+                if has_tavily:
+                    return await self._search_tavily(query, cfg.tavily_api_key)  # type: ignore[arg-type]
             return result
+        elif has_brave:
+            return await self._search_brave(query, num, cfg.brave_search_api_key)  # type: ignore[arg-type]
         elif has_tavily:
             return await self._search_tavily(query, cfg.tavily_api_key)  # type: ignore[arg-type]
         else:
@@ -113,6 +120,39 @@ class SearchTool(BaseTool):
             return {"success": False, "error": f"HTTP {response.status_code}: {response.text}"}
 
         return response.json()
+
+    async def _search_brave(self, query: str, num: int, api_key: str) -> list[dict[str, Any]] | dict[str, Any]:
+        """Search using Brave Search API."""
+        client = get_http_client()
+        # Brave API max count is 20
+        params = {"q": query, "count": min(num, 20)}
+        headers = {"X-Subscription-Token": api_key}
+
+        response = await client.get(
+            "https://api.search.brave.com/res/v1/web/search",
+            params=params,
+            headers=headers,
+            timeout=60,
+        )
+
+        if response.status_code != 200:
+            return {"success": False, "error": f"HTTP {response.status_code}: {response.text}"}
+
+        data = response.json()
+        # Extract web results from Brave response
+        web_results = data.get("web", {}).get("results", [])
+        if not web_results:
+            return {"success": False, "error": "No search results found."}
+
+        # Normalize to simple format
+        return [
+            {
+                "title": r.get("title", ""),
+                "url": r.get("url", ""),
+                "description": r.get("description", ""),
+            }
+            for r in web_results
+        ]
 
     async def _search_tavily(self, query: str, api_key: str) -> list[dict[str, Any]] | dict[str, Any]:
         """Search using Tavily API."""

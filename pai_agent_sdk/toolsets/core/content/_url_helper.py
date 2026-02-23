@@ -4,13 +4,13 @@ This module provides helper functions to validate URLs and detect content types
 for the LoadMediaUrlTool.
 """
 
-from enum import Enum
+from enum import StrEnum
 from urllib.parse import urlparse
 
 import httpx
 
 
-class ContentCategory(str, Enum):
+class ContentCategory(StrEnum):
     """Categories of content that can be loaded from a URL."""
 
     image = "image"

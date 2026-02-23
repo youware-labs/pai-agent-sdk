@@ -238,11 +238,17 @@ def test_model_cfg_presets_structure() -> None:
     assert cfg["context_window"] == 200_000
     assert cfg["max_videos"] == 0  # Claude doesn't support video
     assert "max_images" in cfg
+    assert "split_large_images" in cfg
+    assert "image_split_max_height" in cfg
+    assert "image_split_overlap" in cfg
     assert "capabilities" in cfg
 
     cfg_1m = get_model_cfg("claude_1m")
     assert cfg_1m["context_window"] == 1_000_000
     assert cfg_1m["max_videos"] == 0  # Claude doesn't support video
+    assert cfg_1m["split_large_images"] is True
+    assert cfg_1m["image_split_max_height"] == 4096
+    assert cfg_1m["image_split_overlap"] == 50
 
 
 def test_model_cfg_capabilities() -> None:

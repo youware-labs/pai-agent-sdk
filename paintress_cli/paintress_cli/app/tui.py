@@ -26,7 +26,7 @@ import sys
 import time
 from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, cast
@@ -107,7 +107,7 @@ and adjust your work accordingly while continuing toward the goal.
 
 
 # TUIState kept for backward compatibility (used in tests and status bar)
-class TUIState(str, Enum):
+class TUIState(StrEnum):
     """TUI application state (legacy, use TUIStateMachine for new code)."""
 
     IDLE = "idle"

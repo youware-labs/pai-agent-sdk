@@ -6,10 +6,10 @@ Provides explicit state machine for TUI application state.
 from __future__ import annotations
 
 from collections.abc import Callable
-from enum import Enum, auto
+from enum import Enum, StrEnum, auto
 
 
-class TUIMode(str, Enum):
+class TUIMode(StrEnum):
     """Agent operating mode."""
 
     ACT = "act"

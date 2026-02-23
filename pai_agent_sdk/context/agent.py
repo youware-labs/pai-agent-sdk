@@ -69,7 +69,7 @@ from collections import defaultdict
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any, cast
 from uuid import uuid4
 from xml.dom.minidom import parseString
@@ -170,7 +170,7 @@ Example::
 # =============================================================================
 
 
-class ModelCapability(str, Enum):
+class ModelCapability(StrEnum):
     """Model capabilities that can be used to describe what a model supports."""
 
     vision = "vision"
@@ -555,6 +555,15 @@ class ModelConfig(BaseModel):
 
     support_gif: bool = True
     """Whether the model supports GIF images. If False, GIF images will be filtered out."""
+
+    split_large_images: bool = True
+    """Whether to split oversized binary images before sending to model."""
+
+    image_split_max_height: int = 4096
+    """Maximum height (in pixels) for each image segment when splitting large images."""
+
+    image_split_overlap: int = 50
+    """Overlap (in pixels) between adjacent image segments when splitting."""
 
     capabilities: set[ModelCapability] = Field(default_factory=set)
     """Set of capabilities supported by the model."""
@@ -1302,7 +1311,12 @@ class AgentContext(BaseModel):
         from pai_agent_sdk.filters.bus_message import inject_bus_messages
         from pai_agent_sdk.filters.capability import filter_by_capability
         from pai_agent_sdk.filters.handoff import process_handoff_message
-        from pai_agent_sdk.filters.image import drop_extra_images, drop_extra_videos, drop_gif_images
+        from pai_agent_sdk.filters.image import (
+            drop_extra_images,
+            drop_extra_videos,
+            drop_gif_images,
+            split_large_images,
+        )
         from pai_agent_sdk.filters.runtime_instructions import inject_runtime_instructions
         from pai_agent_sdk.filters.tool_args import fix_truncated_tool_args
 
@@ -1312,6 +1326,7 @@ class AgentContext(BaseModel):
 
         return [
             # handle_model_switch, # Disabled as response.model_name is not the same as ctx.model.model_name
+            split_large_images,
             drop_extra_images,
             drop_gif_images,
             drop_extra_videos,

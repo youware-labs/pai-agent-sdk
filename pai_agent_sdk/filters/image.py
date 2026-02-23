@@ -34,6 +34,7 @@ Example::
 
 import io
 from collections.abc import Sequence
+from typing import cast
 
 from PIL import Image
 from pydantic_ai.messages import (
@@ -49,6 +50,7 @@ from pydantic_ai.tools import RunContext
 
 from pai_agent_sdk._logger import logger
 from pai_agent_sdk.context import AgentContext
+from pai_agent_sdk.utils import ImageMediaType, split_image_data
 
 
 def _is_image_content(item: UserContent) -> bool:
@@ -80,6 +82,108 @@ def _validate_image(content: BinaryContent) -> bool:
         return True
     except Exception:
         return False
+
+
+async def _split_image_content_list(
+    content_list: list[UserContent],
+    *,
+    max_height: int,
+    overlap: int,
+) -> tuple[list[UserContent], bool]:
+    """Split oversized binary images in a content list.
+
+    Returns:
+        A tuple of (processed_content, modified).
+    """
+    new_content: list[UserContent] = []
+    modified = False
+
+    for item in content_list:
+        if not isinstance(item, BinaryContent) or not item.media_type.startswith("image/"):
+            new_content.append(item)
+            continue
+
+        media_type = cast(ImageMediaType, item.media_type)
+
+        try:
+            segments = await split_image_data(
+                image_bytes=item.data,
+                max_height=max_height,
+                overlap=overlap,
+                media_type=media_type,
+            )
+        except Exception:
+            logger.exception("Failed to split image; keeping original binary content")
+            new_content.append(item)
+            continue
+
+        if len(segments) <= 1:
+            new_content.append(item)
+            continue
+
+        logger.info(
+            "Split large image into %d segments (max_height=%d, overlap=%d)",
+            len(segments),
+            max_height,
+            overlap,
+        )
+        new_content.extend(segments)
+        modified = True
+
+    return new_content, modified
+
+
+async def split_large_images(
+    ctx: RunContext[AgentContext],
+    message_history: list[ModelMessage],
+) -> list[ModelMessage]:
+    """Split oversized binary image content in message history.
+
+    This is a pydantic-ai history_processor that:
+    1. Splits BinaryContent images whose height exceeds configured threshold
+    2. Preserves image order by replacing one image with multiple segments
+    3. Leaves non-image content unchanged
+
+    Behavior is controlled by ModelConfig:
+    - split_large_images: master enable/disable switch
+    - image_split_max_height: max height per segment
+    - image_split_overlap: vertical overlap between segments
+
+    Args:
+        ctx: Runtime context containing AgentContext with model configuration.
+        message_history: List of messages to process.
+
+    Returns:
+        The modified message history with oversized images split into segments.
+    """
+    model_cfg = ctx.deps.model_cfg
+
+    if model_cfg and not model_cfg.split_large_images:
+        return message_history
+
+    max_height = model_cfg.image_split_max_height if model_cfg else 4096
+    overlap = model_cfg.image_split_overlap if model_cfg else 50
+
+    for message in message_history:
+        if not isinstance(message, ModelRequest):
+            continue
+
+        for part in message.parts:
+            if not isinstance(part, UserPromptPart) or isinstance(part.content, str):
+                continue
+
+            content_list: list[UserContent] = (
+                list(part.content) if isinstance(part.content, Sequence) else [part.content]
+            )
+            new_content, modified = await _split_image_content_list(
+                content_list,
+                max_height=max_height,
+                overlap=overlap,
+            )
+            if modified:
+                part.content = new_content
+
+    return message_history
 
 
 def drop_extra_images(

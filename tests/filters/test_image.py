@@ -17,7 +17,7 @@ from pydantic_ai.messages import (
 
 from pai_agent_sdk.context import AgentContext, ModelConfig
 from pai_agent_sdk.environment.local import LocalEnvironment
-from pai_agent_sdk.filters.image import drop_extra_images, drop_extra_videos, drop_gif_images
+from pai_agent_sdk.filters.image import drop_extra_images, drop_extra_videos, drop_gif_images, split_large_images
 
 
 def _create_valid_image_bytes() -> bytes:
@@ -31,6 +31,119 @@ def _create_valid_image_bytes() -> bytes:
 def _create_broken_image_bytes() -> bytes:
     """Create broken image bytes."""
     return b"not a valid image"
+
+
+def _create_valid_tall_image_bytes(height: int = 5000, width: int = 120) -> bytes:
+    """Create a valid tall PNG image bytes."""
+    img = Image.new("RGB", (width, height), color="blue")
+    buffer = BytesIO()
+    img.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+# Tests for split_large_images
+
+
+async def test_split_large_images_splits_tall_binary_image(tmp_path: Path) -> None:
+    """Should split tall binary image into multiple segments."""
+    async with LocalEnvironment(
+        allowed_paths=[tmp_path],
+        default_path=tmp_path,
+        tmp_base_dir=tmp_path,
+    ) as env:
+        async with AgentContext(
+            env=env,
+            model_cfg=ModelConfig(
+                split_large_images=True,
+                image_split_max_height=1000,
+                image_split_overlap=100,
+            ),
+        ) as ctx:
+            mock_ctx = MagicMock()
+            mock_ctx.deps = ctx
+
+            tall_image = BinaryContent(data=_create_valid_tall_image_bytes(height=2600), media_type="image/png")
+            request = ModelRequest(parts=[UserPromptPart(content=[tall_image])])
+            history = [request]
+
+            result = await split_large_images(mock_ctx, history)
+
+            assert result == history
+            content = request.parts[0].content  # type: ignore[union-attr]
+            assert isinstance(content, list)
+            assert len(content) == 3
+            assert all(isinstance(item, BinaryContent) for item in content)
+            assert all(item.media_type == "image/png" for item in content)
+
+
+async def test_split_large_images_disabled_by_config(tmp_path: Path) -> None:
+    """Should keep image unchanged when split_large_images is disabled."""
+    async with LocalEnvironment(
+        allowed_paths=[tmp_path],
+        default_path=tmp_path,
+        tmp_base_dir=tmp_path,
+    ) as env:
+        async with AgentContext(
+            env=env,
+            model_cfg=ModelConfig(
+                split_large_images=False,
+                image_split_max_height=1000,
+                image_split_overlap=100,
+            ),
+        ) as ctx:
+            mock_ctx = MagicMock()
+            mock_ctx.deps = ctx
+
+            tall_image = BinaryContent(data=_create_valid_tall_image_bytes(height=2600), media_type="image/png")
+            request = ModelRequest(parts=[UserPromptPart(content=[tall_image])])
+            history = [request]
+
+            await split_large_images(mock_ctx, history)
+
+            content = request.parts[0].content  # type: ignore[union-attr]
+            assert isinstance(content, list)
+            assert len(content) == 1
+            assert isinstance(content[0], BinaryContent)
+            assert content[0].data == tall_image.data
+
+
+async def test_split_large_images_keeps_non_image_content(tmp_path: Path) -> None:
+    """Should only split binary image content and keep others unchanged."""
+    async with LocalEnvironment(
+        allowed_paths=[tmp_path],
+        default_path=tmp_path,
+        tmp_base_dir=tmp_path,
+    ) as env:
+        async with AgentContext(
+            env=env,
+            model_cfg=ModelConfig(
+                split_large_images=True,
+                image_split_max_height=1000,
+                image_split_overlap=100,
+            ),
+        ) as ctx:
+            mock_ctx = MagicMock()
+            mock_ctx.deps = ctx
+
+            text = "hello"
+            image_url = ImageUrl(url="https://example.com/image.png")
+            tall_image = BinaryContent(data=_create_valid_tall_image_bytes(height=2600), media_type="image/png")
+            video = VideoUrl(url="https://example.com/video.mp4")
+            request = ModelRequest(parts=[UserPromptPart(content=[text, image_url, tall_image, video])])
+            history = [request]
+
+            await split_large_images(mock_ctx, history)
+
+            content = request.parts[0].content  # type: ignore[union-attr]
+            assert isinstance(content, list)
+            # text + image_url + 3 image segments + video = 6
+            assert len(content) == 6
+            assert content[0] == text
+            assert isinstance(content[1], ImageUrl)
+            assert isinstance(content[2], BinaryContent)
+            assert isinstance(content[3], BinaryContent)
+            assert isinstance(content[4], BinaryContent)
+            assert isinstance(content[5], VideoUrl)
 
 
 # Tests for drop_extra_images

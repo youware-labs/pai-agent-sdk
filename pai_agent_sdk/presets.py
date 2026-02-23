@@ -29,7 +29,7 @@ Usage::
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Literal
 
 from pai_agent_sdk.context import ModelCapability
@@ -72,7 +72,7 @@ def build_anthropic_betas(
 # =============================================================================
 
 
-class ModelSettingsPreset(str, Enum):
+class ModelSettingsPreset(StrEnum):
     """Available ModelSettings presets."""
 
     # Anthropic standard presets (no beta headers)
@@ -633,7 +633,7 @@ def list_presets() -> list[str]:
 INHERIT = "inherit"
 
 
-class ModelConfigPreset(str, Enum):
+class ModelConfigPreset(StrEnum):
     """Available ModelConfig presets for context management."""
 
     # Anthropic models
@@ -656,6 +656,9 @@ _MODEL_CFG_REGISTRY: dict[str, dict[str, Any]] = {
         "max_images": 20,
         "max_videos": 0,  # Claude doesn't support video
         "support_gif": True,
+        "split_large_images": True,
+        "image_split_max_height": 4096,
+        "image_split_overlap": 50,
         "capabilities": {ModelCapability.vision, ModelCapability.document_understanding},
     },
     ModelConfigPreset.CLAUDE_1M.value: {
@@ -663,6 +666,9 @@ _MODEL_CFG_REGISTRY: dict[str, dict[str, Any]] = {
         "max_images": 20,
         "max_videos": 0,  # Claude doesn't support video
         "support_gif": True,
+        "split_large_images": True,
+        "image_split_max_height": 4096,
+        "image_split_overlap": 50,
         "capabilities": {ModelCapability.vision, ModelCapability.document_understanding},
     },
     # OpenAI GPT-5 series (vision, no video support)
@@ -671,6 +677,9 @@ _MODEL_CFG_REGISTRY: dict[str, dict[str, Any]] = {
         "max_images": 20,
         "max_videos": 0,  # GPT doesn't support video
         "support_gif": False,
+        "split_large_images": True,
+        "image_split_max_height": 4096,
+        "image_split_overlap": 50,
         "capabilities": {ModelCapability.vision},
     },
     # Gemini models (vision + video support)
@@ -679,6 +688,9 @@ _MODEL_CFG_REGISTRY: dict[str, dict[str, Any]] = {
         "max_images": 20,
         "max_videos": 1,  # Gemini supports video
         "support_gif": True,
+        "split_large_images": True,
+        "image_split_max_height": 4096,
+        "image_split_overlap": 50,
         "capabilities": {
             ModelCapability.vision,
             ModelCapability.video_understanding,
@@ -690,6 +702,9 @@ _MODEL_CFG_REGISTRY: dict[str, dict[str, Any]] = {
         "max_images": 20,
         "max_videos": 1,  # Gemini supports video
         "support_gif": True,
+        "split_large_images": True,
+        "image_split_max_height": 4096,
+        "image_split_overlap": 50,
         "capabilities": {
             ModelCapability.vision,
             ModelCapability.video_understanding,

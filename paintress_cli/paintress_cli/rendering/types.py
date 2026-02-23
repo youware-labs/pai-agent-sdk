@@ -5,14 +5,14 @@ Contains enums and data classes used across the rendering layer.
 
 from __future__ import annotations
 
-import enum
 import time
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel
 
 
-class ToolCallState(str, enum.Enum):
+class ToolCallState(StrEnum):
     """Tool call execution state."""
 
     CALLING = "calling"
@@ -20,7 +20,7 @@ class ToolCallState(str, enum.Enum):
     RENDERED = "rendered"
 
 
-class RenderDirective(str, enum.Enum):
+class RenderDirective(StrEnum):
     """Render directive for display updates."""
 
     CALLING = "calling"

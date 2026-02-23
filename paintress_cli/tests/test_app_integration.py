@@ -49,7 +49,7 @@ class MockConfigManager:
     global_config_dir: Any = field(default_factory=lambda: MagicMock())
     project_config_dir: Any = field(default_factory=lambda: MagicMock())
 
-    def get_auto_save_dir(self) -> Any:
+    def get_sessions_dir(self) -> Any:
         return MagicMock(exists=lambda: False)
 
     def get_mcp_config(self) -> None:

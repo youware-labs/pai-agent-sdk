@@ -23,11 +23,10 @@ Configuration files are loaded with project-level priority (no merging):
 
 from __future__ import annotations
 
-import hashlib
 import tomllib
 from importlib import resources
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, TypedDict
 
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -515,23 +514,32 @@ class ConfigManager:
         """Get path to project tools config file."""
         return self._project_dir / self.PROJECT_CONFIG_DIR / "tools.toml"
 
-    def get_project_hash(self) -> str:
-        """Generate stable hash from project directory path.
+    def get_sessions_dir(self) -> Path:
+        """Get sessions directory for session-based storage.
 
         Returns:
-            A 12-character hex string derived from SHA256 of the absolute project path.
+            Path to the sessions directory under global config.
+            Format: ~/.config/youware-labs/paintress-cli/sessions/
         """
-        path_str = str(self._project_dir.resolve())
-        return hashlib.sha256(path_str.encode()).hexdigest()[:12]
+        return self._config_dir / "sessions"
 
-    def get_auto_save_dir(self) -> Path:
-        """Get auto-save directory for current project.
 
-        Returns:
-            Path to the project-specific auto-save directory under global config.
-            Format: ~/.config/youware-labs/paintress-cli/message_history/{project_hash}/
-        """
-        return self._config_dir / "message_history" / self.get_project_hash()
+# =============================================================================
+# Worktree Metadata
+# =============================================================================
+
+
+class WorktreeMetadata(TypedDict):
+    """Metadata for a git worktree managed by paintress-cli.
+
+    Stored as JSON in ~/.config/youware-labs/paintress-cli/worktrees/{project_hash}/metadata.json.
+    """
+
+    git_root: str
+    """Absolute path to the original git repository root."""
+
+    created_at: str
+    """ISO 8601 timestamp of when this worktree group was first created."""
 
 
 # =============================================================================

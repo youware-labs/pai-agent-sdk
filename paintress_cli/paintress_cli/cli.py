@@ -7,17 +7,21 @@ Most interactions happen inside the TUI via slash commands.
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import os
 import re
 import shutil
+import subprocess
 import sys
+from datetime import UTC, datetime
 from importlib import resources
 from pathlib import Path
 
 import click
 
 from paintress_cli import __version__  # pyright: ignore[reportAttributeAccessIssue]
-from paintress_cli.config import ConfigManager, PaintressConfig
+from paintress_cli.config import ConfigManager, PaintressConfig, WorktreeMetadata
 from paintress_cli.logging import LOG_FILE_NAME, configure_logging, get_logger
 
 logger = get_logger(__name__)
@@ -443,22 +447,123 @@ def ensure_builtin_assets(config_manager: ConfigManager) -> None:
 
 
 # =============================================================================
+# Git Worktree Support
+# =============================================================================
+
+
+def _get_git_root() -> Path | None:
+    """Get the root directory of the current git repository.
+
+    Returns:
+        Path to git root, or None if not in a git repo.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],  # noqa: S607
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return Path(result.stdout.strip())
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+
+def _project_hash(git_root: Path) -> str:
+    """Generate stable hash from git root path.
+
+    Returns:
+        A 12-character hex string derived from SHA256 of the absolute path.
+    """
+    path_str = str(git_root.resolve())
+    return hashlib.sha256(path_str.encode()).hexdigest()[:12]
+
+
+def _create_worktree(branch_name: str | None) -> tuple[Path, str, bool]:
+    """Create or resume a git worktree for isolated agent work.
+
+    If a worktree with the given branch name already exists, it will be
+    reused (resumed) instead of creating a new one.
+
+    Args:
+        branch_name: Branch name to create. If None, auto-generates one.
+
+    Returns:
+        Tuple of (worktree_path, branch_name, is_resume).
+
+    Raises:
+        click.ClickException: If not in a git repo or worktree creation fails.
+    """
+    git_root = _get_git_root()
+    if git_root is None:
+        raise click.ClickException("--worktree requires a git repository, but none was found.")
+
+    # Auto-generate branch name if not provided
+    if branch_name is None:
+        timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+        branch_name = f"paintress/{timestamp}"
+
+    # Create worktree directory under config_dir/worktrees/{project_hash}/{branch}
+    proj_hash = _project_hash(git_root)
+    worktrees_dir = ConfigManager.DEFAULT_CONFIG_DIR / "worktrees" / proj_hash
+    worktrees_dir.mkdir(parents=True, exist_ok=True)
+    worktree_dir = worktrees_dir / branch_name.replace("/", "-")
+
+    # Write metadata for discoverability
+    metadata_file = worktrees_dir / "metadata.json"
+    if not metadata_file.exists():
+        metadata: WorktreeMetadata = {
+            "git_root": str(git_root.resolve()),
+            "created_at": datetime.now(UTC).isoformat(),
+        }
+        metadata_file.write_text(json.dumps(metadata, indent=2))
+
+    # Resume if worktree already exists
+    if worktree_dir.exists():
+        return worktree_dir, branch_name, True
+
+    try:
+        subprocess.run(  # noqa: S603
+            ["git", "worktree", "add", str(worktree_dir), "-b", branch_name],  # noqa: S607
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=str(git_root),
+        )
+    except subprocess.CalledProcessError as e:
+        stderr = e.stderr.strip() if e.stderr else "Unknown error"
+        raise click.ClickException(f"Failed to create git worktree: {stderr}") from e
+
+    return worktree_dir, branch_name, False
+
+
+# =============================================================================
 # CLI Entry Point
 # =============================================================================
 
 
 @click.command()
 @click.option("-v", "--verbose", is_flag=True, help="Enable verbose logging")
+@click.option("-w", "--worktree", is_flag=True, default=False, help="Run in a git worktree.")
+@click.option(
+    "-b",
+    "--branch",
+    "worktree_branch",
+    default=None,
+    metavar="BRANCH",
+    help="Branch name for worktree (implies --worktree).",
+)
 @click.version_option(version=__version__, prog_name="paintress-cli")
-def cli(verbose: bool) -> None:
+def cli(verbose: bool, worktree: bool, worktree_branch: str | None) -> None:
     """Paintress CLI - AI-powered coding assistant.
 
     Inside TUI, use slash commands:
       /help     - Show available commands
       /config   - Show/edit configuration
       /mode     - Switch between act/plan modes
-      /dump     - Save session
-      /load     - Load session
+      /session  - List/restore sessions
+      /dump     - Save session to folder
+      /load     - Load session from folder
       /clear    - Clear conversation
       /exit     - Exit application
     """
@@ -483,12 +588,29 @@ def cli(verbose: bool) -> None:
     # Load env vars from config
     load_env_from_config(config)
 
+    # Set up worktree if requested
+    worktree_dir: Path | None = None
+    actual_branch: str | None = None
+    if worktree or worktree_branch is not None:
+        worktree_dir, actual_branch, is_resume = _create_worktree(worktree_branch)
+        if is_resume:
+            click.echo(click.style("Resuming worktree:", fg="cyan", bold=True))
+        else:
+            click.echo(click.style("Worktree created:", fg="cyan", bold=True))
+        click.echo(f"  Branch:    {actual_branch}")
+        click.echo(f"  Directory: {worktree_dir}")
+        click.echo()
+
+    working_dir = worktree_dir or Path.cwd()
+
     # Run the TUI
+    exit_code = 0
+    session_id: str | None = None
     try:
-        asyncio.run(_run_tui(config, config_manager, verbose))
+        session_id = asyncio.run(_run_tui(config, config_manager, verbose, working_dir=working_dir))
     except KeyboardInterrupt:
         click.echo("\nGoodbye!")
-        sys.exit(130)
+        exit_code = 130
     except Exception as e:
         logger.exception("Fatal error")
         click.echo()
@@ -514,19 +636,54 @@ def cli(verbose: bool) -> None:
         click.echo("  - Invalid model configuration")
         click.echo()
         click.echo(f"Check logs at: {LOG_FILE_NAME} (with --verbose flag)")
-        sys.exit(1)
+        exit_code = 1
+
+    # Show resume hints on exit
+    if session_id or worktree_dir is not None:
+        click.echo()
+
+    if session_id:
+        click.echo(click.style(f"Session: {session_id}", fg="cyan", bold=True))
+        click.echo()
+        click.echo("To resume this session:")
+        click.echo(f"  /session {session_id}")
+
+    if worktree_dir is not None:
+        click.echo()
+        click.echo(click.style("Worktree is still available:", fg="cyan", bold=True))
+        click.echo(f"  Directory: {worktree_dir}")
+        click.echo()
+        click.echo("To resume in this worktree:")
+        click.echo(f"  paintress-cli -w -b {actual_branch}")
+        click.echo()
+        click.echo("To remove when done:")
+        click.echo(f"  git worktree remove {worktree_dir}")
+
+    sys.exit(exit_code)
 
 
 async def _run_tui(
     config: PaintressConfig,
     config_manager: ConfigManager,
     verbose: bool,
-) -> None:
-    """Run the TUI application."""
+    *,
+    working_dir: Path | None = None,
+) -> str | None:
+    """Run the TUI application.
+
+    Returns:
+        Session ID if the session has saved data, None otherwise.
+    """
     from paintress_cli.app import TUIApp
 
-    async with TUIApp(config=config, config_manager=config_manager, verbose=verbose) as app:
+    async with TUIApp(
+        config=config,
+        config_manager=config_manager,
+        verbose=verbose,
+        working_dir=working_dir or Path.cwd(),
+    ) as app:
         await app.run()
+        return app.session_id if app.has_session_data else None
 
 
 def main() -> None:

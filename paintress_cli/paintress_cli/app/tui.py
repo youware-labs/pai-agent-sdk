@@ -22,10 +22,13 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import shutil
 import sys
 import time
+import uuid
 from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 from types import TracebackType
@@ -136,6 +139,7 @@ class TUIApp:
     config: PaintressConfig
     config_manager: ConfigManager
     verbose: bool = False
+    working_dir: Path = field(default_factory=Path.cwd)
 
     # Runtime state
     _mode: TUIMode = field(default=TUIMode.ACT, init=False)
@@ -161,6 +165,9 @@ class TUIApp:
     _total_line_count: int = field(default=0, init=False)  # Cached line count
     _renderer: RichRenderer = field(default_factory=RichRenderer, init=False)
     _event_renderer: EventRenderer = field(default_factory=EventRenderer, init=False)
+
+    # Session
+    _session_id: str = field(default_factory=lambda: uuid.uuid4().hex[:12], init=False)
 
     # Agent execution
     _agent_task: asyncio.Task[None] | None = field(default=None, init=False)
@@ -264,7 +271,7 @@ class TUIApp:
             config=self.config,
             mcp_config=mcp_config,
             browser_manager=self._browser,
-            working_dir=Path.cwd(),
+            working_dir=self.working_dir,
         )
         await self._exit_stack.enter_async_context(self._runtime)
 
@@ -718,7 +725,7 @@ class TUIApp:
         user_rules = None
 
         # Load AGENTS.md from working directory
-        agents_path = Path.cwd() / "AGENTS.md"
+        agents_path = self.working_dir / "AGENTS.md"
         if agents_path.exists() and agents_path.is_file():
             try:
                 content = agents_path.read_text(encoding="utf-8")
@@ -1604,16 +1611,17 @@ class TUIApp:
             case "/dump":
                 self._append_user_input(command)
                 self._dump_history(args.strip() if args else None)
+            case "/session":
+                self._append_user_input(command)
+                if not args.strip():
+                    self._list_sessions()
+                else:
+                    self._load_session(args.strip())
             case "/load":
                 self._append_user_input(command)
                 if not args.strip():
-                    # Load from auto-save directory
-                    auto_save_dir = self.config_manager.get_auto_save_dir()
-                    if auto_save_dir.exists():
-                        self._load_history(str(auto_save_dir))
-                    else:
-                        self._append_system_output("No auto-saved session found for this project")
-                        self._append_system_output(f"Expected: {auto_save_dir}")
+                    self._append_system_output("Usage: /load <folder>")
+                    self._append_system_output("To restore a session by ID, use /session <id>")
                 else:
                     self._load_history(args.strip())
             case "/exit":
@@ -1670,7 +1678,7 @@ class TUIApp:
                 command_str,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                cwd=Path.cwd(),
+                cwd=self.working_dir,
                 env=os.environ.copy(),
             )
 
@@ -1730,6 +1738,7 @@ class TUIApp:
         sys_table.add_row("/help", "Show this help")
         sys_table.add_row("/clear", "Clear output and history")
         sys_table.add_row("/cost", "Show cost summary")
+        sys_table.add_row("/session [id]", "List sessions or restore by ID")
         sys_table.add_row("/dump [folder]", "Export session to folder")
         sys_table.add_row("/load <folder>", "Load session from folder")
         sys_table.add_row("/act", "Switch to ACT mode")
@@ -1903,18 +1912,22 @@ class TUIApp:
             self._append_system_output(f"Error loading session: {e}")
 
     def _auto_save_history(self) -> None:
-        """Auto-save session to project-specific directory.
+        """Auto-save session to session-specific directory.
 
-        Saves message history and context state to:
-        ~/.config/youware-labs/paintress-cli/message_history/{project_hash}/
+        Saves message history, context state, and metadata to:
+        ~/.config/youware-labs/paintress-cli/sessions/{session_id}/
 
         This is called automatically after each agent run completes.
+        Also prunes old sessions beyond the retention limit.
         """
         if not self._message_history:
             return
 
-        save_dir = self.config_manager.get_auto_save_dir()
+        sessions_dir = self.config_manager.get_sessions_dir()
+        save_dir = sessions_dir / self._session_id
         save_dir.mkdir(parents=True, exist_ok=True)
+
+        now = datetime.now(UTC).isoformat()
 
         # Save message history
         history_file = save_dir / "message_history.json"
@@ -1925,7 +1938,168 @@ class TUIApp:
         state = self.runtime.ctx.export_state()
         state_file.write_text(state.model_dump_json(indent=2))
 
+        # Save/update metadata
+        metadata_file = save_dir / "metadata.json"
+        if metadata_file.exists():
+            metadata = json.loads(metadata_file.read_text())
+            metadata["updated_at"] = now
+        else:
+            metadata = {
+                "session_id": self._session_id,
+                "working_dir": str(self.working_dir),
+                "created_at": now,
+                "updated_at": now,
+            }
+        metadata_file.write_text(json.dumps(metadata, indent=2))
+
         logger.debug(f"Auto-saved session to {save_dir}")
+
+        # Prune old sessions
+        self._prune_sessions(sessions_dir)
+
+    @property
+    def session_id(self) -> str:
+        """Get the current session ID."""
+        return self._session_id
+
+    @property
+    def has_session_data(self) -> bool:
+        """Check if this session has any saved data."""
+        sessions_dir = self.config_manager.get_sessions_dir()
+        return (sessions_dir / self._session_id / "message_history.json").exists()
+
+    def _prune_sessions(self, sessions_dir: Path, max_sessions: int = 100) -> None:
+        """Remove old sessions beyond the retention limit.
+
+        Keeps the most recent `max_sessions` sessions, deleting the rest.
+        Sessions are sorted by updated_at from metadata.json, falling back
+        to directory mtime.
+
+        Args:
+            sessions_dir: Path to config_dir/sessions/
+            max_sessions: Maximum number of sessions to retain.
+        """
+        if not sessions_dir.exists():
+            return
+
+        session_dirs = [d for d in sessions_dir.iterdir() if d.is_dir()]
+        if len(session_dirs) <= max_sessions:
+            return
+
+        def _get_session_time(d: Path) -> str:
+            metadata_file = d / "metadata.json"
+            if metadata_file.exists():
+                try:
+                    metadata = json.loads(metadata_file.read_text())
+                    return metadata.get("updated_at", "")
+                except (json.JSONDecodeError, OSError):
+                    pass
+            # Fallback to directory mtime
+            return datetime.fromtimestamp(d.stat().st_mtime, tz=UTC).isoformat()
+
+        # Sort by time ascending (oldest first)
+        session_dirs.sort(key=_get_session_time)
+
+        # Remove oldest sessions
+        to_remove = session_dirs[: len(session_dirs) - max_sessions]
+        for d in to_remove:
+            try:
+                shutil.rmtree(d)
+                logger.debug(f"Pruned old session: {d.name}")
+            except OSError as e:
+                logger.warning(f"Failed to prune session {d.name}: {e}")
+
+    def _list_sessions(self, max_display: int = 20) -> None:
+        """List recent sessions.
+
+        Shows session ID, timestamp, and working directory.
+
+        Args:
+            max_display: Maximum number of sessions to show.
+        """
+        from rich.table import Table
+
+        sessions_dir = self.config_manager.get_sessions_dir()
+        if not sessions_dir.exists():
+            self._append_system_output("No sessions found.")
+            return
+
+        session_dirs = [d for d in sessions_dir.iterdir() if d.is_dir()]
+        if not session_dirs:
+            self._append_system_output("No sessions found.")
+            return
+
+        # Collect session info
+        sessions: list[dict[str, str]] = []
+        for d in session_dirs:
+            metadata_file = d / "metadata.json"
+            if metadata_file.exists():
+                try:
+                    metadata = json.loads(metadata_file.read_text())
+                    sessions.append({
+                        "id": d.name,
+                        "updated_at": metadata.get("updated_at", "unknown"),
+                        "working_dir": metadata.get("working_dir", "unknown"),
+                    })
+                except (json.JSONDecodeError, OSError):
+                    sessions.append({"id": d.name, "updated_at": "unknown", "working_dir": "unknown"})
+            else:
+                sessions.append({"id": d.name, "updated_at": "unknown", "working_dir": "unknown"})
+
+        # Sort by updated_at descending (newest first)
+        sessions.sort(key=lambda s: s["updated_at"], reverse=True)
+
+        # Mark current session
+        current_id = self._session_id
+
+        table = Table(show_header=True, box=None, padding=(0, 2))
+        table.add_column("Session ID", style="cyan")
+        table.add_column("Updated", style="dim")
+        table.add_column("Working Dir", style="dim")
+
+        for s in sessions[:max_display]:
+            sid = s["id"]
+            marker = f"{sid} *" if sid == current_id else sid
+            # Shorten timestamp for display
+            updated = s["updated_at"][:19].replace("T", " ") if s["updated_at"] != "unknown" else "unknown"
+            table.add_row(marker, updated, s["working_dir"])
+
+        self._append_system_output(
+            f"Sessions ({len(sessions)} total, showing latest {min(len(sessions), max_display)}):"
+        )
+        self._append_output(self._renderer.render(table).rstrip())
+        self._append_system_output("Use /session <id> to restore. (* = current session)")
+
+    def _load_session(self, session_id: str) -> None:
+        """Load a session by ID (supports prefix matching).
+
+        Args:
+            session_id: Full or prefix of session ID.
+        """
+        sessions_dir = self.config_manager.get_sessions_dir()
+        if not sessions_dir.exists():
+            self._append_system_output("No sessions found.")
+            return
+
+        # Exact match first
+        target = sessions_dir / session_id
+        if target.is_dir():
+            self._load_history(str(target))
+            self._session_id = session_id
+            return
+
+        # Prefix match
+        matches = [d for d in sessions_dir.iterdir() if d.is_dir() and d.name.startswith(session_id)]
+        if len(matches) == 1:
+            self._load_history(str(matches[0]))
+            self._session_id = matches[0].name
+            return
+        elif len(matches) > 1:
+            self._append_system_output(f"Ambiguous session ID '{session_id}'. Matches:")
+            for m in sorted(matches, key=lambda d: d.name):
+                self._append_system_output(f"  {m.name}")
+        else:
+            self._append_system_output(f"Session not found: {session_id}")
 
     def _append_system_output(self, text: str) -> None:
         """Append system message to output."""
@@ -1949,12 +2123,8 @@ class TUIApp:
         self._append_output("")  # blank line before help
         self._show_help()
 
-        # Hint about auto-saved session if available
-        auto_save_dir = self.config_manager.get_auto_save_dir()
-        if (auto_save_dir / "message_history.json").exists():
-            self._append_output("")
-            hint = Text("Previous session found. Use /load to restore.", style="dim")
-            self._append_output(self._renderer.render(hint).rstrip())
+        # Show session ID
+        self._append_output(f"Session: {self._session_id}")
 
         # Create scrollable FormattedTextControl with mouse support
         tui_ref = self

@@ -56,7 +56,7 @@ This approach:
 ```toml
 [tools]
 # Tools requiring user approval before execution
-need_approval = ["shell", "replace"]
+need_approval = ["shell", "write"]
 ```
 
 Location priority:

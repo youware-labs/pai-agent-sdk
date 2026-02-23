@@ -952,12 +952,12 @@ async def test_resumable_state_with_need_user_approve_tools(env: LocalEnvironmen
 
     async with AgentContext(env=env) as ctx:
         # Set need_user_approve_tools
-        ctx.need_user_approve_tools = ["shell", "edit", "replace"]
+        ctx.need_user_approve_tools = ["shell", "edit", "write"]
 
         state = ctx.export_state()
 
         # Verify state contains the tools list
-        assert state.need_user_approve_tools == ["shell", "edit", "replace"]
+        assert state.need_user_approve_tools == ["shell", "edit", "write"]
 
         # Serialize to JSON string
         json_str = state.model_dump_json()
@@ -969,14 +969,14 @@ async def test_resumable_state_with_need_user_approve_tools(env: LocalEnvironmen
         restored_state = ResumableState.model_validate_json(json_str)
 
         # Verify restored state
-        assert restored_state.need_user_approve_tools == ["shell", "edit", "replace"]
+        assert restored_state.need_user_approve_tools == ["shell", "edit", "write"]
 
         # Verify restore method works
         new_ctx = AgentContext(env=env)
         assert new_ctx.need_user_approve_tools == []  # Default is empty
 
         restored_state.restore(new_ctx)
-        assert new_ctx.need_user_approve_tools == ["shell", "edit", "replace"]
+        assert new_ctx.need_user_approve_tools == ["shell", "edit", "write"]
 
 
 async def test_agent_context_need_user_approve_tools_default(env: LocalEnvironment) -> None:

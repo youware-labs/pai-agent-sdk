@@ -160,7 +160,7 @@ class TimeoutToolset(Toolset):
 Configure tools requiring user approval:
 
 ```python
-ctx.need_user_approve_tools = ["shell", "edit", "replace"]
+ctx.need_user_approve_tools = ["shell", "edit", "write"]
 ```
 
 When called, these tools raise `ApprovalRequired`. Implement `get_approval_metadata()` in your tool to provide context.

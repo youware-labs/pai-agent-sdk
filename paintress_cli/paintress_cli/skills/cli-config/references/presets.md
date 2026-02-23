@@ -10,7 +10,7 @@ instruction: |
   Provide: error message, stack trace, steps to reproduce, expected vs actual behavior.
   Returns: root cause analysis, fix recommendations, verification steps.
 tools: [glob, grep, view, ls]
-optional_tools: [shell, edit, multi_edit, replace]
+optional_tools: [shell, edit, multi_edit, write]
 model: inherit
 ```
 
@@ -29,7 +29,7 @@ instruction: |
   Provide: what to find, starting points, context.
   Returns: file paths, code snippets, pattern summaries.
 tools: [glob, grep, view, ls]
-optional_tools: [edit, multi_edit, replace]
+optional_tools: [edit, multi_edit, write]
 model: inherit
 ```
 
@@ -65,7 +65,7 @@ instruction: |
   Provide: specific question, context, constraints.
   Returns: relevant information, code examples, sources.
 tools: [search]
-optional_tools: [scrape, fetch, edit, multi_edit, replace]
+optional_tools: [scrape, fetch, edit, multi_edit, write]
 model: inherit
 ```
 

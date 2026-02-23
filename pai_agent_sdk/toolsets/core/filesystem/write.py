@@ -1,4 +1,4 @@
-"""Replace tool for overwriting file contents."""
+"""Write tool for writing or appending file contents."""
 
 from functools import cache
 from pathlib import Path
@@ -19,26 +19,26 @@ _PROMPTS_DIR = Path(__file__).parent / "prompts"
 
 @cache
 def _load_instruction() -> str:
-    """Load replace instruction from prompts/replace.md."""
-    prompt_file = _PROMPTS_DIR / "replace.md"
+    """Load write instruction from prompts/write.md."""
+    prompt_file = _PROMPTS_DIR / "write.md"
     return prompt_file.read_text()
 
 
-class ReplaceTool(BaseTool):
-    """Tool for replacing entire file contents."""
+class WriteTool(BaseTool):
+    """Tool for writing entire file contents."""
 
-    name = "replace"
+    name = "write"
     description = "Write or overwrite entire file content. For partial edits, use `edit` tool instead."
 
     def is_available(self, ctx: RunContext[AgentContext]) -> bool:
         """Check if tool is available (requires file_operator)."""
         if ctx.deps.file_operator is None:
-            logger.debug("ReplaceTool unavailable: file_operator is not configured")
+            logger.debug("WriteTool unavailable: file_operator is not configured")
             return False
         return True
 
     def get_instruction(self, ctx: RunContext[AgentContext]) -> str | None:
-        """Load instruction from prompts/replace.md."""
+        """Load instruction from prompts/write.md."""
         return _load_instruction()
 
     async def call(
@@ -68,4 +68,4 @@ class ReplaceTool(BaseTool):
         return f"Successfully wrote to file: {file_path}"
 
 
-__all__ = ["ReplaceTool"]
+__all__ = ["WriteTool"]

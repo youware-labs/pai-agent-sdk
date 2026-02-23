@@ -66,13 +66,13 @@ Project-level tool permissions in `.paintress/tools.toml`:
 ```toml
 [tools]
 # Tools requiring user approval before execution
-need_approval = ["shell", "replace"]
+need_approval = ["shell", "write"]
 ```
 
 Common patterns:
 - `[]` - No approval needed (trust all tools)
 - `["shell"]` - Approve shell commands only
-- `["shell", "replace", "edit"]` - Approve all code modifications
+- `["shell", "write", "edit"]` - Approve all code modifications
 
 ### mcp.json
 

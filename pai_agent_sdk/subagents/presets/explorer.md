@@ -26,7 +26,7 @@ tools:
 optional_tools:
   - edit
   - multi_edit
-  - replace
+  - write
 model: inherit
 model_settings: inherit
 model_cfg: inherit

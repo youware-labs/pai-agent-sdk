@@ -2,7 +2,6 @@
 Performs exact string replacement in files.
 
 <best-practices>
-- Always use `view` tool first to read the file before editing
 - old_string must match file content EXACTLY (including whitespace/indentation)
 - Preserve exact indentation from view output (ignore line number prefixes)
 - Include 3-5 lines of context to ensure unique matches

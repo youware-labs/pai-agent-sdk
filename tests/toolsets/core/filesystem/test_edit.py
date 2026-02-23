@@ -66,7 +66,7 @@ async def test_edit_create_file_already_exists(tmp_path: Path) -> None:
         mock_run_ctx.deps = ctx
 
         result = await tool.call(mock_run_ctx, file_path="existing.txt", old_string="", new_string="new content")
-        assert result == snapshot("Error: File already exists: existing.txt. Use `replace` tool to overwrite.")
+        assert result == snapshot("Error: File already exists: existing.txt. Use `write` tool to overwrite.")
 
 
 async def test_edit_file_not_found(tmp_path: Path) -> None:
@@ -235,7 +235,7 @@ async def test_multi_edit_file_already_exists(tmp_path: Path) -> None:
 
         edits = [EditItem(old_string="", new_string="new content", replace_all=False)]
         result = await tool.call(mock_run_ctx, file_path="existing.txt", edits=edits)
-        assert result == snapshot("Error: File already exists: existing.txt. Use `replace` tool to overwrite.")
+        assert result == snapshot("Error: File already exists: existing.txt. Use `write` tool to overwrite.")
 
 
 async def test_multi_edit_file_not_found(tmp_path: Path) -> None:

@@ -1,4 +1,4 @@
-"""Tests for pai_agent_sdk.toolsets.core.filesystem.replace module."""
+"""Tests for pai_agent_sdk.toolsets.core.filesystem.write module."""
 
 from contextlib import AsyncExitStack
 from pathlib import Path
@@ -9,28 +9,28 @@ from pydantic_ai import RunContext
 
 from pai_agent_sdk.context import AgentContext
 from pai_agent_sdk.environment.local import LocalEnvironment
-from pai_agent_sdk.toolsets.core.filesystem.replace import ReplaceTool
+from pai_agent_sdk.toolsets.core.filesystem.write import WriteTool
 
 
-def test_replace_tool_attributes(agent_context: AgentContext) -> None:
+def test_write_tool_attributes(agent_context: AgentContext) -> None:
     """Should have correct name and description."""
-    assert ReplaceTool.name == "replace"
-    assert "Write or overwrite" in ReplaceTool.description
-    tool = ReplaceTool()
+    assert WriteTool.name == "write"
+    assert "Write or overwrite" in WriteTool.description
+    tool = WriteTool()
     mock_run_ctx = MagicMock(spec=RunContext)
     mock_run_ctx.deps = agent_context
     instruction = tool.get_instruction(mock_run_ctx)
     assert instruction is not None
 
 
-async def test_replace_create_new_file(tmp_path: Path) -> None:
+async def test_write_create_new_file(tmp_path: Path) -> None:
     """Should create new file."""
     async with AsyncExitStack() as stack:
         env = await stack.enter_async_context(
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = ReplaceTool()
+        tool = WriteTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
@@ -40,14 +40,14 @@ async def test_replace_create_new_file(tmp_path: Path) -> None:
         assert (tmp_path / "new_file.txt").read_text() == "Hello World"
 
 
-async def test_replace_overwrite_file(tmp_path: Path) -> None:
+async def test_write_overwrite_file(tmp_path: Path) -> None:
     """Should overwrite existing file."""
     async with AsyncExitStack() as stack:
         env = await stack.enter_async_context(
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = ReplaceTool()
+        tool = WriteTool()
 
         (tmp_path / "test.txt").write_text("old content")
 
@@ -59,14 +59,14 @@ async def test_replace_overwrite_file(tmp_path: Path) -> None:
         assert (tmp_path / "test.txt").read_text() == "new content"
 
 
-async def test_replace_append_mode(tmp_path: Path) -> None:
+async def test_write_append_mode(tmp_path: Path) -> None:
     """Should append to file in append mode."""
     async with AsyncExitStack() as stack:
         env = await stack.enter_async_context(
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = ReplaceTool()
+        tool = WriteTool()
 
         (tmp_path / "test.txt").write_text("Hello ")
 
@@ -78,14 +78,14 @@ async def test_replace_append_mode(tmp_path: Path) -> None:
         assert (tmp_path / "test.txt").read_text() == "Hello World"
 
 
-async def test_replace_invalid_mode(tmp_path: Path) -> None:
+async def test_write_invalid_mode(tmp_path: Path) -> None:
     """Should return error for invalid mode."""
     async with AsyncExitStack() as stack:
         env = await stack.enter_async_context(
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = ReplaceTool()
+        tool = WriteTool()
 
         mock_run_ctx = MagicMock(spec=RunContext)
         mock_run_ctx.deps = ctx
@@ -94,14 +94,14 @@ async def test_replace_invalid_mode(tmp_path: Path) -> None:
         assert result == snapshot("Error: Invalid mode 'x'. Only 'w' and 'a' are supported.")
 
 
-async def test_replace_create_with_subdirectory(tmp_path: Path) -> None:
+async def test_write_create_with_subdirectory(tmp_path: Path) -> None:
     """Should create file in subdirectory."""
     async with AsyncExitStack() as stack:
         env = await stack.enter_async_context(
             LocalEnvironment(allowed_paths=[tmp_path], default_path=tmp_path, tmp_base_dir=tmp_path)
         )
         ctx = await stack.enter_async_context(AgentContext(env=env))
-        tool = ReplaceTool()
+        tool = WriteTool()
 
         (tmp_path / "subdir").mkdir()
 

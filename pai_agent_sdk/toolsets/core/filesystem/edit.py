@@ -70,7 +70,7 @@ class EditTool(BaseTool):
 
         if not old_string:
             if await file_operator.exists(file_path):
-                return f"Error: File already exists: {file_path}. Use `replace` tool to overwrite."
+                return f"Error: File already exists: {file_path}. Use `write` tool to overwrite."
             await file_operator.write_file(file_path, new_string)
             return f"Successfully created new file: {file_path}"
 
@@ -144,7 +144,7 @@ class MultiEditTool(BaseTool):
 
         if not edits[0].old_string:
             if await file_operator.exists(file_path):
-                return f"Error: File already exists: {file_path}. Use `replace` tool to overwrite."
+                return f"Error: File already exists: {file_path}. Use `write` tool to overwrite."
             content = edits[0].new_string
             remaining_edits = edits[1:]
         else:

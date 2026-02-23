@@ -26,8 +26,8 @@ from pai_agent_sdk.toolsets.core.filesystem.grep import GrepTool
 from pai_agent_sdk.toolsets.core.filesystem.ls import ListTool
 from pai_agent_sdk.toolsets.core.filesystem.mkdir import MkdirTool
 from pai_agent_sdk.toolsets.core.filesystem.move_copy import CopyTool, MoveTool
-from pai_agent_sdk.toolsets.core.filesystem.replace import ReplaceTool
 from pai_agent_sdk.toolsets.core.filesystem.view import ViewTool
+from pai_agent_sdk.toolsets.core.filesystem.write import WriteTool
 
 tools: list[type[BaseTool]] = [
     GlobTool,
@@ -36,7 +36,7 @@ tools: list[type[BaseTool]] = [
     ViewTool,
     EditTool,
     MultiEditTool,
-    ReplaceTool,
+    WriteTool,
     MkdirTool,
     MoveTool,
     CopyTool,
@@ -61,11 +61,11 @@ __all__ = [
     "MoveTool",
     "MultiEditTool",
     "PathPair",
-    "ReplaceTool",
     "ViewMetadata",
     "ViewReadingParams",
     "ViewSegment",
     "ViewTool",
     "ViewTruncationInfo",
+    "WriteTool",
     "tools",
 ]

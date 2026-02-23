@@ -82,12 +82,26 @@ class ModelSettingsPreset(str, Enum):
     ANTHROPIC_LOW = "anthropic_low"
     ANTHROPIC_OFF = "anthropic_off"
 
+    # Anthropic interleaved thinking presets (with beta headers)
+    ANTHROPIC_DEFAULT_INTERLEAVED_THINKING = "anthropic_default_interleaved_thinking"
+    ANTHROPIC_HIGH_INTERLEAVED_THINKING = "anthropic_high_interleaved_thinking"
+    ANTHROPIC_MEDIUM_INTERLEAVED_THINKING = "anthropic_medium_interleaved_thinking"
+    ANTHROPIC_LOW_INTERLEAVED_THINKING = "anthropic_low_interleaved_thinking"
+    ANTHROPIC_OFF_INTERLEAVED_THINKING = "anthropic_off_interleaved_thinking"
+
     # Anthropic 1M context presets (with beta headers for extended context)
     ANTHROPIC_1M_DEFAULT = "anthropic_1m_default"
     ANTHROPIC_1M_HIGH = "anthropic_1m_high"
     ANTHROPIC_1M_MEDIUM = "anthropic_1m_medium"
     ANTHROPIC_1M_LOW = "anthropic_1m_low"
     ANTHROPIC_1M_OFF = "anthropic_1m_off"
+
+    # Anthropic 1M context + interleaved thinking presets (with beta headers)
+    ANTHROPIC_1M_DEFAULT_INTERLEAVED_THINKING = "anthropic_1m_default_interleaved_thinking"
+    ANTHROPIC_1M_HIGH_INTERLEAVED_THINKING = "anthropic_1m_high_interleaved_thinking"
+    ANTHROPIC_1M_MEDIUM_INTERLEAVED_THINKING = "anthropic_1m_medium_interleaved_thinking"
+    ANTHROPIC_1M_LOW_INTERLEAVED_THINKING = "anthropic_1m_low_interleaved_thinking"
+    ANTHROPIC_1M_OFF_INTERLEAVED_THINKING = "anthropic_1m_off_interleaved_thinking"
 
     # OpenAI Chat Completions presets (GPT-4, etc.)
     OPENAI_DEFAULT = "openai_default"
@@ -125,6 +139,7 @@ def _anthropic_settings(
     max_tokens: int = 21 * K_TOKENS,
     *,
     use_1m_context: bool = False,
+    use_interleaved_thinking: bool = False,
 ) -> dict[str, Any]:
     """Create Anthropic model settings with thinking enabled.
 
@@ -132,6 +147,7 @@ def _anthropic_settings(
         thinking_budget: Token budget for thinking (higher = more reasoning).
         max_tokens: Maximum output tokens.
         use_1m_context: Whether to include 1M context beta headers.
+        use_interleaved_thinking: Whether to include interleaved thinking beta headers.
 
     Returns:
         Dict suitable for AnthropicModelSettings.
@@ -146,16 +162,21 @@ def _anthropic_settings(
         "anthropic_cache_response": True,
         "anthropic_cache_messages": True,
     }
-    if use_1m_context:
-        settings["extra_headers"] = build_anthropic_betas(use_1m_context=use_1m_context, use_interleaved_thinking=True)
+    extra_headers = build_anthropic_betas(
+        use_1m_context=use_1m_context,
+        use_interleaved_thinking=use_interleaved_thinking,
+    )
+    if extra_headers:
+        settings["extra_headers"] = extra_headers
     return settings
 
 
-def _anthropic_off_settings(*, use_1m_context: bool = False) -> dict[str, Any]:
+def _anthropic_off_settings(*, use_1m_context: bool = False, use_interleaved_thinking: bool = False) -> dict[str, Any]:
     """Create Anthropic model settings with thinking disabled.
 
     Args:
         use_1m_context: Whether to include 1M context beta headers.
+        use_interleaved_thinking: Whether to include interleaved thinking beta headers.
 
     Returns:
         Dict suitable for AnthropicModelSettings.
@@ -168,8 +189,12 @@ def _anthropic_off_settings(*, use_1m_context: bool = False) -> dict[str, Any]:
         "anthropic_cache_response": True,
         "anthropic_cache_messages": True,
     }
-    if use_1m_context:
-        settings["extra_headers"] = build_anthropic_betas(use_1m_context=use_1m_context)
+    extra_headers = build_anthropic_betas(
+        use_1m_context=use_1m_context,
+        use_interleaved_thinking=use_interleaved_thinking,
+    )
+    if extra_headers:
+        settings["extra_headers"] = extra_headers
     return settings
 
 
@@ -205,6 +230,43 @@ ANTHROPIC_OFF: dict[str, Any] = _anthropic_off_settings()
 """Anthropic off: Thinking disabled, caching enabled."""
 
 # -----------------------------------------------------------------------------
+# Anthropic interleaved thinking presets (with beta headers)
+# -----------------------------------------------------------------------------
+
+ANTHROPIC_DEFAULT_INTERLEAVED_THINKING: dict[str, Any] = _anthropic_settings(
+    thinking_budget=16 * K_TOKENS,
+    max_tokens=21 * K_TOKENS,
+    use_interleaved_thinking=True,
+)
+"""Anthropic interleaved default: Same as medium with interleaved thinking beta."""
+
+ANTHROPIC_HIGH_INTERLEAVED_THINKING: dict[str, Any] = _anthropic_settings(
+    thinking_budget=32 * K_TOKENS,
+    max_tokens=21 * K_TOKENS,
+    use_interleaved_thinking=True,
+)
+"""Anthropic interleaved high: 32K thinking budget with interleaved thinking beta."""
+
+ANTHROPIC_MEDIUM_INTERLEAVED_THINKING: dict[str, Any] = _anthropic_settings(
+    thinking_budget=16 * K_TOKENS,
+    max_tokens=21 * K_TOKENS,
+    use_interleaved_thinking=True,
+)
+"""Anthropic interleaved medium: 16K thinking budget with interleaved thinking beta."""
+
+ANTHROPIC_LOW_INTERLEAVED_THINKING: dict[str, Any] = _anthropic_settings(
+    thinking_budget=4 * K_TOKENS,
+    max_tokens=8 * K_TOKENS,
+    use_interleaved_thinking=True,
+)
+"""Anthropic interleaved low: 4K thinking budget with interleaved thinking beta."""
+
+ANTHROPIC_OFF_INTERLEAVED_THINKING: dict[str, Any] = _anthropic_off_settings(
+    use_interleaved_thinking=True,
+)
+"""Anthropic interleaved off: Thinking disabled with interleaved thinking beta and caching enabled."""
+
+# -----------------------------------------------------------------------------
 # Anthropic 1M context presets (with beta headers for extended context)
 # -----------------------------------------------------------------------------
 
@@ -238,6 +300,48 @@ ANTHROPIC_1M_LOW: dict[str, Any] = _anthropic_settings(
 
 ANTHROPIC_1M_OFF: dict[str, Any] = _anthropic_off_settings(use_1m_context=True)
 """Anthropic 1M off: Thinking disabled, with 1M context beta and caching enabled."""
+
+# -----------------------------------------------------------------------------
+# Anthropic 1M context + interleaved thinking presets (with beta headers)
+# -----------------------------------------------------------------------------
+
+ANTHROPIC_1M_DEFAULT_INTERLEAVED_THINKING: dict[str, Any] = _anthropic_settings(
+    thinking_budget=16 * K_TOKENS,
+    max_tokens=16 * K_TOKENS,
+    use_1m_context=True,
+    use_interleaved_thinking=True,
+)
+"""Anthropic 1M interleaved default: 16K thinking budget with 1M + interleaved betas."""
+
+ANTHROPIC_1M_HIGH_INTERLEAVED_THINKING: dict[str, Any] = _anthropic_settings(
+    thinking_budget=32 * K_TOKENS,
+    max_tokens=21 * K_TOKENS,
+    use_1m_context=True,
+    use_interleaved_thinking=True,
+)
+"""Anthropic 1M interleaved high: 32K thinking budget with 1M + interleaved betas."""
+
+ANTHROPIC_1M_MEDIUM_INTERLEAVED_THINKING: dict[str, Any] = _anthropic_settings(
+    thinking_budget=16 * K_TOKENS,
+    max_tokens=16 * K_TOKENS,
+    use_1m_context=True,
+    use_interleaved_thinking=True,
+)
+"""Anthropic 1M interleaved medium: 16K thinking budget with 1M + interleaved betas."""
+
+ANTHROPIC_1M_LOW_INTERLEAVED_THINKING: dict[str, Any] = _anthropic_settings(
+    thinking_budget=4 * K_TOKENS,
+    max_tokens=8 * K_TOKENS,
+    use_1m_context=True,
+    use_interleaved_thinking=True,
+)
+"""Anthropic 1M interleaved low: 4K thinking budget with 1M + interleaved betas."""
+
+ANTHROPIC_1M_OFF_INTERLEAVED_THINKING: dict[str, Any] = _anthropic_off_settings(
+    use_1m_context=True,
+    use_interleaved_thinking=True,
+)
+"""Anthropic 1M interleaved off: Thinking disabled with 1M + interleaved betas and caching enabled."""
 
 
 # =============================================================================
@@ -490,12 +594,24 @@ _PRESET_REGISTRY: dict[str, dict[str, Any]] = {
     ModelSettingsPreset.ANTHROPIC_MEDIUM.value: ANTHROPIC_MEDIUM,
     ModelSettingsPreset.ANTHROPIC_LOW.value: ANTHROPIC_LOW,
     ModelSettingsPreset.ANTHROPIC_OFF.value: ANTHROPIC_OFF,
+    # Anthropic interleaved thinking (with beta headers)
+    ModelSettingsPreset.ANTHROPIC_DEFAULT_INTERLEAVED_THINKING.value: ANTHROPIC_DEFAULT_INTERLEAVED_THINKING,
+    ModelSettingsPreset.ANTHROPIC_HIGH_INTERLEAVED_THINKING.value: ANTHROPIC_HIGH_INTERLEAVED_THINKING,
+    ModelSettingsPreset.ANTHROPIC_MEDIUM_INTERLEAVED_THINKING.value: ANTHROPIC_MEDIUM_INTERLEAVED_THINKING,
+    ModelSettingsPreset.ANTHROPIC_LOW_INTERLEAVED_THINKING.value: ANTHROPIC_LOW_INTERLEAVED_THINKING,
+    ModelSettingsPreset.ANTHROPIC_OFF_INTERLEAVED_THINKING.value: ANTHROPIC_OFF_INTERLEAVED_THINKING,
     # Anthropic 1M context (with beta headers)
     ModelSettingsPreset.ANTHROPIC_1M_DEFAULT.value: ANTHROPIC_1M_DEFAULT,
     ModelSettingsPreset.ANTHROPIC_1M_HIGH.value: ANTHROPIC_1M_HIGH,
     ModelSettingsPreset.ANTHROPIC_1M_MEDIUM.value: ANTHROPIC_1M_MEDIUM,
     ModelSettingsPreset.ANTHROPIC_1M_LOW.value: ANTHROPIC_1M_LOW,
     ModelSettingsPreset.ANTHROPIC_1M_OFF.value: ANTHROPIC_1M_OFF,
+    # Anthropic 1M context + interleaved thinking (with beta headers)
+    ModelSettingsPreset.ANTHROPIC_1M_DEFAULT_INTERLEAVED_THINKING.value: ANTHROPIC_1M_DEFAULT_INTERLEAVED_THINKING,
+    ModelSettingsPreset.ANTHROPIC_1M_HIGH_INTERLEAVED_THINKING.value: ANTHROPIC_1M_HIGH_INTERLEAVED_THINKING,
+    ModelSettingsPreset.ANTHROPIC_1M_MEDIUM_INTERLEAVED_THINKING.value: ANTHROPIC_1M_MEDIUM_INTERLEAVED_THINKING,
+    ModelSettingsPreset.ANTHROPIC_1M_LOW_INTERLEAVED_THINKING.value: ANTHROPIC_1M_LOW_INTERLEAVED_THINKING,
+    ModelSettingsPreset.ANTHROPIC_1M_OFF_INTERLEAVED_THINKING.value: ANTHROPIC_1M_OFF_INTERLEAVED_THINKING,
     # OpenAI Chat
     ModelSettingsPreset.OPENAI_DEFAULT.value: OPENAI_DEFAULT,
     ModelSettingsPreset.OPENAI_HIGH.value: OPENAI_HIGH,
@@ -523,7 +639,9 @@ _PRESET_REGISTRY: dict[str, dict[str, Any]] = {
 _PRESET_ALIASES: dict[str, str] = {
     # Provider defaults (default preset)
     "anthropic": ModelSettingsPreset.ANTHROPIC_DEFAULT.value,
+    "anthropic_interleaved": ModelSettingsPreset.ANTHROPIC_DEFAULT_INTERLEAVED_THINKING.value,
     "anthropic_1m": ModelSettingsPreset.ANTHROPIC_1M_DEFAULT.value,
+    "anthropic_1m_interleaved": ModelSettingsPreset.ANTHROPIC_1M_DEFAULT_INTERLEAVED_THINKING.value,
     "openai": ModelSettingsPreset.OPENAI_DEFAULT.value,
     "openai_responses": ModelSettingsPreset.OPENAI_RESPONSES_DEFAULT.value,
     "gemini_2.5": ModelSettingsPreset.GEMINI_THINKING_BUDGET_DEFAULT.value,

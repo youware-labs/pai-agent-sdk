@@ -7,15 +7,25 @@ from inline_snapshot import snapshot
 
 from pai_agent_sdk.presets import (
     ANTHROPIC_1M_DEFAULT,
+    ANTHROPIC_1M_DEFAULT_INTERLEAVED_THINKING,
     ANTHROPIC_1M_HIGH,
+    ANTHROPIC_1M_HIGH_INTERLEAVED_THINKING,
     ANTHROPIC_1M_LOW,
+    ANTHROPIC_1M_LOW_INTERLEAVED_THINKING,
     ANTHROPIC_1M_MEDIUM,
+    ANTHROPIC_1M_MEDIUM_INTERLEAVED_THINKING,
     ANTHROPIC_1M_OFF,
+    ANTHROPIC_1M_OFF_INTERLEAVED_THINKING,
     ANTHROPIC_DEFAULT,
+    ANTHROPIC_DEFAULT_INTERLEAVED_THINKING,
     ANTHROPIC_HIGH,
+    ANTHROPIC_HIGH_INTERLEAVED_THINKING,
     ANTHROPIC_LOW,
+    ANTHROPIC_LOW_INTERLEAVED_THINKING,
     ANTHROPIC_MEDIUM,
+    ANTHROPIC_MEDIUM_INTERLEAVED_THINKING,
     ANTHROPIC_OFF,
+    ANTHROPIC_OFF_INTERLEAVED_THINKING,
     INHERIT,
     OPENAI_DEFAULT,
     OPENAI_HIGH,
@@ -81,6 +91,50 @@ def test_anthropic_1m_presets_structure() -> None:
     assert "anthropic-beta" in ANTHROPIC_1M_OFF["extra_headers"]
 
 
+def test_anthropic_interleaved_presets_structure() -> None:
+    """Test that Anthropic interleaved presets have interleaved beta header and caching."""
+    for preset in [
+        ANTHROPIC_DEFAULT_INTERLEAVED_THINKING,
+        ANTHROPIC_HIGH_INTERLEAVED_THINKING,
+        ANTHROPIC_MEDIUM_INTERLEAVED_THINKING,
+        ANTHROPIC_LOW_INTERLEAVED_THINKING,
+    ]:
+        assert "extra_headers" in preset
+        assert "anthropic-beta" in preset["extra_headers"]
+        assert "interleaved-thinking" in preset["extra_headers"]["anthropic-beta"]
+        assert preset["anthropic_cache_instructions"] is True
+        assert preset["anthropic_cache_messages"] is True
+
+    # OFF should disable thinking but still include interleaved beta header
+    assert ANTHROPIC_OFF_INTERLEAVED_THINKING["anthropic_thinking"]["type"] == "disabled"
+    assert "extra_headers" in ANTHROPIC_OFF_INTERLEAVED_THINKING
+    assert "anthropic-beta" in ANTHROPIC_OFF_INTERLEAVED_THINKING["extra_headers"]
+    assert "interleaved-thinking" in ANTHROPIC_OFF_INTERLEAVED_THINKING["extra_headers"]["anthropic-beta"]
+
+
+def test_anthropic_1m_interleaved_presets_structure() -> None:
+    """Test that Anthropic 1M interleaved presets include both beta headers and caching."""
+    for preset in [
+        ANTHROPIC_1M_DEFAULT_INTERLEAVED_THINKING,
+        ANTHROPIC_1M_HIGH_INTERLEAVED_THINKING,
+        ANTHROPIC_1M_MEDIUM_INTERLEAVED_THINKING,
+        ANTHROPIC_1M_LOW_INTERLEAVED_THINKING,
+    ]:
+        assert "extra_headers" in preset
+        assert "anthropic-beta" in preset["extra_headers"]
+        assert "context-1m" in preset["extra_headers"]["anthropic-beta"]
+        assert "interleaved-thinking" in preset["extra_headers"]["anthropic-beta"]
+        assert preset["anthropic_cache_instructions"] is True
+        assert preset["anthropic_cache_messages"] is True
+
+    # OFF should disable thinking but still include both beta headers
+    assert ANTHROPIC_1M_OFF_INTERLEAVED_THINKING["anthropic_thinking"]["type"] == "disabled"
+    assert "extra_headers" in ANTHROPIC_1M_OFF_INTERLEAVED_THINKING
+    assert "anthropic-beta" in ANTHROPIC_1M_OFF_INTERLEAVED_THINKING["extra_headers"]
+    assert "context-1m" in ANTHROPIC_1M_OFF_INTERLEAVED_THINKING["extra_headers"]["anthropic-beta"]
+    assert "interleaved-thinking" in ANTHROPIC_1M_OFF_INTERLEAVED_THINKING["extra_headers"]["anthropic-beta"]
+
+
 def test_anthropic_thinking_budgets() -> None:
     """Test that Anthropic thinking budgets are ordered correctly."""
     # Standard presets
@@ -129,6 +183,12 @@ def test_get_model_settings_by_enum() -> None:
     settings_1m = get_model_settings(ModelSettingsPreset.ANTHROPIC_1M_HIGH)
     assert settings_1m == ANTHROPIC_1M_HIGH
 
+    settings_interleaved = get_model_settings(ModelSettingsPreset.ANTHROPIC_HIGH_INTERLEAVED_THINKING)
+    assert settings_interleaved == ANTHROPIC_HIGH_INTERLEAVED_THINKING
+
+    settings_1m_interleaved = get_model_settings(ModelSettingsPreset.ANTHROPIC_1M_HIGH_INTERLEAVED_THINKING)
+    assert settings_1m_interleaved == ANTHROPIC_1M_HIGH_INTERLEAVED_THINKING
+
 
 def test_get_model_settings_by_string() -> None:
     """Test getting model settings by string name."""
@@ -148,6 +208,12 @@ def test_get_model_settings_by_alias() -> None:
     # Test 1M alias
     settings_1m = get_model_settings("anthropic_1m")
     assert settings_1m == ANTHROPIC_1M_DEFAULT
+
+    settings_interleaved = get_model_settings("anthropic_interleaved")
+    assert settings_interleaved == ANTHROPIC_DEFAULT_INTERLEAVED_THINKING
+
+    settings_1m_interleaved = get_model_settings("anthropic_1m_interleaved")
+    assert settings_1m_interleaved == ANTHROPIC_1M_DEFAULT_INTERLEAVED_THINKING
 
     settings = get_model_settings("openai")
     assert settings == OPENAI_DEFAULT
@@ -190,15 +256,27 @@ def test_list_presets() -> None:
         "anthropic",
         "anthropic_1m",
         "anthropic_1m_default",
+        "anthropic_1m_default_interleaved_thinking",
         "anthropic_1m_high",
+        "anthropic_1m_high_interleaved_thinking",
+        "anthropic_1m_interleaved",
         "anthropic_1m_low",
+        "anthropic_1m_low_interleaved_thinking",
         "anthropic_1m_medium",
+        "anthropic_1m_medium_interleaved_thinking",
         "anthropic_1m_off",
+        "anthropic_1m_off_interleaved_thinking",
         "anthropic_default",
+        "anthropic_default_interleaved_thinking",
         "anthropic_high",
+        "anthropic_high_interleaved_thinking",
+        "anthropic_interleaved",
         "anthropic_low",
+        "anthropic_low_interleaved_thinking",
         "anthropic_medium",
+        "anthropic_medium_interleaved_thinking",
         "anthropic_off",
+        "anthropic_off_interleaved_thinking",
         "gemini",
         "gemini_2.5",
         "gemini_3",

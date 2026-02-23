@@ -40,8 +40,8 @@ Repository = "https://github.com/youware-labs/pai-agent-sdk"
 examples = ["pydantic-ai",
     "python-dotenv"]
 docker = ["docker>=7.0.0"]
-web = ["tavily-python>=0.7.0", "firecrawl-py>=4.0.0", "markitdown[all]>=0.1.2"]
-document = ["pymupdf>=1.26.6", "pymupdf4llm>=0.2.8", "markitdown[all]>=0.1.2", "pymupdf-layout>=1.26.6"]
+web = ["tavily-python>=0.7.0", "firecrawl-py>=4.0.0", "markitdown[all]>=0.1.5"]
+document = ["pymupdf>=1.26.6", "pymupdf4llm>=0.2.8", "markitdown[all]>=0.1.5", "pymupdf-layout>=1.26.6"]
 s3 = ["boto3>=1.34"]
 all = ["pai-agent-sdk[docker,web,document,s3,examples]"]
 
@@ -61,7 +61,7 @@ dev = [
     "docker>=7.0.0",
     "tavily-python>=0.7.0",
     "firecrawl-py>=4.0.0",
-    "markitdown[all]>=0.1.2",
+    "markitdown[all]>=0.1.5",
     "pymupdf>=1.26.6",
     "pymupdf4llm>=0.2.8",
     "pymupdf-layout>=1.26.6",

@@ -34,7 +34,7 @@ from typing import TYPE_CHECKING, Any, cast
 from prompt_toolkit import Application
 from prompt_toolkit.formatted_text import ANSI
 from prompt_toolkit.key_binding import KeyBindings
-from prompt_toolkit.layout import HSplit, Layout, ScrollablePane, Window
+from prompt_toolkit.layout import HSplit, Layout, Window
 from prompt_toolkit.layout.controls import BufferControl, FormattedTextControl
 from prompt_toolkit.mouse_events import MouseEvent, MouseEventType
 from prompt_toolkit.styles import Style
@@ -81,6 +81,7 @@ from paintress_cli.environment import TUIEnvironment
 from paintress_cli.events import ContextUpdateEvent
 from paintress_cli.hooks import emit_context_update
 from paintress_cli.logging import configure_tui_logging, get_logger
+from paintress_cli.perf import perf_log_report, perf_report, perf_timer
 from paintress_cli.runtime import create_tui_runtime
 from paintress_cli.session import TUIContext
 from paintress_cli.usage import SessionUsage
@@ -154,11 +155,13 @@ class TUIApp:
     _output_lines: list[str] = field(default_factory=list, init=False)
     _max_output_lines: int = field(default=500, init=False)  # Overridden from config.display
 
-    # Output cache for performance (avoid re-joining and re-parsing on every render)
-    _output_cache: str = field(default="", init=False)
-    _output_ansi_cache: ANSI | None = field(default=None, init=False)  # Cached ANSI object
-    _output_cache_valid: bool = field(default=True, init=False)
-    _total_line_count: int = field(default=0, init=False)  # Cached line count
+    # Virtual viewport rendering (only parse ANSI for visible lines)
+    _scroll_offset: int = field(default=0, init=False)  # Display line offset from top
+    _block_line_counts: list[int] = field(default_factory=list, init=False)  # Line count per output block
+    _total_line_count: int = field(default=0, init=False)  # Sum of all block line counts
+    _output_generation: int = field(default=0, init=False)  # Bumped on any content change
+    _viewport_cache_key: tuple[int, int, int] | None = field(default=None, init=False)
+    _output_ansi_cache: ANSI | None = field(default=None, init=False)  # Cached visible ANSI
     _renderer: RichRenderer = field(default_factory=RichRenderer, init=False)
     _event_renderer: EventRenderer = field(default_factory=EventRenderer, init=False)
 
@@ -188,9 +191,6 @@ class TUIApp:
     _last_ctrl_c_time: float = field(default=0.0, init=False)
     _ctrl_c_exit_timeout: float = field(default=2.0, init=False)
 
-    # UI component references (for scroll support)
-    _output_window: ScrollablePane | None = field(default=None, init=False)
-
     # Prompt history for up/down navigation
     _prompt_history: list[str] = field(default_factory=list, init=False)
     _history_index: int = field(default=-1, init=False)
@@ -214,6 +214,10 @@ class TUIApp:
     # UI refresh throttling
     _last_invalidate_time: float = field(default=0.0, init=False)
     _invalidate_interval: float = field(default=0.016, init=False)  # ~60fps max
+
+    # Streaming render throttle (separate from UI invalidation)
+    _last_stream_render_time: float = field(default=0.0, init=False)
+    _stream_render_interval: float = field(default=0.08, init=False)  # ~12fps for markdown re-render
 
     # HITL (Human-in-the-Loop) approval state
     _hitl_pending: bool = field(default=False, init=False)
@@ -339,28 +343,52 @@ class TUIApp:
             self._app.invalidate()
 
     def _invalidate_output_cache(self) -> None:
-        """Mark output cache as invalid (must be called after modifying _output_lines)."""
-        self._output_cache_valid = False
-        # Recalculate line count
-        self._total_line_count = sum(line.count("\n") + 1 for line in self._output_lines)
+        """Mark output cache as invalid (must be called after modifying _output_lines).
+
+        O(1) operation - just bumps the generation counter.
+        Line counts are maintained incrementally by _append_block and _update_block.
+        """
+        self._output_generation += 1
+
+    def _append_block(self, content: str) -> None:
+        """Append an output block with incremental bookkeeping.
+
+        Handles line count tracking and generation bump.
+        All code that appends to _output_lines should use this method.
+        """
+        line_count = content.count("\n") + 1
+        self._output_lines.append(content)
+        self._block_line_counts.append(line_count)
+        self._total_line_count += line_count
+        self._output_generation += 1
+
+    def _update_block(self, idx: int, new_content: str) -> None:
+        """Update an output block in-place with incremental line count tracking.
+
+        This is O(1) for line count update (just delta between old and new).
+        Used by streaming text/thinking updates.
+        """
+        if idx >= len(self._output_lines):
+            return
+        old_count = self._block_line_counts[idx]
+        new_count = new_content.count("\n") + 1
+        self._output_lines[idx] = new_content
+        self._block_line_counts[idx] = new_count
+        self._total_line_count += new_count - old_count
+        self._output_generation += 1
 
     def _append_output(self, text: str) -> None:
         """Append text to output buffer with auto-scroll when running."""
-        # Update line count incrementally (avoid full recalculation)
-        new_lines = text.count("\n") + 1
-        self._total_line_count += new_lines
-        self._output_lines.append(text)
+        self._append_block(text)
 
         # Trim old lines to prevent memory issues
         if len(self._output_lines) > self._max_output_lines:
             trim_count = len(self._output_lines) - self._max_output_lines
-            # Subtract line counts of removed lines
+            # Subtract line counts of removed blocks
             for i in range(trim_count):
-                self._total_line_count -= self._output_lines[i].count("\n") + 1
+                self._total_line_count -= self._block_line_counts[i]
             self._output_lines = self._output_lines[trim_count:]
-
-        # Invalidate cache (content changed)
-        self._output_cache_valid = False
+            self._block_line_counts = self._block_line_counts[trim_count:]
 
         # Auto-scroll to bottom when agent is running
         if self._state == TUIState.RUNNING:
@@ -368,58 +396,87 @@ class TUIApp:
         # Invalidate app to refresh display (throttled during streaming)
         self._throttled_invalidate()
 
-    def _scroll_to_bottom(self) -> None:
-        """Scroll output pane to bottom.
-
-        Uses cached line count for performance.
-        """
-        if not self._output_window:
-            return
-        try:
-            # Use cached line count
-            total_lines = self._total_line_count
-
-            # Get visible height from terminal
-            if self._app and self._app.output:
-                terminal_size = self._app.output.get_size()
-                # Reserve: status bar (2) + steering (dynamic) + input area (5) + margins
-                visible_height = max(5, terminal_size.rows - 9)
-            else:
-                visible_height = 20
-
-            # Calculate scroll needed to show bottom content with padding
-            bottom_padding = 4
-            if total_lines > visible_height:
-                scroll_to = total_lines - visible_height + bottom_padding
-                self._output_window.vertical_scroll = max(0, scroll_to)
-            else:
-                self._output_window.vertical_scroll = 0
-        except Exception:  # noqa: S110
-            pass
-
-    def _get_output_text(self) -> ANSI:
-        """Get formatted output for display.
-
-        Uses cached ANSI object to avoid O(n) join and ANSI parsing on every UI render.
-        This is critical for performance since prompt_toolkit calls this on every redraw.
-        """
-        if not self._output_cache_valid or self._output_ansi_cache is None:
-            self._output_cache = "\n".join(self._output_lines)
-            self._output_ansi_cache = ANSI(self._output_cache)
-            self._output_cache_valid = True
-        return self._output_ansi_cache
-
-    def _get_max_scroll(self) -> int:
-        """Calculate maximum scroll position.
-
-        Uses cached line count for performance.
-        """
+    def _get_viewport_height(self) -> int:
+        """Get visible output height in lines."""
         if self._app and self._app.output:
             terminal_size = self._app.output.get_size()
-            visible_height = max(5, terminal_size.rows - 10)
+            # Reserve: status bar (2) + steering (dynamic) + input area (5) + margins
+            return max(5, terminal_size.rows - 9)
+        return 40
+
+    def _scroll_to_bottom(self) -> None:
+        """Scroll output to bottom.
+
+        Uses cached line count for performance - O(1) operation.
+        """
+        visible_height = self._get_viewport_height()
+        bottom_padding = 4
+        if self._total_line_count > visible_height:
+            self._scroll_offset = self._total_line_count - visible_height + bottom_padding
         else:
-            visible_height = 20
-        return max(0, self._total_line_count - visible_height)
+            self._scroll_offset = 0
+
+    def _get_output_text(self) -> ANSI:
+        """Get formatted output for display using virtual viewport.
+
+        Only joins and parses ANSI for the visible portion of output,
+        making this O(viewport) instead of O(total_content).
+        Critical for performance since prompt_toolkit calls this on every redraw.
+        """
+        with perf_timer("get_output_text"):
+            if not self._output_lines:
+                return ANSI("")
+
+            vh = self._get_viewport_height()
+            cache_key = (self._scroll_offset, vh, self._output_generation)
+            if cache_key == self._viewport_cache_key and self._output_ansi_cache is not None:
+                return self._output_ansi_cache
+
+            visible = self._get_visible_text(self._scroll_offset, self._scroll_offset + vh)
+            self._output_ansi_cache = ANSI(visible)
+            self._viewport_cache_key = cache_key
+            return self._output_ansi_cache
+
+    def _get_visible_text(self, start_line: int, end_line: int) -> str:
+        """Extract only the text visible in the given line range.
+
+        Scans output blocks using pre-computed line counts to find
+        the overlapping blocks, then slices them to the exact visible range.
+        O(total_blocks) scan + O(visible_blocks) string operations.
+        The scan is cheap (integer additions on at most _max_output_lines blocks).
+        """
+        if not self._output_lines:
+            return ""
+
+        cum = 0
+        parts: list[str] = []
+
+        for i in range(len(self._output_lines)):
+            block_count = self._block_line_counts[i]
+            block_end = cum + block_count
+
+            if block_end <= start_line:
+                cum = block_end
+                continue
+            if cum >= end_line:
+                break
+
+            # This block overlaps with visible range
+            block_lines = self._output_lines[i].split("\n")
+            local_start = max(0, start_line - cum)
+            local_end = min(block_count, end_line - cum)
+
+            if local_start > 0 or local_end < block_count:
+                block_lines = block_lines[local_start:local_end]
+
+            parts.append("\n".join(block_lines))
+            cum = block_end
+
+        return "\n".join(parts)
+
+    def _get_max_scroll(self) -> int:
+        """Calculate maximum scroll position. O(1) using cached line count."""
+        return max(0, self._total_line_count - self._get_viewport_height())
 
     def _get_terminal_width(self) -> int:
         """Get current terminal width for Rich rendering."""
@@ -436,22 +493,33 @@ class TUIApp:
         """Start tracking a new streaming text block."""
         self._streaming_text = initial_content
         self._streaming_line_index = len(self._output_lines)
+        self._last_stream_render_time = 0.0  # Reset throttle for new block
         # Add placeholder that will be updated
-        self._output_lines.append(initial_content)
-        self._invalidate_output_cache()
+        self._append_block(initial_content)
 
     def _update_streaming_text(self, delta: str) -> None:
-        """Update the current streaming text block with delta."""
+        """Update the current streaming text block with delta.
+
+        Throttles markdown re-rendering to ~12fps to avoid expensive Rich
+        markdown parsing on every single token delta.
+        """
         self._streaming_text += delta
-        # Re-render markdown for the complete text so far with dynamic width
+
+        # Throttle: skip expensive markdown re-render if too soon
+        now = time.time()
+        if now - self._last_stream_render_time < self._stream_render_interval:
+            return  # Delta buffered in _streaming_text, will render on next interval or finalize
+        self._last_stream_render_time = now
+
+        # Re-render markdown for the complete text so far
         if self._streaming_line_index is not None and self._streaming_line_index < len(self._output_lines):
-            rendered = self._renderer.render_markdown(
-                self._streaming_text,
-                code_theme=self._get_code_theme(),
-                width=self._get_terminal_width(),
-            ).rstrip("\n")
-            self._output_lines[self._streaming_line_index] = rendered
-            self._invalidate_output_cache()
+            with perf_timer("stream_render_markdown"):
+                rendered = self._renderer.render_markdown(
+                    self._streaming_text,
+                    code_theme=self._get_code_theme(),
+                    width=self._get_terminal_width(),
+                ).rstrip("\n")
+            self._update_block(self._streaming_line_index, rendered)
             if self._state == TUIState.RUNNING:
                 self._scroll_to_bottom()
             self._throttled_invalidate()
@@ -466,8 +534,7 @@ class TUIApp:
                 width=self._get_terminal_width(),
             ).rstrip("\n")
             if self._streaming_line_index < len(self._output_lines):
-                self._output_lines[self._streaming_line_index] = rendered
-                self._invalidate_output_cache()
+                self._update_block(self._streaming_line_index, rendered)
         self._streaming_text = ""
         self._streaming_line_index = None
 
@@ -475,15 +542,25 @@ class TUIApp:
         """Start tracking a new streaming thinking block."""
         self._streaming_thinking = initial_content
         self._streaming_thinking_line_index = len(self._output_lines)
+        self._last_stream_render_time = 0.0  # Reset throttle for new block
         # Render initial content with thinking style
         rendered = self._event_renderer.render_thinking(initial_content, width=self._get_terminal_width()).rstrip("\n")
-        self._output_lines.append(rendered)
-        self._invalidate_output_cache()
+        self._append_block(rendered)
         self._throttled_invalidate()
 
     def _update_streaming_thinking(self, delta: str) -> None:
-        """Update current streaming thinking with delta."""
+        """Update current streaming thinking with delta.
+
+        Throttled similarly to streaming text to avoid excessive re-rendering.
+        """
         self._streaming_thinking += delta
+
+        # Throttle: skip expensive re-render if too soon
+        now = time.time()
+        if now - self._last_stream_render_time < self._stream_render_interval:
+            return  # Delta buffered, will render on next interval or finalize
+        self._last_stream_render_time = now
+
         # Re-render thinking for the complete text so far
         if self._streaming_thinking_line_index is not None and self._streaming_thinking_line_index < len(
             self._output_lines
@@ -492,8 +569,7 @@ class TUIApp:
                 self._streaming_thinking,
                 width=self._get_terminal_width(),
             ).rstrip("\n")
-            self._output_lines[self._streaming_thinking_line_index] = rendered
-            self._invalidate_output_cache()
+            self._update_block(self._streaming_thinking_line_index, rendered)
             if self._state == TUIState.RUNNING:
                 self._scroll_to_bottom()
             self._throttled_invalidate()
@@ -507,8 +583,7 @@ class TUIApp:
                 width=self._get_terminal_width(),
             ).rstrip("\n")
             if self._streaming_thinking_line_index < len(self._output_lines):
-                self._output_lines[self._streaming_thinking_line_index] = rendered
-                self._invalidate_output_cache()
+                self._update_block(self._streaming_thinking_line_index, rendered)
         self._streaming_thinking = ""
         self._streaming_thinking_line_index = None
 
@@ -1113,8 +1188,7 @@ class TUIApp:
             "tool_names": [],
             "agent_name": agent_name,
         }
-        self._output_lines.append(rendered.rstrip())
-        self._invalidate_output_cache()
+        self._append_block(rendered.rstrip())
         self._throttled_invalidate()
 
     def _handle_subagent_complete(self, event: SubagentCompleteEvent) -> None:
@@ -1169,8 +1243,7 @@ class TUIApp:
 
         # Update the line in place
         if line_index < len(self._output_lines):
-            self._output_lines[line_index] = rendered.rstrip()
-            self._invalidate_output_cache()
+            self._update_block(line_index, rendered.rstrip())
 
         # Clean up state
         del self._subagent_states[agent_id]
@@ -1203,8 +1276,7 @@ class TUIApp:
 
         # Update the line in place
         if line_index < len(self._output_lines):
-            self._output_lines[line_index] = rendered.rstrip()
-            self._invalidate_output_cache()
+            self._update_block(line_index, rendered.rstrip())
             self._throttled_invalidate()
 
     def _handle_stream_event(self, event: StreamEvent) -> None:
@@ -1409,17 +1481,16 @@ class TUIApp:
         # Scroll functions
         def _scroll_up(event: KeyPressEvent) -> None:
             """Scroll output up."""
-            if self._output_window:
-                with contextlib.suppress(Exception):
-                    self._output_window.vertical_scroll = max(0, self._output_window.vertical_scroll - 10)
+            self._scroll_offset = max(0, self._scroll_offset - 10)
+            if self._app:
+                self._app.invalidate()
 
         def _scroll_down(event: KeyPressEvent) -> None:
             """Scroll output down."""
-            if self._output_window:
-                with contextlib.suppress(Exception):
-                    max_scroll = self._get_max_scroll()
-                    new_scroll = self._output_window.vertical_scroll + 10
-                    self._output_window.vertical_scroll = min(new_scroll, max_scroll)
+            max_scroll = self._get_max_scroll()
+            self._scroll_offset = min(self._scroll_offset + 10, max_scroll)
+            if self._app:
+                self._app.invalidate()
 
         # Register scroll keybindings
         kb.add("pageup")(_scroll_up)
@@ -1435,6 +1506,8 @@ class TUIApp:
         def handle_ctrl_l(event: KeyPressEvent) -> None:
             """Scroll to bottom of output."""
             self._scroll_to_bottom()
+            if self._app:
+                self._app.invalidate()
 
         @kb.add("c-u")
         def handle_ctrl_u(event: KeyPressEvent) -> None:
@@ -1601,6 +1674,9 @@ class TUIApp:
             case "/cost":
                 self._append_user_input(command)
                 self._show_cost()
+            case "/perf":
+                self._append_user_input(command)
+                self._append_system_output(perf_report())
             case "/dump":
                 self._append_user_input(command)
                 self._dump_history(args.strip() if args else None)
@@ -1730,6 +1806,7 @@ class TUIApp:
         sys_table.add_row("/help", "Show this help")
         sys_table.add_row("/clear", "Clear output and history")
         sys_table.add_row("/cost", "Show cost summary")
+        sys_table.add_row("/perf", "Show performance stats (PAINTRESS_PERF=1)")
         sys_table.add_row("/dump [folder]", "Export session to folder")
         sys_table.add_row("/load <folder>", "Load session from folder")
         sys_table.add_row("/act", "Switch to ACT mode")
@@ -1785,11 +1862,13 @@ class TUIApp:
         - Session usage (token/cost tracking)
         """
         self._output_lines.clear()
-        # Reset cache
-        self._output_cache = ""
+        # Reset virtual viewport state
+        self._block_line_counts.clear()
         self._output_ansi_cache = None
-        self._output_cache_valid = True
+        self._viewport_cache_key = None
+        self._output_generation = 0
         self._total_line_count = 0
+        self._scroll_offset = 0
         # Reset streaming state
         self._streaming_text = ""
         self._streaming_line_index = None
@@ -1804,9 +1883,6 @@ class TUIApp:
         self._last_run = None
         # Reset status bar context (but keep usage)
         self._current_context_tokens = 0
-        # Reset scroll position to top
-        if self._output_window:
-            self._output_window.vertical_scroll = 0
         # Show help after clear
         self._show_help()
 
@@ -1964,24 +2040,25 @@ class TUIApp:
 
             def mouse_handler(self, mouse_event: MouseEvent) -> object:
                 """Handle mouse scroll events."""
-                if tui_ref._output_window:
-                    if mouse_event.event_type == MouseEventType.SCROLL_UP:
-                        tui_ref._output_window.vertical_scroll = max(0, tui_ref._output_window.vertical_scroll - 3)
-                        return None
-                    elif mouse_event.event_type == MouseEventType.SCROLL_DOWN:
-                        max_scroll = tui_ref._get_max_scroll()
-                        new_scroll = tui_ref._output_window.vertical_scroll + 3
-                        tui_ref._output_window.vertical_scroll = min(new_scroll, max_scroll)
-                        return None
+                if mouse_event.event_type == MouseEventType.SCROLL_UP:
+                    tui_ref._scroll_offset = max(0, tui_ref._scroll_offset - 3)
+                    if tui_ref._app:
+                        tui_ref._app.invalidate()
+                    return None
+                elif mouse_event.event_type == MouseEventType.SCROLL_DOWN:
+                    max_scroll = tui_ref._get_max_scroll()
+                    tui_ref._scroll_offset = min(tui_ref._scroll_offset + 3, max_scroll)
+                    if tui_ref._app:
+                        tui_ref._app.invalidate()
+                    return None
                 return super().mouse_handler(mouse_event)
 
-        # Create output control and window
+        # Create output control and window (no ScrollablePane - virtual viewport handles scrolling)
         output_control = ScrollableFormattedTextControl(self._get_output_text)
-        output_inner_window = Window(
+        output_window = Window(
             content=output_control,
             wrap_lines=False,
         )
-        self._output_window = ScrollablePane(output_inner_window)
 
         # Steering pane
         steering_control = FormattedTextControl(self._get_steering_text)
@@ -2048,7 +2125,7 @@ class TUIApp:
         # Layout: Output | Steering | Status | Input
         layout = Layout(
             HSplit([
-                self._output_window,
+                output_window,
                 steering_window,
                 status_bar,
                 input_area,
@@ -2075,6 +2152,8 @@ class TUIApp:
             # Re-raise to be caught by cli.py with proper error display
             raise RuntimeError(f"TUI crashed: {e}") from e
         finally:
+            # Log performance report on shutdown
+            perf_log_report()
             # Ensure agent task is fully cancelled and awaited before __aexit__
             # This prevents async generator cleanup issues with MCP servers
             if self._agent_task and not self._agent_task.done():

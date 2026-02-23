@@ -15,7 +15,7 @@ lint: ## Lint the code
 cli: ## Run the CLI
 	@echo "🚀 Running paintress-cli CLI"
 	@./scripts/sync-skills.sh
-	@rm -f paintress.log && uv run paintress-cli -v
+	@rm -f paintress.log && PAINTRESS_PERF=1 uv run paintress-cli -v
 
 .PHONY: check
 check: ## Run code quality tools.

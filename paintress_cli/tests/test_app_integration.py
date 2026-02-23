@@ -141,18 +141,18 @@ def test_tui_app_mode_switch_no_change_when_same():
 
 
 def test_tui_app_output_cache_invalidation():
-    """Test output cache is invalidated properly."""
+    """Test output generation counter is bumped on invalidation."""
     config = MockConfig()
     config_manager = MockConfigManager()
 
     app = TUIApp(config=config, config_manager=config_manager)
 
-    # Initial state - cache is valid (empty)
-    assert app._output_cache_valid is True
+    # Initial state - generation is 0
+    assert app._output_generation == 0
 
-    # Invalidate cache
+    # Invalidate cache bumps generation
     app._invalidate_output_cache()
-    assert app._output_cache_valid is False
+    assert app._output_generation == 1
 
 
 def test_tui_app_append_output():
@@ -169,7 +169,9 @@ def test_tui_app_append_output():
     assert len(app._output_lines) == 2
     assert app._output_lines[0] == "Line 1"
     assert app._output_lines[1] == "Line 2"
-    assert app._output_cache_valid is False
+    assert app._output_generation > 0
+    assert len(app._block_line_counts) == 2
+    assert app._total_line_count == 2
 
 
 def test_tui_app_output_line_limit():
@@ -189,6 +191,152 @@ def test_tui_app_output_line_limit():
     # Oldest lines should be removed
     assert app._output_lines[0] == "Line 5"
     assert app._output_lines[-1] == "Line 14"
+
+
+# =============================================================================
+# Virtual Viewport Tests
+# =============================================================================
+
+
+def test_get_visible_text_single_block():
+    """Test _get_visible_text with a single block fully visible."""
+    config = MockConfig()
+    config_manager = MockConfigManager()
+
+    app = TUIApp(config=config, config_manager=config_manager)
+    app._append_output("line1\nline2\nline3")
+
+    # Request all 3 lines
+    result = app._get_visible_text(0, 3)
+    assert result == "line1\nline2\nline3"
+
+
+def test_get_visible_text_partial_block():
+    """Test _get_visible_text slicing into the middle of a block."""
+    config = MockConfig()
+    config_manager = MockConfigManager()
+
+    app = TUIApp(config=config, config_manager=config_manager)
+    app._append_output("a\nb\nc\nd\ne")  # 5 lines
+
+    # Request lines 1-3 (0-indexed display lines)
+    result = app._get_visible_text(1, 4)
+    assert result == "b\nc\nd"
+
+
+def test_get_visible_text_across_blocks():
+    """Test _get_visible_text spanning multiple blocks."""
+    config = MockConfig()
+    config_manager = MockConfigManager()
+
+    app = TUIApp(config=config, config_manager=config_manager)
+    app._append_output("block0-line0\nblock0-line1")  # 2 lines
+    app._append_output("block1-line0")  # 1 line
+    app._append_output("block2-line0\nblock2-line1\nblock2-line2")  # 3 lines
+
+    # Total: 6 lines. Request lines 1-4 (crosses block boundary)
+    result = app._get_visible_text(1, 5)
+    assert "block0-line1" in result
+    assert "block1-line0" in result
+    assert "block2-line0" in result
+    assert "block2-line1" in result
+
+
+def test_get_visible_text_empty():
+    """Test _get_visible_text with no content."""
+    config = MockConfig()
+    config_manager = MockConfigManager()
+
+    app = TUIApp(config=config, config_manager=config_manager)
+    result = app._get_visible_text(0, 10)
+    assert result == ""
+
+
+def test_get_visible_text_beyond_range():
+    """Test _get_visible_text when range exceeds available content."""
+    config = MockConfig()
+    config_manager = MockConfigManager()
+
+    app = TUIApp(config=config, config_manager=config_manager)
+    app._append_output("only-line")
+
+    # Request way beyond what exists
+    result = app._get_visible_text(0, 100)
+    assert result == "only-line"
+
+
+def test_update_block_line_count_tracking():
+    """Test _update_block maintains correct line counts."""
+    config = MockConfig()
+    config_manager = MockConfigManager()
+
+    app = TUIApp(config=config, config_manager=config_manager)
+    app._append_output("one-line")  # 1 line
+    app._append_output("another")  # 1 line
+
+    assert app._total_line_count == 2
+    assert app._block_line_counts == [1, 1]
+
+    # Update first block to have 3 lines
+    app._update_block(0, "line1\nline2\nline3")
+    assert app._block_line_counts[0] == 3
+    assert app._total_line_count == 4  # 3 + 1
+    assert app._output_lines[0] == "line1\nline2\nline3"
+
+
+def test_update_block_out_of_range():
+    """Test _update_block silently ignores invalid index."""
+    config = MockConfig()
+    config_manager = MockConfigManager()
+
+    app = TUIApp(config=config, config_manager=config_manager)
+    app._append_output("content")
+
+    prev_gen = app._output_generation
+    prev_count = app._total_line_count
+
+    # Should not crash or change state
+    app._update_block(99, "new-content")
+    assert app._output_generation == prev_gen
+    assert app._total_line_count == prev_count
+
+
+def test_append_block_bookkeeping():
+    """Test _append_block maintains all counters consistently."""
+    config = MockConfig()
+    config_manager = MockConfigManager()
+
+    app = TUIApp(config=config, config_manager=config_manager)
+    assert app._output_generation == 0
+    assert app._total_line_count == 0
+
+    app._append_block("a\nb")  # 2 lines
+    assert app._output_generation == 1
+    assert app._total_line_count == 2
+    assert len(app._block_line_counts) == 1
+    assert app._block_line_counts[0] == 2
+
+    app._append_block("c")  # 1 line
+    assert app._output_generation == 2
+    assert app._total_line_count == 3
+    assert len(app._block_line_counts) == 2
+
+
+def test_output_trimming_preserves_line_counts():
+    """Test that trimming old blocks keeps line counts in sync."""
+    config = MockConfig()
+    config_manager = MockConfigManager()
+
+    app = TUIApp(config=config, config_manager=config_manager)
+    app._max_output_lines = 3
+
+    app._append_output("a\nb")  # 2 lines, block count [2]
+    app._append_output("c")  # 1 line, block count [2, 1]
+    app._append_output("d\ne\nf")  # 3 lines, block count [2, 1, 3] -> trim -> [1, 3]
+
+    # After trim: first block (2 lines) removed
+    assert len(app._output_lines) == len(app._block_line_counts)
+    assert app._total_line_count == sum(app._block_line_counts)
 
 
 # =============================================================================

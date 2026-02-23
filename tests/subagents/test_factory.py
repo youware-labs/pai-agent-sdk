@@ -2,8 +2,16 @@
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+from pydantic_ai import Agent, RunContext
+
+from pai_agent_sdk.context import AgentContext
+from pai_agent_sdk.environment.local import LocalEnvironment
 from pai_agent_sdk.subagents import SubagentConfig, create_subagent_tool_from_config
 from pai_agent_sdk.toolsets.core.base import BaseTool, Toolset
+from pai_agent_sdk.toolsets.core.subagent.factory import create_subagent_call_func
 
 
 class GrepTool(BaseTool):
@@ -326,3 +334,94 @@ class TestModelCfgResolution:
 
         tool_cls = create_subagent_tool_from_config(config, parent_toolset, model="test")
         assert tool_cls is not None
+
+
+# =============================================================================
+# Agent registry cleanup on failure tests
+# =============================================================================
+
+
+@pytest.fixture
+async def async_agent_context(tmp_path):
+    """Create an async AgentContext for tests that need create_subagent_context."""
+    async with LocalEnvironment(
+        allowed_paths=[tmp_path],
+        default_path=tmp_path,
+        tmp_base_dir=tmp_path,
+    ) as env:
+        async with AgentContext(env=env) as ctx:
+            yield ctx
+
+
+async def test_agent_registry_cleaned_up_on_new_agent_failure(async_agent_context: AgentContext) -> None:
+    """Agent registry should not have ghost entries when a new subagent fails."""
+    agent: Agent[AgentContext, str] = Agent(
+        model="test",
+        system_prompt="You are a test agent",
+        name="failing_agent",
+    )
+    call_func = create_subagent_call_func(agent)
+
+    mock_ctx = MagicMock(spec=RunContext)
+    mock_ctx.deps = async_agent_context
+    mock_ctx.tool_call_id = "test-tool-call"
+
+    mock_self = MagicMock(spec=BaseTool)
+
+    with patch(
+        "pai_agent_sdk.toolsets.core.subagent.factory._run_subagent_iter",
+        new_callable=AsyncMock,
+        side_effect=RuntimeError("Model API failed"),
+    ):
+        with pytest.raises(RuntimeError, match="Model API failed"):
+            await call_func(mock_self, mock_ctx, "test prompt")
+
+    # agent_registry should NOT contain a ghost entry
+    assert len(async_agent_context.agent_registry) == 0
+    # subagent_history should also be empty
+    assert len(async_agent_context.subagent_history) == 0
+
+
+async def test_agent_registry_preserved_on_resume_agent_failure(async_agent_context: AgentContext) -> None:
+    """Agent registry entry should be preserved when a resumed subagent fails.
+
+    If the agent was already registered (e.g., from a previous successful call),
+    the registry entry should not be removed even on failure, since the agent
+    has valid history from before.
+    """
+    agent: Agent[AgentContext, str] = Agent(
+        model="test",
+        system_prompt="You are a test agent",
+        name="resume_agent",
+    )
+    call_func = create_subagent_call_func(agent)
+
+    mock_ctx = MagicMock(spec=RunContext)
+    mock_ctx.deps = async_agent_context
+    mock_ctx.tool_call_id = "test-tool-call"
+
+    mock_self = MagicMock(spec=BaseTool)
+
+    # Pre-populate agent_registry to simulate a previously successful call
+    from pai_agent_sdk.context import AgentInfo
+
+    agent_id = "resume_agent-abcd"
+    async_agent_context.agent_registry[agent_id] = AgentInfo(
+        agent_id=agent_id,
+        agent_name="resume_agent",
+        parent_agent_id=None,
+    )
+    # Also populate subagent_history to simulate prior success
+    async_agent_context.subagent_history[agent_id] = []
+
+    with patch(
+        "pai_agent_sdk.toolsets.core.subagent.factory._run_subagent_iter",
+        new_callable=AsyncMock,
+        side_effect=RuntimeError("Model API failed on resume"),
+    ):
+        with pytest.raises(RuntimeError, match="Model API failed on resume"):
+            await call_func(mock_self, mock_ctx, "continue work", agent_id)
+
+    # agent_registry should still contain the entry (not cleaned up for resume)
+    assert agent_id in async_agent_context.agent_registry
+    assert async_agent_context.agent_registry[agent_id].agent_name == "resume_agent"

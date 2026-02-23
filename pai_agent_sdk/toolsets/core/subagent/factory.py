@@ -238,6 +238,9 @@ def create_subagent_call_func(
             short_id = generate_unique_id(deps.subagent_history)
             agent_id = f"{agent_name}-{short_id}"
 
+        # Track whether this is a new agent (not a resume) for cleanup on failure
+        is_new_agent = agent_id not in deps.agent_registry
+
         # Create subagent context (handles registration in agent_registry)
         override_kwargs: dict[str, Any] = {}
         if model_cfg is not None:
@@ -290,6 +293,11 @@ def create_subagent_call_func(
             except Exception as e:
                 success = False
                 error_msg = str(e)
+                # Clean up agent_registry for new agents that failed before
+                # producing any history, to avoid ghost entries that show up
+                # in known-subagents and SubagentInfoTool with no history.
+                if is_new_agent and agent_id not in deps.subagent_history:
+                    deps.agent_registry.pop(agent_id, None)
                 raise
 
             finally:

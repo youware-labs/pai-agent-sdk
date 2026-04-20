@@ -1,6 +1,6 @@
 ---
 name: cli-config
-description: Guide for configuring Paintress CLI. Use this skill when users want to configure models, tools, subagents, custom commands, or other CLI settings. Covers both global and project-level configuration.
+description: "Configure Paintress CLI settings including model providers, tool approval rules, MCP server connections, subagent definitions, and custom slash commands. Covers global (~/.config/youware-labs/paintress-cli/) and project-level (.paintress/) configuration with TOML and JSON files. Use when setting up a new project, adding model providers, defining subagent roles, creating custom commands, configuring tool permissions, connecting MCP servers, or troubleshooting CLI configuration."
 ---
 
 # Paintress CLI Configuration
@@ -176,4 +176,9 @@ TUI settings can be overridden via `PAINTRESS_*` environment variables:
 
 ## Quick Setup
 
-Run `paintress setup` to initialize global configuration with defaults.
+1. Run `paintress setup` to initialize global configuration with defaults
+2. Verify config loaded: check `~/.config/youware-labs/paintress-cli/config.toml` exists
+3. For project overrides: create `.paintress/` directory in project root
+4. Test with `paintress` — a successful launch confirms configuration is valid
+
+**Common errors:** Invalid TOML syntax causes silent fallback to defaults. If settings appear ignored, validate TOML syntax first.

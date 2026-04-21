@@ -1,8 +1,0 @@
-{
-  "repo": "youware-labs/pai-agent-sdk",
-  "skills": [
-    { "name": "skill-creator", "before": 61, "after": 88 },
-    { "name": "cli-config", "before": 87, "after": 92 },
-    { "name": "agent-builder", "before": 89, "after": 89 }
-  ]
-}

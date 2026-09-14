@@ -69,6 +69,7 @@ from pai_agent_sdk.toolsets.core.base import BaseTool
 from pydantic_ai import RunContext
 from pai_agent_sdk.context import AgentContext
 
+
 class MyTool(BaseTool):
     name = "my_tool"
     description = "Does something useful"
@@ -91,6 +92,7 @@ with open("session.json", "w") as f:
 
 # Restore
 from pai_agent_sdk.context import ResumableState
+
 state = ResumableState.model_validate_json(open("session.json").read())
 
 async with create_agent("openai:gpt-4o", state=state) as runtime:
@@ -161,14 +163,19 @@ Handle real-time events with lifecycle hooks:
 from pai_agent_sdk.agents import stream_agent
 from pai_agent_sdk.stream import AgentStartContext, AgentCompleteContext
 
+
 async def on_start(ctx: AgentStartContext):
     print(f"Agent started with prompt: {ctx.user_prompt}")
+
 
 async def on_complete(ctx: AgentCompleteContext):
     print(f"Agent completed in {ctx.duration_ms}ms")
 
+
 async with stream_agent(
-    runtime.agent, "Hello", runtime.ctx,
+    runtime.agent,
+    "Hello",
+    runtime.ctx,
     on_agent_start=on_start,
     on_agent_complete=on_complete,
 ) as stream:
@@ -206,6 +213,7 @@ Full guide: [docs/message-bus.md](docs/message-bus.md)
 ```python
 # Native pydantic-ai format
 "openai:gpt-4o"
+
 "anthropic:claude-sonnet-4"
 "gemini:gemini-1.5-pro"
 

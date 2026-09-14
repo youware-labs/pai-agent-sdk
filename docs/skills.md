@@ -160,13 +160,13 @@ from pai_agent_sdk.toolsets.skills import SkillToolset, PreScanHook
 from pai_agent_sdk.context import AgentContext
 from pydantic_ai import RunContext
 
+
 # Sync hook
-def sync_hook(toolset: SkillToolset, ctx: RunContext[AgentContext]) -> None:
-    ...
+def sync_hook(toolset: SkillToolset, ctx: RunContext[AgentContext]) -> None: ...
+
 
 # Async hook
-async def async_hook(toolset: SkillToolset, ctx: RunContext[AgentContext]) -> None:
-    ...
+async def async_hook(toolset: SkillToolset, ctx: RunContext[AgentContext]) -> None: ...
 ```
 
 ### Hook Parameters
@@ -182,6 +182,7 @@ async def async_hook(toolset: SkillToolset, ctx: RunContext[AgentContext]) -> No
 from pathlib import Path
 import shutil
 from importlib import resources
+
 
 def sync_builtin_skills(toolset: SkillToolset, ctx: RunContext[AgentContext]) -> None:
     """Copy builtin skills to config directory before scanning."""
@@ -220,6 +221,7 @@ skill_toolset = SkillToolset(pre_scan_hook=sync_builtin_skills)
 
 ```python
 import httpx
+
 
 async def download_skills(toolset: SkillToolset, ctx: RunContext[AgentContext]) -> None:
     """Download skills from remote registry."""

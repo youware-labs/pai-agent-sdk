@@ -53,11 +53,11 @@ Extends `pai_agent_sdk.events.AgentEvent` to carry log information:
 ```python
 @dataclass
 class LogEvent(AgentEvent):
-    level: str = "INFO"        # DEBUG, INFO, WARNING, ERROR, CRITICAL
-    logger_name: str = ""       # e.g., "paintress_cli.session"
-    message: str = ""           # Formatted log message
-    func_name: str = ""         # Function where log was called
-    line_no: int = 0            # Line number
+    level: str = "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    logger_name: str = ""  # e.g., "paintress_cli.session"
+    message: str = ""  # Formatted log message
+    func_name: str = ""  # Function where log was called
+    line_no: int = 0  # Line number
 ```
 
 ### QueueHandler

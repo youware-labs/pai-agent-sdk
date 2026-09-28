@@ -45,6 +45,7 @@ flowchart LR
 ```python
 from agent_environment import BaseResource
 
+
 class BrowserSession(BaseResource):
     def __init__(self, browser: Browser):
         self._browser = browser
@@ -72,6 +73,7 @@ For resources that don't need state persistence, just implement `close()`:
 class DatabasePool(BaseResource):
     async def close(self) -> None:
         await self._pool.close()
+
     # export_state/restore_state use defaults (empty dict / no-op)
 ```
 
@@ -110,6 +112,7 @@ class ProcessManager(BaseResource):
     def get_toolsets(self) -> list[Any]:
         """Return process management tools."""
         from my_app.toolsets import ProcessToolset
+
         return [ProcessToolset(self)]
 
     async def get_context_instructions(self) -> str | None:
@@ -160,11 +163,13 @@ Factory functions receive the `Environment` instance:
 ```python
 from agent_environment import Environment
 
+
 async def create_browser(env: Environment) -> BrowserSession:
     return BrowserSession(
         file_operator=env.file_operator,
         tmp_dir=env.tmp_dir,
     )
+
 
 async with LocalEnvironment() as env:
     env.resources.register_factory("browser", create_browser)
@@ -191,9 +196,7 @@ async with LocalEnvironment(
 ### Chaining API
 
 ```python
-env = (LocalEnvironment()
-    .with_resource_factory("browser", create_browser)
-    .with_resource_state(state))
+env = LocalEnvironment().with_resource_factory("browser", create_browser).with_resource_state(state)
 ```
 
 ## ResourceRegistry API

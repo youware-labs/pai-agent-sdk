@@ -148,9 +148,7 @@ async def _request_user_action(
     if not deferred.approvals:
         return results
 
-    self._append_system_output(
-        f"[Tool approval required: {len(deferred.approvals)} tool(s)]"
-    )
+    self._append_system_output(f"[Tool approval required: {len(deferred.approvals)} tool(s)]")
 
     for idx, tool_call in enumerate(deferred.approvals, 1):
         # Display approval panel
@@ -163,12 +161,8 @@ async def _request_user_action(
             results.approvals[tool_call.tool_call_id] = True
             self._append_system_output(f"Approved: {tool_call.tool_name}")
         else:
-            results.approvals[tool_call.tool_call_id] = ToolDenied(
-                decision.reason or "User rejected"
-            )
-            self._append_system_output(
-                f"Rejected: {tool_call.tool_name} - {decision.reason}"
-            )
+            results.approvals[tool_call.tool_call_id] = ToolDenied(decision.reason or "User rejected")
+            self._append_system_output(f"Rejected: {tool_call.tool_name} - {decision.reason}")
 
     return results
 ```
@@ -183,6 +177,7 @@ class ApprovalDecision:
     approved: bool
     reason: str | None = None
 
+
 async def _wait_for_approval_input(self) -> ApprovalDecision:
     """Block until user provides approval decision."""
     self._approval_event = asyncio.Event()
@@ -192,6 +187,7 @@ async def _wait_for_approval_input(self) -> ApprovalDecision:
     await self._approval_event.wait()
 
     return self._approval_result or ApprovalDecision(approved=False, reason="No input")
+
 
 # In key bindings:
 @kb.add("enter")

@@ -50,10 +50,7 @@ elif isinstance(event, ToolCallsStartEvent):
     self._agent_phase = "tools"
 
 # In status bar rendering
-phase_display = {
-    "thinking": "Thinking...",
-    "tools": "Running tools..."
-}.get(self._agent_phase, "Running...")
+phase_display = {"thinking": "Thinking...", "tools": "Running tools..."}.get(self._agent_phase, "Running...")
 ```
 
 **Status Bar Display:**
@@ -73,11 +70,13 @@ These events are emitted by tools/agents for UI feedback:
 class CompactStartEvent(AgentEvent):
     message_count: int
 
+
 @dataclass
 class CompactCompleteEvent(AgentEvent):
     summary_markdown: str
     original_message_count: int
     compacted_message_count: int
+
 
 @dataclass
 class CompactFailedEvent(AgentEvent):
@@ -92,10 +91,12 @@ class CompactFailedEvent(AgentEvent):
 class HandoffStartEvent(AgentEvent):
     message_count: int
 
+
 @dataclass
 class HandoffCompleteEvent(AgentEvent):
     handoff_content: str
     original_message_count: int
+
 
 @dataclass
 class HandoffFailedEvent(AgentEvent):
@@ -111,6 +112,7 @@ class SubagentStartEvent(AgentEvent):
     agent_id: str
     agent_name: str
     prompt_preview: str
+
 
 @dataclass
 class SubagentCompleteEvent(AgentEvent):
@@ -129,6 +131,7 @@ class SubagentCompleteEvent(AgentEvent):
 @dataclass
 class MessageReceivedEvent(AgentEvent):
     """Emitted when steering messages are injected."""
+
     messages: list[BusMessageInfo]
 ```
 
@@ -190,8 +193,8 @@ When subagents are active, events carry `agent_id` and `agent_name`:
 ```python
 @dataclass
 class StreamEvent:
-    agent_id: str      # e.g., "explorer-a7b9"
-    agent_name: str    # e.g., "explorer"
+    agent_id: str  # e.g., "explorer-a7b9"
+    agent_name: str  # e.g., "explorer"
     event: AgentStreamEvent
 ```
 

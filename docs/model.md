@@ -142,10 +142,7 @@ Naming convention: `{GATEWAY_NAME}_API_KEY` and `{GATEWAY_NAME}_BASE_URL`
 For session affinity scenarios, pass `extra_headers`:
 
 ```python
-model = infer_model(
-    "mygateway@gemini:gemini-1.5-pro",
-    extra_headers={"x-session-id": "unique-session-id"}
-)
+model = infer_model("mygateway@gemini:gemini-1.5-pro", extra_headers={"x-session-id": "unique-session-id"})
 ```
 
 **Note**: `extra_headers` only applies to Gateway mode, primarily for providers like `gemini` and `bedrock` that require header injection via http_client.
@@ -156,10 +153,7 @@ model = infer_model(
 from pydantic_ai import Agent
 from pai_agent_sdk.agents.models import infer_model
 
-agent = Agent(
-    model=infer_model("mygateway@openai:gpt-4o"),
-    system_prompt="You are a helpful assistant."
-)
+agent = Agent(model=infer_model("mygateway@openai:gpt-4o"), system_prompt="You are a helpful assistant.")
 ```
 
 ## References

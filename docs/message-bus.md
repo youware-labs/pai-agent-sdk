@@ -35,32 +35,40 @@ from pai_agent_sdk.context import AgentContext, BusMessage
 
 async with AgentContext(env=env) as ctx:
     # Targeted message to main agent
-    ctx.send_message(BusMessage(
-        content="Focus on security issues",
-        source="user",
-        target="main",
-    ))
+    ctx.send_message(
+        BusMessage(
+            content="Focus on security issues",
+            source="user",
+            target="main",
+        )
+    )
 
     # Broadcast to all subscribers
-    ctx.send_message(BusMessage(
-        content="System alert",
-        source="monitor",
-    ))
+    ctx.send_message(
+        BusMessage(
+            content="System alert",
+            source="monitor",
+        )
+    )
 
     # With template formatting
-    ctx.send_message(BusMessage(
-        content="Stop current task",
-        source="user",
-        target="main",
-        template="[URGENT] {{ content }}",
-    ))
+    ctx.send_message(
+        BusMessage(
+            content="Stop current task",
+            source="user",
+            target="main",
+            template="[URGENT] {{ content }}",
+        )
+    )
 
     # With explicit ID for idempotent send
-    ctx.send_message(BusMessage(
-        id="unique-id-123",
-        content="Important message",
-        source="user",
-    ))
+    ctx.send_message(
+        BusMessage(
+            id="unique-id-123",
+            content="Important message",
+            source="user",
+        )
+    )
 ```
 
 ### Subscriber Lifecycle
@@ -170,14 +178,18 @@ from pai_agent_sdk.context import BusMessage
 
 runtime = create_agent("openai:gpt-4o")
 
+
 async def on_user_input(text: str):
     """Called when user types during agent execution."""
     # Always send to main agent
-    runtime.ctx.send_message(BusMessage(
-        content=text,
-        source="user",
-        target="main",
-    ))
+    runtime.ctx.send_message(
+        BusMessage(
+            content=text,
+            source="user",
+            target="main",
+        )
+    )
+
 
 async with stream_agent(runtime, "Analyze this codebase") as streamer:
     async for event in streamer:
@@ -190,17 +202,21 @@ Coordinate between main agent and subagents:
 
 ```python
 # Main agent sends task to subagent
-ctx.send_message(BusMessage(
-    content="Check for memory leaks",
-    source="main",
-    target="debugger-a7b9",
-))
+ctx.send_message(
+    BusMessage(
+        content="Check for memory leaks",
+        source="main",
+        target="debugger-a7b9",
+    )
+)
 
 # Broadcast alert to all active agents
-ctx.send_message(BusMessage(
-    content="Low memory warning",
-    source="monitor",
-))
+ctx.send_message(
+    BusMessage(
+        content="Low memory warning",
+        source="monitor",
+    )
+)
 ```
 
 ## Filter Integration
@@ -234,9 +250,9 @@ async for event in streamer:
 
 ```python
 class BusMessage(BaseModel):
-    id: str           # Unique ID (auto-generated UUID if not provided)
-    content: str      # Message content
-    source: str       # Sender identifier
+    id: str  # Unique ID (auto-generated UUID if not provided)
+    content: str  # Message content
+    source: str  # Sender identifier
     target: str | None = None  # Recipient (None = broadcast)
     template: str | None = None  # Jinja2 template
     timestamp: datetime  # Creation time (auto-set)

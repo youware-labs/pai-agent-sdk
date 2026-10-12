@@ -15,10 +15,11 @@ All events inherit from `AgentEvent` and are delivered via `StreamEvent` wrapper
 from pai_agent_sdk.context import StreamEvent
 from pai_agent_sdk.events import AgentEvent
 
+
 @dataclass
 class StreamEvent:
-    agent_id: str      # Unique agent identifier
-    agent_name: str    # Human-readable agent name
+    agent_id: str  # Unique agent identifier
+    agent_name: str  # Human-readable agent name
     event: AgentEvent  # The actual event
 ```
 
@@ -209,10 +210,13 @@ Create custom events by subclassing `AgentEvent`:
 from dataclasses import dataclass
 from pai_agent_sdk.events import AgentEvent
 
+
 @dataclass
 class MyCustomEvent(AgentEvent):
     """Custom event for my feature."""
+
     custom_field: str = ""
+
 
 # Emit via context
 await ctx.emit_event(MyCustomEvent(event_id="custom-001", custom_field="value"))
@@ -234,6 +238,7 @@ from pai_agent_sdk.events import LifecycleEvent
 #     | ToolCallsStartEvent
 #     | ToolCallsCompleteEvent
 # )
+
 
 def handle_lifecycle(event: LifecycleEvent) -> None:
     match event:

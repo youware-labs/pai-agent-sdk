@@ -85,9 +85,11 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Callable, Awaitable
 
+
 @dataclass
 class ProcessInfo:
     """Public information about a managed process."""
+
     process_id: str
     command: str
     args: list[str]
@@ -96,9 +98,11 @@ class ProcessInfo:
     is_running: bool
     exit_code: int | None = None
 
+
 @dataclass
 class ManagedProcess:
     """Internal process wrapper with management capabilities."""
+
     process_id: str
     command: str
     args: list[str]
@@ -195,6 +199,7 @@ class ProcessManager:
 
         # Prepare environment
         import os
+
         full_env = os.environ.copy()
         if env:
             full_env.update(env)
@@ -221,23 +226,21 @@ class ProcessManager:
 
         # Emit start event
         if self._event_bus:
-            await self._event_bus.emit(ProcessStartedEvent(
-                process_id=proc_id,
-                command=f"{command} {' '.join(args)}",
-                pid=process.pid,
-            ))
+            await self._event_bus.emit(
+                ProcessStartedEvent(
+                    process_id=proc_id,
+                    command=f"{command} {' '.join(args)}",
+                    pid=process.pid,
+                )
+            )
 
         # Start output streaming tasks
         if capture_output:
             if process.stdout:
-                stdout_task = asyncio.create_task(
-                    self._stream_output(managed, process.stdout, is_stderr=False)
-                )
+                stdout_task = asyncio.create_task(self._stream_output(managed, process.stdout, is_stderr=False))
                 managed._output_tasks.append(stdout_task)
             if process.stderr:
-                stderr_task = asyncio.create_task(
-                    self._stream_output(managed, process.stderr, is_stderr=True)
-                )
+                stderr_task = asyncio.create_task(self._stream_output(managed, process.stderr, is_stderr=True))
                 managed._output_tasks.append(stderr_task)
 
         # Start exit monitor
@@ -256,11 +259,13 @@ class ProcessManager:
             async for line in stream:
                 decoded = line.decode("utf-8", errors="replace").rstrip()
                 if self._event_bus and decoded:
-                    await self._event_bus.emit(ProcessOutputEvent(
-                        process_id=managed.process_id,
-                        output=decoded,
-                        is_stderr=is_stderr,
-                    ))
+                    await self._event_bus.emit(
+                        ProcessOutputEvent(
+                            process_id=managed.process_id,
+                            output=decoded,
+                            is_stderr=is_stderr,
+                        )
+                    )
         except asyncio.CancelledError:
             pass
 
@@ -276,10 +281,12 @@ class ProcessManager:
                 pass
 
         if self._event_bus:
-            await self._event_bus.emit(ProcessExitedEvent(
-                process_id=managed.process_id,
-                exit_code=exit_code,
-            ))
+            await self._event_bus.emit(
+                ProcessExitedEvent(
+                    process_id=managed.process_id,
+                    exit_code=exit_code,
+                )
+            )
 
     async def kill(self, process_id: str, timeout: float = 5.0) -> bool:
         """Kill a specific process by ID."""
@@ -322,6 +329,7 @@ from typing import AsyncIterator
 
 from pai_agent_sdk.environment.local import LocalEnvironment
 from pai_agent_sdk.sandbox.browser.docker_ import DockerBrowserSandbox
+
 
 class TUIEnvironment(LocalEnvironment):
     """Extended environment for TUI with subprocess and browser support."""
@@ -430,6 +438,7 @@ class TUIEnvironment(LocalEnvironment):
 ```python
 from pai_agent_sdk.environment.local import LocalShell
 
+
 class TUIShell(LocalShell):
     """Shell with TUI event integration."""
 
@@ -456,11 +465,13 @@ class TUIShell(LocalShell):
         # Emit start event
         cmd_str = command if isinstance(command, str) else " ".join(command)
         if self._event_bus:
-            await self._event_bus.emit(ProcessStartedEvent(
-                process_id=exec_id,
-                command=cmd_str,
-                pid=0,  # Will be updated
-            ))
+            await self._event_bus.emit(
+                ProcessStartedEvent(
+                    process_id=exec_id,
+                    command=cmd_str,
+                    pid=0,  # Will be updated
+                )
+            )
 
         try:
             result = await super().execute(command, cwd=cwd, timeout=timeout, env=env)
@@ -468,33 +479,41 @@ class TUIShell(LocalShell):
             # Emit output events
             if self._event_bus:
                 if result.stdout:
-                    await self._event_bus.emit(ProcessOutputEvent(
-                        process_id=exec_id,
-                        output=result.stdout[:1000],  # Truncate for display
-                        is_stderr=False,
-                    ))
+                    await self._event_bus.emit(
+                        ProcessOutputEvent(
+                            process_id=exec_id,
+                            output=result.stdout[:1000],  # Truncate for display
+                            is_stderr=False,
+                        )
+                    )
                 if result.stderr:
-                    await self._event_bus.emit(ProcessOutputEvent(
-                        process_id=exec_id,
-                        output=result.stderr[:1000],
-                        is_stderr=True,
-                    ))
+                    await self._event_bus.emit(
+                        ProcessOutputEvent(
+                            process_id=exec_id,
+                            output=result.stderr[:1000],
+                            is_stderr=True,
+                        )
+                    )
 
             # Emit exit event
             if self._event_bus:
-                await self._event_bus.emit(ProcessExitedEvent(
-                    process_id=exec_id,
-                    exit_code=result.return_code,
-                ))
+                await self._event_bus.emit(
+                    ProcessExitedEvent(
+                        process_id=exec_id,
+                        exit_code=result.return_code,
+                    )
+                )
 
             return result
 
         except Exception as e:
             if self._event_bus:
-                await self._event_bus.emit(ProcessExitedEvent(
-                    process_id=exec_id,
-                    exit_code=-1,
-                ))
+                await self._event_bus.emit(
+                    ProcessExitedEvent(
+                        process_id=exec_id,
+                        exit_code=-1,
+                    )
+                )
             raise
 ```
 

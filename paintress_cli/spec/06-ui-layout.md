@@ -124,7 +124,7 @@ class StatusBarRenderer:
 
     def _format_tokens(self, tokens: int) -> str:
         if tokens >= 1000:
-            return f"{tokens/1000:.1f}k"
+            return f"{tokens / 1000:.1f}k"
         return str(tokens)
 ```
 
@@ -335,14 +335,13 @@ TUI_STYLES = {
     "mode_act": "bold green",
     "mode_plan": "bold yellow",
     "mode_fix": "bold red",
-    "usage_low": "green",      # < 50%
+    "usage_low": "green",  # < 50%
     "usage_medium": "yellow",  # 50-80%
-    "usage_high": "red",       # > 80%
+    "usage_high": "red",  # > 80%
     "timer": "dim",
     "browser_active": "green",
     "browser_error": "red",
     "steering_pending": "magenta",
-
     # Output
     "text": "white",
     "tool_call_header": "bold cyan",
@@ -350,19 +349,16 @@ TUI_STYLES = {
     "tool_result_header": "bold green",
     "tool_error": "bold red",
     "code": "white on #1e1e1e",
-
     # Agents
     "agent_main": "bold white",
     "agent_sub": "dim white",
     "agent_running": "bold yellow",
     "agent_done": "green",
     "agent_failed": "red",
-
     # Events
     "compact_event": "cyan",
     "handoff_event": "magenta",
     "steering_event": "yellow",
-
     # Input
     "prompt": "bold",
     "placeholder": "dim",
@@ -417,6 +413,7 @@ class LayoutManager:
 
     def _update_size(self) -> None:
         import shutil
+
         size = shutil.get_terminal_size()
         self._width = max(size.columns, self.MIN_WIDTH)
         self._height = size.lines

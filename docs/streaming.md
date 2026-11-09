@@ -60,6 +60,7 @@ async def build_prompt(runtime: AgentRuntime) -> str:
     content = await runtime.ctx.file_operator.read_file("context.md")
     return f"Based on this context:\n{content}\n\nAnswer the question."
 
+
 async with stream_agent(
     runtime,
     user_prompt_factory=build_prompt,
@@ -133,14 +134,18 @@ from pai_agent_sdk.agents.main import (
     EventHookContext,
 )
 
+
 async def pre_node(ctx: NodeHookContext) -> None:
     print(f"Starting node: {type(ctx.node).__name__}")
+
 
 async def post_node(ctx: NodeHookContext) -> None:
     print(f"Completed node: {type(ctx.node).__name__}")
 
+
 async def pre_event(ctx: EventHookContext) -> None:
     print(f"Event: {ctx.event}")
+
 
 async with stream_agent(
     runtime,

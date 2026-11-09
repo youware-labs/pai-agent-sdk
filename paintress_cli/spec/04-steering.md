@@ -87,9 +87,11 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Protocol
 
+
 @dataclass
 class SteeringMessage:
     """A steering message to be injected into agent context."""
+
     message_id: str
     prompt: str
     timestamp: datetime = field(default_factory=datetime.now)
@@ -161,6 +163,7 @@ The steering filter is a pydantic-ai history processor that injects steering mes
 ```python
 from pydantic_ai import ModelMessage, ModelRequest, UserPromptPart, RunContext
 
+
 def render_steering_messages(messages: list[SteeringMessage]) -> list[UserPromptPart]:
     """Render steering messages as user prompt parts."""
     prompts = "\n".join([m.prompt for m in messages])
@@ -218,10 +221,12 @@ async def inject_steering_message(
 
     # Emit event for TUI display
     if tui_ctx.event_bus:
-        await tui_ctx.event_bus.emit(SteeringInjectedEvent(
-            message_count=len(steering_messages),
-            preview=steering_messages[0].prompt[:100] if steering_messages else "",
-        ))
+        await tui_ctx.event_bus.emit(
+            SteeringInjectedEvent(
+                message_count=len(steering_messages),
+                preview=steering_messages[0].prompt[:100] if steering_messages else "",
+            )
+        )
 
     return message_history
 ```
@@ -282,16 +287,20 @@ from typing import Callable, Any
 from pai_agent_sdk.context import AgentContext, ModelConfig, ToolConfig
 from agent_environment import Environment
 
+
 class TUIState(str, Enum):
     """TUI application state."""
-    IDLE = "idle"        # Waiting for user input
+
+    IDLE = "idle"  # Waiting for user input
     RUNNING = "running"  # Agent is executing
+
 
 class TUIMode(str, Enum):
     """Agent execution mode."""
-    ACT = "act"    # Execute and implement
+
+    ACT = "act"  # Execute and implement
     PLAN = "plan"  # Plan and analyze
-    FIX = "fix"    # Debug and fix
+    FIX = "fix"  # Debug and fix
 
 
 class TUIContext(AgentContext):
@@ -360,12 +369,14 @@ class TUIContext(AgentContext):
 
         # Emit state change event
         if self.event_bus:
-            asyncio.create_task(self.event_bus.emit(
-                StateChangeEvent(
-                    old_state=old_state,
-                    new_state=new_state,
+            asyncio.create_task(
+                self.event_bus.emit(
+                    StateChangeEvent(
+                        old_state=old_state,
+                        new_state=new_state,
+                    )
                 )
-            ))
+            )
 
     def set_mode(self, mode: TUIMode) -> None:
         """Set the agent execution mode."""
@@ -387,7 +398,7 @@ class TUIContext(AgentContext):
             if not message.startswith(self._steering_config.prefix):
                 return None
             # Remove prefix
-            message = message[len(self._steering_config.prefix):].strip()
+            message = message[len(self._steering_config.prefix) :].strip()
 
         return await self.steering_manager.enqueue(message)
 
@@ -416,7 +427,7 @@ class TUIContext(AgentContext):
             model_cfg=sub_ctx.model_cfg,
             tool_config=sub_ctx.tool_config,
             event_bus=self.event_bus,  # Share event bus
-            steering_manager=None,      # No steering for subagents
+            steering_manager=None,  # No steering for subagents
             agent_stream_queues=self.agent_stream_queues,  # Share stream queues
             agent_registry=self.agent_registry,  # Share registry
         )

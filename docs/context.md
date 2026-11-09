@@ -94,6 +94,7 @@ with open("session.json", "w") as f:
 
 # Restore
 from pai_agent_sdk.context import ResumableState
+
 state = ResumableState.model_validate_json(Path("session.json").read_text())
 runtime = create_agent("openai:gpt-4", state=state)
 ```
@@ -154,6 +155,7 @@ caching, rate limiting, or cost tracking. The `wrapper_metadata` field and
 from pai_agent_sdk.context import AgentContext, ModelWrapper
 from pydantic_ai.models import Model
 
+
 # Sync wrapper (recommended for create_agent)
 def my_wrapper(model: Model, agent_name: str, context: dict[str, Any]) -> Model:
     """Wrap model with custom instrumentation.
@@ -171,6 +173,7 @@ def my_wrapper(model: Model, agent_name: str, context: dict[str, Any]) -> Model:
         parent_span_id=context.get("parent_run_id"),
         user_id=context.get("user_id"),
     )
+
 
 # Usage with custom wrapper_metadata
 runtime = create_agent(
@@ -201,6 +204,7 @@ ctx.wrapper_metadata["request_id"] = current_request.id
 ```python
 # Option 1: Set wrapper_metadata field (simple)
 ctx.wrapper_metadata = {"trace_id": "abc", "user_id": "123"}
+
 
 # Option 2: Override get_wrapper_metadata (advanced)
 class MyContext(AgentContext):
@@ -243,18 +247,24 @@ For full type safety, inherit from the config class and override the field in `A
 from pydantic import Field
 from pai_agent_sdk.context import AgentContext, ToolConfig, ModelConfig
 
+
 class MyToolConfig(ToolConfig):
     """Custom tool configuration with additional API keys."""
+
     my_service_api_key: str | None = None
     my_custom_setting: int = 100
 
+
 class MyModelConfig(ModelConfig):
     """Custom model configuration."""
+
     custom_threshold: float = 0.8
+
 
 class MyContext(AgentContext):
     tool_config: MyToolConfig = Field(default_factory=MyToolConfig)
     model_cfg: MyModelConfig = Field(default_factory=MyModelConfig)
+
 
 # Usage with create_agent
 runtime = create_agent(
@@ -313,6 +323,7 @@ class MyContext(AgentContext):
     def export_state(self) -> "MyState":
         base = super().export_state()
         return MyState(**base.model_dump(), custom_field=self.custom_field)
+
 
 class MyState(ResumableState):
     custom_field: str = ""

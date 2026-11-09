@@ -32,6 +32,7 @@ from pai_agent_sdk.toolsets.core.base import BaseTool
 from pydantic_ai import RunContext
 from pai_agent_sdk.context import AgentContext
 
+
 class MyCustomTool(BaseTool):
     name = "my_tool"
     description = "A custom tool example"
@@ -71,14 +72,16 @@ When multiple related tools share the same instruction, use `Instruction` with a
 ```python
 from pai_agent_sdk.toolsets import Instruction
 
+
 class TaskCreateTool(BaseTool):
     name = "task_create"
 
     def get_instruction(self, ctx):
         return Instruction(
             group="task-manager",  # Same group = deduplicated
-            content="Task manager guidelines..."
+            content="Task manager guidelines...",
         )
+
 
 class TaskListTool(BaseTool):
     name = "task_list"
@@ -86,7 +89,7 @@ class TaskListTool(BaseTool):
     def get_instruction(self, ctx):
         return Instruction(
             group="task-manager",  # Same group, only first one kept
-            content="Task manager guidelines..."
+            content="Task manager guidelines...",
         )
 ```
 

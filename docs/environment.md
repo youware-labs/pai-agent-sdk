@@ -140,6 +140,7 @@ Resources can provide their own toolsets via `get_toolsets()`. This enables bett
 ```python
 from agent_environment import BaseResource
 
+
 class ProcessManager(BaseResource):
     async def setup(self) -> None:
         """Async initialization after factory creation."""
@@ -179,6 +180,7 @@ Resources can be exported and restored across process restarts using factories.
 ```python
 from agent_environment import BaseResource
 
+
 class BrowserSession(BaseResource):
     def __init__(self, browser: Browser):
         self._browser = browser
@@ -208,11 +210,13 @@ Factory functions receive the `Environment` instance, allowing access to `file_o
 ```python
 from agent_environment import Environment
 
+
 async def create_browser(env: Environment) -> BrowserSession:
     return BrowserSession(
         file_operator=env.file_operator,
         tmp_dir=env.tmp_dir,
     )
+
 
 # First run: create and export
 async with LocalEnvironment() as env:
@@ -234,9 +238,7 @@ async with LocalEnvironment(
 ### Chaining API
 
 ```python
-env = (LocalEnvironment()
-    .with_resource_factory("browser", create_browser)
-    .with_resource_state(state))
+env = LocalEnvironment().with_resource_factory("browser", create_browser).with_resource_state(state)
 ```
 
 > Non-resumable resources (without `export_state`/`restore_state`) are silently skipped during export.

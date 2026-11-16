@@ -75,10 +75,9 @@ runtime = create_agent(
 ```python
 async def delegate(
     subagent_name: str,  # Name of subagent to call (e.g., "debugger", "explorer")
-    prompt: str,         # Task to delegate
+    prompt: str,  # Task to delegate
     agent_id: str | None = None,  # Optional ID to resume conversation
-) -> str:
-    ...
+) -> str: ...
 ```
 
 ### Key Benefits
@@ -231,7 +230,7 @@ Located in `pai_agent_sdk/subagents/presets/`:
 from pai_agent_sdk.subagents import (
     get_builtin_subagent_configs,
     load_builtin_unified_subagent_tool,  # Recommended
-    load_builtin_subagent_tools,         # Individual tools
+    load_builtin_subagent_tools,  # Individual tools
 )
 
 # Inspect configurations

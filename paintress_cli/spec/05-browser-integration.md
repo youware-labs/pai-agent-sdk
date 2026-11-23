@@ -138,15 +138,17 @@ class DockerBrowserConfig:
     """Additional Chrome arguments."""
 
     # Chrome flags for headless operation
-    default_chrome_args: list[str] = field(default_factory=lambda: [
-        "--headless=new",
-        "--disable-gpu",
-        "--no-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-setuid-sandbox",
-        "--disable-web-security",
-        "--allow-running-insecure-content",
-    ])
+    default_chrome_args: list[str] = field(
+        default_factory=lambda: [
+            "--headless=new",
+            "--disable-gpu",
+            "--no-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-setuid-sandbox",
+            "--disable-web-security",
+            "--allow-running-insecure-content",
+        ]
+    )
 ```
 
 ## BrowserUseToolset Integration
@@ -155,6 +157,7 @@ class DockerBrowserConfig:
 
 ```python
 from pai_agent_sdk.toolsets.browser_use import BrowserUseToolset
+
 
 async def create_browser_toolset(
     cdp_url: str,
@@ -251,16 +254,15 @@ async def _verify_external_browser(cdp_url: str) -> str:
             pass
         return cdp_url
     except Exception as e:
-        raise BrowserConnectionError(
-            f"Cannot connect to browser at {cdp_url}: {e}"
-        )
+        raise BrowserConnectionError(f"Cannot connect to browser at {cdp_url}: {e}")
 
 
 async def _is_docker_available() -> bool:
     """Check if Docker is available and running."""
     try:
         proc = await asyncio.create_subprocess_exec(
-            "docker", "info",
+            "docker",
+            "info",
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.DEVNULL,
         )
@@ -276,22 +278,31 @@ async def _is_docker_available() -> bool:
 ```python
 class BrowserError(Exception):
     """Base exception for browser operations."""
+
     pass
+
 
 class BrowserStartError(BrowserError):
     """Failed to start browser."""
+
     pass
+
 
 class BrowserConnectionError(BrowserError):
     """Failed to connect to browser."""
+
     pass
+
 
 class BrowserTimeoutError(BrowserError):
     """Browser operation timed out."""
+
     pass
+
 
 class DockerNotAvailableError(BrowserStartError):
     """Docker is not available for auto-start mode."""
+
     pass
 ```
 
@@ -320,9 +331,11 @@ async def setup_toolsets(
             # Log warning but continue without browser
             logger.warning(f"Browser toolset unavailable: {e}")
             if ctx.event_bus:
-                await ctx.event_bus.emit(BrowserUnavailableEvent(
-                    reason=str(e),
-                ))
+                await ctx.event_bus.emit(
+                    BrowserUnavailableEvent(
+                        reason=str(e),
+                    )
+                )
 
     return toolsets
 ```
@@ -369,7 +382,7 @@ When browser tools are active:
 # Docker run with network restrictions
 docker_args = [
     "--network=bridge",  # Default bridge network
-    "--cap-drop=ALL",    # Drop all capabilities
+    "--cap-drop=ALL",  # Drop all capabilities
     "--cap-add=SYS_ADMIN",  # Required for Chrome sandbox
     "--security-opt=no-new-privileges",
 ]
@@ -394,7 +407,8 @@ Browser data (cookies, localStorage) is ephemeral by default:
 # No volume mounts = data lost on container stop
 # For persistent data (optional):
 docker_args.extend([
-    "-v", f"{data_dir}:/data",
+    "-v",
+    f"{data_dir}:/data",
     "--user-data-dir=/data",
 ])
 ```
